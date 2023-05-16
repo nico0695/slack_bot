@@ -1,19 +1,37 @@
-import { Entity, BaseEntity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeorm"
+import {
+  Entity,
+  BaseEntity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+} from 'typeorm';
 
 @Entity()
 export class Users extends BaseEntity {
-    @PrimaryGeneratedColumn()
-    id: number
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @Column()
-    name: string
+  @Column({ default: '' })
+  username: string;
 
-    @Column()
-    phone: string
+  @Column()
+  name: string;
 
-    @Column()
-    email: string
+  @Column({ default: '' })
+  lastName: string;
 
-    @CreateDateColumn()
-    createdAt: Date
+  @Column()
+  phone: string;
+
+  @Column({ nullable: true })
+  email: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @Column({ default: '' })
+  slackTeamId: string;
+
+  @Column({ default: '' })
+  slackId: string;
 }

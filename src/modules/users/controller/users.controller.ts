@@ -28,7 +28,9 @@ export default class UsersController {
 
   public async createUser(req: any, res: any) {
     const dataUser: IUsers = {
+      username: req.body.username,
       name: req.body.name,
+      lastName: req.body.lastName,
       email: req.body.email,
       phone: req.body.phone,
     };

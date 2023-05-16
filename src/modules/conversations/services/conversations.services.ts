@@ -1,15 +1,26 @@
-import OpenaiRepository from '../repository/openai/openai.repository';
-import RedisRepository from '../repository/redis/redis.repository';
+import { GlobalConstants } from '../../../shared/constants/global';
+
+import UsersServices from '../../users/services/users.services';
+
+import OpenaiRepository from '../repositories/openai/openai.repository';
 import { roleTypes } from '../shared/constants/openai';
+
+import RedisRepository from '../repositories/redis/redis.repository';
+import { rConversationKey } from '../repositories/redis/redis.constatns';
+
 import { IConversation } from '../shared/interfaces/converstions';
 
 export default class ConversationsServices {
   #openaiRepository: OpenaiRepository;
   #redisRepository: RedisRepository;
 
+  #usersServices: UsersServices;
+
   constructor() {
     this.#openaiRepository = new OpenaiRepository();
     this.#redisRepository = new RedisRepository();
+
+    this.#usersServices = new UsersServices();
 
     this.generateConversation = this.generateConversation.bind(this);
   }
@@ -36,9 +47,7 @@ export default class ConversationsServices {
     channelId?: string
   ): Promise<string | null> => {
     try {
-      const conversationKey = channelId
-        ? `cb_${channelId}_${userId}`
-        : `cb_${userId}`;
+      const conversationKey = rConversationKey(userId, channelId);
 
       /** Get conversation */
       const conversationStored =
@@ -73,9 +82,7 @@ export default class ConversationsServices {
     channelId?: string
   ): Promise<boolean> => {
     try {
-      const conversationKey = channelId
-        ? `cb_${channelId}_${userId}`
-        : `cb_${userId}`;
+      const conversationKey = rConversationKey(userId, channelId);
 
       await this.#redisRepository.saveConversationMessages(conversationKey, []);
 
@@ -88,23 +95,37 @@ export default class ConversationsServices {
 
   showConversation = async (
     userId: string,
-    channelId?: string
+    channelId?: string,
+    teamId?: string
   ): Promise<string | null> => {
     try {
-      const conversationKey = channelId
-        ? `cb_${channelId}_${userId}`
-        : `cb_${userId}`;
+      const conversationKey = rConversationKey(userId, channelId);
 
+      /** Get conversation */
       const conversationStored =
         await this.#redisRepository.getConversationMessages(conversationKey);
 
       if (conversationStored.length === 0) return null;
 
+      const membersNames: { [key: string]: string } = {};
+
+      /** Get team members */
+      if (teamId) {
+        const teamMembers = await this.#usersServices.getUsersByTeamId(teamId);
+        if (teamMembers?.data) {
+          teamMembers.data.forEach((member) => {
+            membersNames[member.slackId] = member.name;
+          });
+        }
+      }
+
       return conversationStored
         .map((message) => {
-          return `${message.role === roleTypes.assistant ? 'bot' : userId}: ${
-            message.content
-          }`;
+          return `${
+            message.role === roleTypes.assistant
+              ? GlobalConstants.BOT_NAME
+              : membersNames[userId] ?? userId
+          }: ${message.content}`;
         })
         .join('\n');
     } catch (error) {

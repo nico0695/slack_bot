@@ -87,19 +87,16 @@ export default class ConversationsController {
    */
   public showConversation = async (data: any) => {
     console.log('### showConversation ###');
-    const { payload, say }: any = data;
+    const { payload, say, body }: any = data;
 
     try {
-      const message: string = payload.text;
+      const conversation = await this.#openaiServices.showConversation(
+        payload.user,
+        payload.channel,
+        body.team_id
+      );
 
-      if (message !== 'clean_cb') {
-        const conversaion = await this.#openaiServices.showConversation(
-          payload.user,
-          payload.channel
-        );
-
-        say(conversaion ?? 'No hay ninguna conversación guardada 🤷‍♂️');
-      }
+      say(conversation ?? 'No hay ninguna conversación guardada 🤷‍♂️');
     } catch (error) {
       console.log('err= ', error);
     }
