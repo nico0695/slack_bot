@@ -1,51 +1,48 @@
-import * as redis from 'redis';
-import { IConversation } from '../../shared/interfaces/converstions';
+import * as redis from 'redis'
+import { IConversation } from '../../shared/interfaces/converstions'
 
 export default class RedisRepository {
-  #redisClient;
+  #redisClient
 
   constructor() {
-    this.#redisClient = redis.createClient();
-    this.#connect();
+    this.#redisClient = redis.createClient()
+    void this.#connect()
 
-    this.saveConversationMessages = this.saveConversationMessages.bind(this);
-    this.getConversationMessages = this.getConversationMessages.bind(this);
+    this.saveConversationMessages = this.saveConversationMessages.bind(this)
+    this.getConversationMessages = this.getConversationMessages.bind(this)
   }
 
-  #connect = async () => {
+  #connect = async (): Promise<void> => {
     try {
-      await this.#redisClient.connect();
+      await this.#redisClient.connect()
     } catch (error) {
-      console.log('connect error= ', error.message);
+      console.log('connect error= ', error.message)
     }
-  };
+  }
 
-  saveConversationMessages = async (
-    key: string,
-    value: IConversation[]
-  ): Promise<boolean> => {
+  saveConversationMessages = async (key: string, value: IConversation[]): Promise<boolean> => {
     try {
-      const valueFormated = JSON.stringify(value);
+      const valueFormated = JSON.stringify(value)
 
-      const response = await this.#redisClient.set(key, valueFormated);
+      await this.#redisClient.set(key, valueFormated)
 
-      return true;
+      return true
     } catch (error) {
-      console.log('error= ', error.message);
-      return false;
+      console.log('error= ', error.message)
+      return false
     }
-  };
+  }
 
   getConversationMessages = async (key: string): Promise<IConversation[]> => {
     try {
-      const response = await this.#redisClient.get(key);
+      const response = await this.#redisClient.get(key)
 
-      const responseFormated: IConversation[] = JSON.parse(response); 
+      const responseFormated: IConversation[] = JSON.parse(response)
 
-      return responseFormated;
+      return responseFormated
     } catch (error) {
-      console.log('error= ', error.message);
-      return null;
+      console.log('error= ', error.message)
+      return null
     }
-  };
+  }
 }

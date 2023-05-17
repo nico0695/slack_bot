@@ -1,4 +1,4 @@
 export interface IConversation {
-  role: string;
-  content: string;
+  role: string
+  content: string
 }

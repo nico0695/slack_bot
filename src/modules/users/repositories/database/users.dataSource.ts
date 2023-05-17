@@ -1,45 +1,44 @@
-import { Users } from '../../../../entities/users';
+import { Users } from '../../../../entities/users'
 
-import { IUsers } from '../../interfaces/users.interfaces';
+import { IUsers } from '../../interfaces/users.interfaces'
 
 export default class UsersDataSources {
-  
   /**
    * Verify if email exist in database
    * @param email string - Email user
    */
   public async existEmail(email: string): Promise<boolean> {
     try {
-      const user = await Users.count({ where: { email } });
+      const user = await Users.count({ where: { email } })
 
-      if (user > 0) return true;
-      return false;
+      if (user > 0) return true
+      return false
     } catch (error) {
-      return error;
+      return error
     }
   }
 
   /**
    * Save user in database
    * @param data IUsers - Data user
-   * @returns 
+   * @returns
    */
   public async createUser(data: IUsers): Promise<Users> {
     try {
-      const newUser = new Users();
-      newUser.username = data.username;
-      newUser.name = data.name;
-      newUser.lastName = data.lastName;
-      newUser.email = data.email;
-      newUser.phone = data.phone;
-      newUser.slackId = data.slackId;
-      newUser.slackTeamId = data.slackTeamId;
+      const newUser = new Users()
+      newUser.username = data.username
+      newUser.name = data.name
+      newUser.lastName = data.lastName
+      newUser.email = data.email
+      newUser.phone = data.phone
+      newUser.slackId = data.slackId
+      newUser.slackTeamId = data.slackTeamId
 
-      await newUser.save();
+      await newUser.save()
 
-      return newUser;
+      return newUser
     } catch (error) {
-      return error;
+      return error
     }
   }
 
@@ -50,16 +49,16 @@ export default class UsersDataSources {
    */
   public async getUserBySlackId(slackId: string): Promise<IUsers | undefined> {
     try {
-      const user = await Users.findOne({ where: { slackId } });
+      const user = await Users.findOne({ where: { slackId } })
 
       if (user) {
-        const { username, name, lastName, email, phone, slackId, slackTeamId } = user;
-        return { username, name, lastName, email, phone, slackId, slackTeamId };
+        const { username, name, lastName, email, phone, slackId, slackTeamId } = user
+        return { username, name, lastName, email, phone, slackId, slackTeamId }
       }
 
-      return undefined;
+      return undefined
     } catch (error) {
-      return error;
+      return error
     }
   }
 
@@ -70,16 +69,14 @@ export default class UsersDataSources {
    */
   public async getUsersBySlackTeamId(slackTeamId: string): Promise<IUsers[]> {
     try {
-      const users = await Users.find({ where: { slackTeamId } });
+      const users = await Users.find({ where: { slackTeamId } })
 
-      return users.map(user => {
-        const { username, name, lastName, email, phone, slackId, slackTeamId } = user;
-        return { username, name, lastName, email, phone, slackId, slackTeamId };
-      });
+      return users.map((user) => {
+        const { username, name, lastName, email, phone, slackId, slackTeamId } = user
+        return { username, name, lastName, email, phone, slackId, slackTeamId }
+      })
     } catch (error) {
-      return error;
+      return error
     }
   }
-
-  
 }

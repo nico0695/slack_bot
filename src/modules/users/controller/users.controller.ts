@@ -1,52 +1,53 @@
-import { Router } from 'express';
+/* eslint-disable @typescript-eslint/no-misused-promises */
+import { Router } from 'express'
 
-import UsersServices from '../services/users.services';
+import UsersServices from '../services/users.services'
 
-import { IUsers } from '../interfaces/users.interfaces';
+import { IUsers } from '../interfaces/users.interfaces'
 
 export default class UsersController {
-  public router: Router;
+  public router: Router
 
-  #usersServices: UsersServices;
+  #usersServices: UsersServices
 
   constructor() {
-    this.createUser = this.createUser.bind(this);
+    this.createUser = this.createUser.bind(this)
 
-    this.#usersServices = new UsersServices();
+    this.#usersServices = new UsersServices()
 
-    this.router = Router();
-    this.registerRoutes();
+    this.router = Router()
+    this.registerRoutes()
   }
 
   /** Users Routes */
-  
+
   protected registerRoutes(): void {
-    this.router.post('/create_user', this.createUser);
+    this.router.post('/create_user', this.createUser)
   }
 
   /** Users Controllers Methods */
 
-  public async createUser(req: any, res: any) {
+  public async createUser(req: any, res: any): Promise<void> {
     const dataUser: IUsers = {
       username: req.body.username,
       name: req.body.name,
       lastName: req.body.lastName,
       email: req.body.email,
       phone: req.body.phone,
-    };
+    }
 
     if (!dataUser.name || !dataUser.email || !dataUser.phone) {
-      res.status(400).send({ message: 'Ingrese los datos correctos' });
-      return;
+      res.status(400).send({ message: 'Ingrese los datos correctos' })
+      return
     }
 
-    const response = await this.#usersServices.createUser(dataUser);
+    const response = await this.#usersServices.createUser(dataUser)
 
     if (response.error) {
-      res.status(400).send({ message: response.error });
-      return;
+      res.status(400).send({ message: response.error })
+      return
     }
 
-    res.send(response.data);
+    res.send(response.data)
   }
 }

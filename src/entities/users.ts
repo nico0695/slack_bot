@@ -4,34 +4,34 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-} from 'typeorm';
+} from 'typeorm'
 
 @Entity()
 export class Users extends BaseEntity {
   @PrimaryGeneratedColumn()
-  id: number;
+    id: number
 
   @Column({ default: '' })
-  username: string;
+    username: string
 
   @Column()
-  name: string;
+    name: string
 
   @Column({ default: '' })
-  lastName: string;
+    lastName: string
 
   @Column()
-  phone: string;
+    phone: string
 
   @Column({ nullable: true })
-  email: string;
+    email: string
 
   @CreateDateColumn()
-  createdAt: Date;
+    createdAt: Date
 
   @Column({ default: '' })
-  slackTeamId: string;
+    slackTeamId: string
 
   @Column({ default: '' })
-  slackId: string;
+    slackId: string
 }

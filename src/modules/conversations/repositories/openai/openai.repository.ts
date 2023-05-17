@@ -1,35 +1,38 @@
-import { Configuration, OpenAIApi } from 'openai';
+import { Configuration, OpenAIApi } from 'openai'
+
+interface IChatCompletion {
+  role: string
+  content: string
+}
 
 export default class OpenaiRepository {
-  #openai;
+  #openai
 
   constructor() {
     const configuration = new Configuration({
       apiKey: process.env.OPENAI_API_KEY,
       organization: 'org-dlzE8QUXcRrvBN096fSCdHBf',
-    });
+    })
 
-    this.#openai = new OpenAIApi(configuration);
+    this.#openai = new OpenAIApi(configuration)
 
-    this.chatCompletion = this.chatCompletion.bind(this);
+    this.chatCompletion = this.chatCompletion.bind(this)
   }
 
-  chatCompletion = async (
-    messages: any
-  ): Promise<{ role: string; content: string } | null> => {
+  chatCompletion = async (messages: any): Promise<IChatCompletion | null> => {
     try {
       const apiRequestBot = {
         model: 'gpt-3.5-turbo',
         messages,
         temperature: 0.6,
-      };
+      }
 
-      const completion = await this.#openai.createChatCompletion(apiRequestBot);
+      const completion = await this.#openai.createChatCompletion(apiRequestBot)
 
-      return completion.data.choices[0].message;
+      return completion.data.choices[0].message
     } catch (error) {
-      console.log('error= ', error.message);
-      return null;
+      console.log('error= ', error.message)
+      return null
     }
-  };
+  }
 }

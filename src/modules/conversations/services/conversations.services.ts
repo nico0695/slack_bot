@@ -1,45 +1,42 @@
-import { GlobalConstants } from '../../../shared/constants/global';
+import { GlobalConstants } from '../../../shared/constants/global'
 
-import UsersServices from '../../users/services/users.services';
+import UsersServices from '../../users/services/users.services'
 
-import OpenaiRepository from '../repositories/openai/openai.repository';
-import { roleTypes } from '../shared/constants/openai';
+import OpenaiRepository from '../repositories/openai/openai.repository'
+import { roleTypes } from '../shared/constants/openai'
 
-import RedisRepository from '../repositories/redis/redis.repository';
-import { rConversationKey } from '../repositories/redis/redis.constatns';
+import RedisRepository from '../repositories/redis/redis.repository'
+import { rConversationKey } from '../repositories/redis/redis.constatns'
 
-import { IConversation } from '../shared/interfaces/converstions';
+import { IConversation } from '../shared/interfaces/converstions'
+
+type TMembersNames = Record<string, string>
 
 export default class ConversationsServices {
-  #openaiRepository: OpenaiRepository;
-  #redisRepository: RedisRepository;
+  #openaiRepository: OpenaiRepository
+  #redisRepository: RedisRepository
 
-  #usersServices: UsersServices;
+  #usersServices: UsersServices
 
   constructor() {
-    this.#openaiRepository = new OpenaiRepository();
-    this.#redisRepository = new RedisRepository();
+    this.#openaiRepository = new OpenaiRepository()
+    this.#redisRepository = new RedisRepository()
 
-    this.#usersServices = new UsersServices();
+    this.#usersServices = new UsersServices()
 
-    this.generateConversation = this.generateConversation.bind(this);
+    this.generateConversation = this.generateConversation.bind(this)
   }
 
-  #generatePrompt = async (
-    conversation: IConversation[]
-  ): Promise<IConversation[]> => {
+  #generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {
     const requestMessages = conversation.map((message) => {
-      return { role: message.role, content: message.content };
-    });
+      return { role: message.role, content: message.content }
+    })
 
     const initialPrompt =
-      'Eres un asistente basado en IA con el que puedes chatear sobre cualquier cosa.';
+      'Eres un asistente basado en IA con el que puedes chatear sobre cualquier cosa.'
 
-    return [
-      { role: roleTypes.system, content: initialPrompt },
-      ...requestMessages,
-    ];
-  };
+    return [{ role: roleTypes.system, content: initialPrompt }, ...requestMessages]
+  }
 
   generateConversation = async (
     conversation: IConversation,
@@ -47,51 +44,47 @@ export default class ConversationsServices {
     channelId?: string
   ): Promise<string | null> => {
     try {
-      const conversationKey = rConversationKey(userId, channelId);
+      const conversationKey = rConversationKey(userId, channelId)
 
       /** Get conversation */
-      const conversationStored =
-        await this.#redisRepository.getConversationMessages(conversationKey);
+      const conversationStored = await this.#redisRepository.getConversationMessages(
+        conversationKey
+      )
 
-      const newConversation = [...(conversationStored ?? []), conversation];
+      const newConversation = [...(conversationStored ?? []), conversation]
 
-      const promptGenerated = await this.#generatePrompt(newConversation);
+      const promptGenerated = await this.#generatePrompt(newConversation)
 
       /** Generate conversation */
-      const messageResponse = await this.#openaiRepository.chatCompletion(
-        promptGenerated
-      );
+      const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
 
-      const newConversationGenerated = [...newConversation, messageResponse];
+      const newConversationGenerated = [...newConversation, messageResponse]
 
       /** Save conversation */
       await this.#redisRepository.saveConversationMessages(
         conversationKey,
         newConversationGenerated
-      );
+      )
 
-      return messageResponse.content;
+      return messageResponse.content
     } catch (error) {
-      console.log('error= ', error.message);
-      return null;
+      console.log('error= ', error.message)
+      return null
     }
-  };
+  }
 
-  cleanConversation = async (
-    userId: string,
-    channelId?: string
-  ): Promise<boolean> => {
+  cleanConversation = async (userId: string, channelId?: string): Promise<boolean> => {
     try {
-      const conversationKey = rConversationKey(userId, channelId);
+      const conversationKey = rConversationKey(userId, channelId)
 
-      await this.#redisRepository.saveConversationMessages(conversationKey, []);
+      await this.#redisRepository.saveConversationMessages(conversationKey, [])
 
-      return true;
+      return true
     } catch (error) {
-      console.log('error= ', error.message);
-      return false;
+      console.log('error= ', error.message)
+      return false
     }
-  };
+  }
 
   showConversation = async (
     userId: string,
@@ -99,23 +92,24 @@ export default class ConversationsServices {
     teamId?: string
   ): Promise<string | null> => {
     try {
-      const conversationKey = rConversationKey(userId, channelId);
+      const conversationKey = rConversationKey(userId, channelId)
 
       /** Get conversation */
-      const conversationStored =
-        await this.#redisRepository.getConversationMessages(conversationKey);
+      const conversationStored = await this.#redisRepository.getConversationMessages(
+        conversationKey
+      )
 
-      if (conversationStored.length === 0) return null;
+      if (conversationStored.length === 0) return null
 
-      const membersNames: { [key: string]: string } = {};
+      const membersNames: TMembersNames = {}
 
       /** Get team members */
       if (teamId) {
-        const teamMembers = await this.#usersServices.getUsersByTeamId(teamId);
+        const teamMembers = await this.#usersServices.getUsersByTeamId(teamId)
         if (teamMembers?.data) {
           teamMembers.data.forEach((member) => {
-            membersNames[member.slackId] = member.name;
-          });
+            membersNames[member.slackId] = member.name
+          })
         }
       }
 
@@ -125,12 +119,12 @@ export default class ConversationsServices {
             message.role === roleTypes.assistant
               ? GlobalConstants.BOT_NAME
               : membersNames[userId] ?? userId
-          }: ${message.content}`;
+          }: ${message.content}`
         })
-        .join('\n');
+        .join('\n')
     } catch (error) {
-      console.log('error= ', error.message);
-      return null;
+      console.log('error= ', error.message)
+      return null
     }
-  };
+  }
 }
