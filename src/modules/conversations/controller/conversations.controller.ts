@@ -2,31 +2,23 @@ import { Router } from 'express'
 
 import ConversationsServices from '../services/conversations.services'
 import { roleTypes } from '../shared/constants/openai'
-import { IConversation } from '../shared/interfaces/converstions'
+import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
+import { FlowKeys } from '../shared/constants/conversationFlow'
 
 export default class ConversationsController {
   public router: Router
 
-  #openaiServices: ConversationsServices
+  #conversationServices: ConversationsServices
 
   constructor() {
-    this.#openaiServices = new ConversationsServices()
+    this.#conversationServices = new ConversationsServices()
 
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
     this.showConversation = this.showConversation.bind(this)
-
-    // this.router = Router();
-    // this.registerRoutes();
   }
 
-  /** Users Routes */
-
-  //   protected registerRoutes(): void {
-  //     this.router.post('/create_user', this.createUser);
-  //   }
-
-  /** Users Controllers Methods */
+  /** Conversation Controllers Methods */
 
   /**
    *
@@ -44,7 +36,7 @@ export default class ConversationsController {
         content: newMessage,
       }
 
-      const newResponse = await this.#openaiServices.generateConversation(
+      const newResponse = await this.#conversationServices.generateConversation(
         newMessageFormated,
         payload.user,
         payload.channel
@@ -68,7 +60,7 @@ export default class ConversationsController {
       const message: string = payload.text
 
       if (message !== 'clean_cb') {
-        const newResponse = await this.#openaiServices.cleanConversation(
+        const newResponse = await this.#conversationServices.cleanConversation(
           payload.user,
           payload.channel
         )
@@ -90,7 +82,7 @@ export default class ConversationsController {
     const { payload, say, body }: any = data
 
     try {
-      const conversation = await this.#openaiServices.showConversation(
+      const conversation = await this.#conversationServices.showConversation(
         payload.user,
         payload.channel,
         body.team_id
@@ -99,6 +91,60 @@ export default class ConversationsController {
       say(conversation ?? 'No hay ninguna conversación guardada 🤷‍♂️')
     } catch (error) {
       console.log('err= ', error)
+    }
+  }
+
+  /**
+   * Manage conversation flow between users and bot
+   */
+  public conversationFlow = async (data: any): Promise<void> => {
+    const { payload, say, body }: any = data
+
+    const message: string = payload.text
+
+    switch (message) {
+      case FlowKeys.START: {
+        const response = await this.#conversationServices.startConversationFlow(payload.channel)
+        say(response ?? 'No se pudo iniciar la conversación 🤷‍♂️')
+        break
+      }
+      case FlowKeys.END: {
+        const response = await this.#conversationServices.endConversationFlow(payload.channel)
+        say(response ?? 'No se pudo finalizar la conversación 🤷‍♂️')
+        break
+      }
+      case FlowKeys.SHOW: {
+        const conversation = await this.#conversationServices.showConversationFlow(
+          payload.channel,
+          body.team_id
+        )
+        say(conversation ?? 'No hay ninguna conversación guardada 🤷‍♂️')
+        break
+      }
+
+      default: {
+        const conversationStarted = await this.#conversationServices.conversationFlowStarted(
+          payload.channel
+        )
+
+        if (conversationStarted) {
+          console.log('### generateConversationFlow ###')
+          const newConversation: IUserConversation = {
+            role: roleTypes.user,
+            content: message,
+            userSlackId: payload.user,
+          }
+
+          const newResponse = await this.#conversationServices.generateConversationFlow(
+            newConversation,
+            payload.channel
+          )
+
+          say(newResponse)
+        }
+
+        break
+      }
     }
   }
 }

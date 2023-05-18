@@ -8,7 +8,11 @@ import { roleTypes } from '../shared/constants/openai'
 import RedisRepository from '../repositories/redis/redis.repository'
 import { rConversationKey } from '../repositories/redis/redis.constatns'
 
-import { IConversation } from '../shared/interfaces/converstions'
+import {
+  IConversation,
+  IConversationFlow,
+  IUserConversation,
+} from '../shared/interfaces/converstions'
 
 type TMembersNames = Record<string, string>
 
@@ -119,6 +123,147 @@ export default class ConversationsServices {
             message.role === roleTypes.assistant
               ? GlobalConstants.BOT_NAME
               : membersNames[userId] ?? userId
+          }: ${message.content}`
+        })
+        .join('\n')
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
+  // Conversation flow
+
+  conversationFlowStarted = async (channelId?: string): Promise<boolean> => {
+    const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+
+    if (conversationFlow !== null) {
+      return true
+    }
+
+    return false
+  }
+
+  startConversationFlow = async (channelId?: string): Promise<string | null> => {
+    try {
+      const conversationStarted = await this.conversationFlowStarted(channelId)
+
+      if (conversationStarted) {
+        return 'Ya existe una conversación en curso en este canal.'
+      }
+
+      const newConversation: IConversationFlow = {
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        chanelId: channelId ?? '',
+        conversation: [],
+      }
+
+      const response = await this.#redisRepository.saveConversationFlow(channelId, newConversation)
+
+      if (!response) {
+        return 'No se pudo iniciar la conversación 🤷‍♂️'
+      }
+
+      return 'Conversación iniciada correctamente.'
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
+  endConversationFlow = async (channelId?: string): Promise<string | null> => {
+    try {
+      const conversationStarted = await this.conversationFlowStarted(channelId)
+
+      if (!conversationStarted) {
+        return 'No existe una conversación en curso en este canal.'
+      }
+
+      const response = await this.#redisRepository.deleteConversationFlow(channelId)
+
+      if (!response) {
+        return 'No se pudo finalizar la conversación 🤷‍♂️'
+      }
+
+      return 'Conversación finalizada correctamente.'
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
+  generateConversationFlow = async (
+    conversation: IUserConversation,
+    channelId?: string
+  ): Promise<string | null> => {
+    try {
+      /** Get conversation */
+      const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+
+      if (conversationFlow === null) {
+        return 'No existe una conversación en curso en este canal.'
+      }
+
+      const { conversation: conversationStored } = conversationFlow
+
+      const newConversationUser = [...conversationStored, conversation]
+
+      const promptGenerated = await this.#generatePrompt(
+        newConversationUser.map((message) => ({
+          role: message.role,
+          content: message.content,
+        }))
+      )
+
+      /** Generate conversation */
+      const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+
+      const newConversationGenerated: IConversationFlow = {
+        ...conversationFlow,
+        conversation: [...newConversationUser, messageResponse],
+        updatedAt: new Date(),
+      }
+
+      /** Save conversation */
+      await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
+
+      return messageResponse.content
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
+  showConversationFlow = async (channelId: string, teamId?: string): Promise<string | null> => {
+    try {
+      /** Get conversation */
+      const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+
+      if (conversationFlow === null) {
+        return 'No existe una conversación en curso en este canal.'
+      }
+
+      const { conversation: conversationStored } = conversationFlow
+
+      const membersNames: TMembersNames = {}
+
+      /** Get team members */
+      if (teamId) {
+        const teamMembers = await this.#usersServices.getUsersByTeamId(teamId)
+        if (teamMembers?.data) {
+          teamMembers.data.forEach((member) => {
+            membersNames[member.slackId] = member.name
+          })
+        }
+      }
+
+      return conversationStored
+        .map((message) => {
+          return `${
+            message.role === roleTypes.assistant
+              ? GlobalConstants.BOT_NAME
+              : membersNames[message.userSlackId] ?? message.userSlackId
           }: ${message.content}`
         })
         .join('\n')

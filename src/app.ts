@@ -72,5 +72,7 @@ export default class App {
       slackListenersKey.showConversation,
       this.#openaiController.showConversation
     )
+
+    this.#slackApp.message('', this.#openaiController.conversationFlow)
   }
 }

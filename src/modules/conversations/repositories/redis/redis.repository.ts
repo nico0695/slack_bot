@@ -1,5 +1,6 @@
 import * as redis from 'redis'
-import { IConversation } from '../../shared/interfaces/converstions'
+import { IConversation, IConversationFlow } from '../../shared/interfaces/converstions'
+import { rConversationFlow } from './redis.constatns'
 
 export default class RedisRepository {
   #redisClient
@@ -7,9 +8,6 @@ export default class RedisRepository {
   constructor() {
     this.#redisClient = redis.createClient()
     void this.#connect()
-
-    this.saveConversationMessages = this.saveConversationMessages.bind(this)
-    this.getConversationMessages = this.getConversationMessages.bind(this)
   }
 
   #connect = async (): Promise<void> => {
@@ -43,6 +41,44 @@ export default class RedisRepository {
     } catch (error) {
       console.log('error= ', error.message)
       return null
+    }
+  }
+
+  /** Conversation Flow */
+
+  saveConversationFlow = async (chanelId: string, value: IConversationFlow): Promise<boolean> => {
+    try {
+      const valueFormated = JSON.stringify(value)
+
+      await this.#redisClient.set(rConversationFlow(chanelId), valueFormated)
+
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  getConversationFlow = async (chanelId: string): Promise<IConversationFlow> => {
+    try {
+      const response = await this.#redisClient.get(rConversationFlow(chanelId))
+
+      const responseFormated: IConversationFlow = JSON.parse(response)
+
+      return responseFormated
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
+  deleteConversationFlow = async (chanelId: string): Promise<boolean> => {
+    try {
+      await this.#redisClient.del(rConversationFlow(chanelId))
+
+      return true
+    } catch (error) {
+      console.log('error= ', error.message)
+      return false
     }
   }
 }
