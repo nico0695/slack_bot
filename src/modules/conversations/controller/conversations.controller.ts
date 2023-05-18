@@ -2,7 +2,7 @@ import { Router } from 'express'
 
 import ConversationsServices from '../services/conversations.services'
 import { roleTypes } from '../shared/constants/openai'
-import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
+import { IConversation } from '../shared/interfaces/converstions'
 import { FlowKeys } from '../shared/constants/conversationFlow'
 
 export default class ConversationsController {
@@ -129,18 +129,16 @@ export default class ConversationsController {
 
         if (conversationStarted) {
           console.log('### generateConversationFlow ###')
-          const newConversation: IUserConversation = {
-            role: roleTypes.user,
-            content: message,
-            userSlackId: payload.user,
-          }
 
           const newResponse = await this.#conversationServices.generateConversationFlow(
-            newConversation,
+            message,
+            payload.user,
             payload.channel
           )
 
-          say(newResponse)
+          if (newResponse !== null) {
+            say(newResponse)
+          }
         }
 
         break

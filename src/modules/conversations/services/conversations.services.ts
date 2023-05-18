@@ -42,6 +42,22 @@ export default class ConversationsServices {
     return [{ role: roleTypes.system, content: initialPrompt }, ...requestMessages]
   }
 
+  #getTeamMembers = async (teamId: string): Promise<TMembersNames> => {
+    const membersNames: TMembersNames = {}
+
+    /** Get team members */
+    if (teamId) {
+      const teamMembers = await this.#usersServices.getUsersByTeamId(teamId)
+      if (teamMembers?.data) {
+        teamMembers.data.forEach((member) => {
+          membersNames[member.slackId] = member.name
+        })
+      }
+    }
+
+    return membersNames
+  }
+
   generateConversation = async (
     conversation: IConversation,
     userId: string,
@@ -105,17 +121,7 @@ export default class ConversationsServices {
 
       if (conversationStored.length === 0) return null
 
-      const membersNames: TMembersNames = {}
-
-      /** Get team members */
-      if (teamId) {
-        const teamMembers = await this.#usersServices.getUsersByTeamId(teamId)
-        if (teamMembers?.data) {
-          teamMembers.data.forEach((member) => {
-            membersNames[member.slackId] = member.name
-          })
-        }
-      }
+      const membersNames = await this.#getTeamMembers(teamId)
 
       return conversationStored
         .map((message) => {
@@ -194,8 +200,9 @@ export default class ConversationsServices {
   }
 
   generateConversationFlow = async (
-    conversation: IUserConversation,
-    channelId?: string
+    message: string,
+    userSlackId: string,
+    channelId: string
   ): Promise<string | null> => {
     try {
       /** Get conversation */
@@ -205,9 +212,33 @@ export default class ConversationsServices {
         return 'No existe una conversación en curso en este canal.'
       }
 
+      let skipGeneration = false
+      if (message.startsWith('+')) {
+        skipGeneration = true
+      }
+      const messageFormated = message.replace('+', '').trimStart()
+
+      const newConversation: IUserConversation = {
+        role: roleTypes.user,
+        content: messageFormated,
+        userSlackId,
+      }
+
       const { conversation: conversationStored } = conversationFlow
 
-      const newConversationUser = [...conversationStored, conversation]
+      const newConversationUser = [...conversationStored, newConversation]
+
+      // save message and skip generation with open ia
+      if (skipGeneration) {
+        /** Save conversation */
+        await this.#redisRepository.saveConversationFlow(channelId, {
+          ...conversationFlow,
+          conversation: newConversationUser,
+          updatedAt: new Date(),
+        })
+
+        return null
+      }
 
       const promptGenerated = await this.#generatePrompt(
         newConversationUser.map((message) => ({
@@ -246,17 +277,7 @@ export default class ConversationsServices {
 
       const { conversation: conversationStored } = conversationFlow
 
-      const membersNames: TMembersNames = {}
-
-      /** Get team members */
-      if (teamId) {
-        const teamMembers = await this.#usersServices.getUsersByTeamId(teamId)
-        if (teamMembers?.data) {
-          teamMembers.data.forEach((member) => {
-            membersNames[member.slackId] = member.name
-          })
-        }
-      }
+      const membersNames = await this.#getTeamMembers(teamId)
 
       return conversationStored
         .map((message) => {
