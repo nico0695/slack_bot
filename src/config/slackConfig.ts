@@ -16,4 +16,6 @@ export const slackListenersKey = {
   generateConversation: /^cb?\b/,
   cleanConversation: /^cb_clean?\b/,
   showConversation: /^cb_show?\b/,
+
+  generateImages: /^img?\b/,
 }

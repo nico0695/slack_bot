@@ -7,7 +7,8 @@ import connectionSource from './config/ormconfig'
 import UsersController from './modules/users/controller/users.controller'
 
 import { App as SlackApp } from '@slack/bolt'
-import OpenaiController from './modules/conversations/controller/conversations.controller'
+import ConversationController from './modules/conversations/controller/conversations.controller'
+import ImagesController from './modules/images/controller/images.controller'
 import { connectionSlackApp, slackListenersKey } from './config/slackConfig'
 import dotenv from 'dotenv'
 
@@ -19,7 +20,8 @@ export default class App {
   #app: express.Application
   #slackApp: SlackApp
 
-  #openaiController: OpenaiController
+  #conversationController: ConversationController
+  #imagesController: ImagesController
 
   constructor() {
     // Express
@@ -30,7 +32,8 @@ export default class App {
     // Slack
     this.#slackApp = connectionSlackApp
 
-    this.#openaiController = new OpenaiController()
+    this.#conversationController = new ConversationController()
+    this.#imagesController = new ImagesController()
   }
 
   #config(): void {
@@ -62,17 +65,19 @@ export default class App {
     // Listener slack bot
     this.#slackApp.message(
       slackListenersKey.generateConversation,
-      this.#openaiController.generateConversation
+      this.#conversationController.generateConversation
     )
     this.#slackApp.message(
       slackListenersKey.cleanConversation,
-      this.#openaiController.cleanConversation
+      this.#conversationController.cleanConversation
     )
     this.#slackApp.message(
       slackListenersKey.showConversation,
-      this.#openaiController.showConversation
+      this.#conversationController.showConversation
     )
 
-    this.#slackApp.message('', this.#openaiController.conversationFlow)
+    this.#slackApp.message('', this.#conversationController.conversationFlow)
+
+    this.#slackApp.message(slackListenersKey.generateImages, this.#imagesController.generateImages)
   }
 }
