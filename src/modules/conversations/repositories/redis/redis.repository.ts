@@ -13,8 +13,9 @@ export default class RedisRepository {
   #connect = async (): Promise<void> => {
     try {
       await this.#redisClient.connect()
+      console.log('~ Redis connected!')
     } catch (error) {
-      console.log('connect error= ', error.message)
+      console.error('x Redis - connect error= ', error.message)
     }
   }
 
