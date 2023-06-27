@@ -1,5 +1,8 @@
 import axios from 'axios'
-import { IGenerateImageResponse, IInferaceJobResponse } from '../../shared/interfaces/images'
+import {
+  IGenerateImageResponse,
+  IInferaceJobResponse,
+} from '../../shared/interfaces/images.interfaces'
 
 export default class LeapRepository {
   #header
@@ -24,7 +27,7 @@ export default class LeapRepository {
         steps: 50,
         width: 512,
         height: 512,
-        numberOfImages: 1,
+        numberOfImages: 2,
         promptStrength: 7,
         enhancePrompt: false,
         restoreFaces: true,

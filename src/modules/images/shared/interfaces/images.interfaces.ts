@@ -15,3 +15,17 @@ export interface IInferaceJobResponse {
   state: LeapStatus
   images?: ILeapImages[]
 }
+
+export interface IImage {
+  imageUrl: string
+  inferenceId: string
+  username?: string
+  slackTeamId?: string
+  slackId: string
+}
+
+export interface IUserData {
+  slackId: string
+  slackTeamId: string
+  username: string
+}

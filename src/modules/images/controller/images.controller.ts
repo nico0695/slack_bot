@@ -20,12 +20,18 @@ export default class ImagessController {
    * @param data slack response
    */
   public generateImages = async (data: any): Promise<void> => {
-    const { payload, say }: any = data
+    const { payload, say, body }: any = data
 
     try {
       const prompt: string = payload.text.replace('img ', '').trimStart()
 
-      const newResponse = await this.#imagesServices.generateImages(prompt, say)
+      const userData = {
+        slackId: payload.user,
+        slackTeamId: body.team_id,
+        username: '',
+      }
+
+      const newResponse = await this.#imagesServices.generateImages(prompt, userData, say)
 
       say(newResponse)
     } catch (error) {

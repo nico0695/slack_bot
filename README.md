@@ -30,7 +30,6 @@ LEAP_API_KEY="LEAP_API_KEY"
 
 ```
 sudo apt-get install redis-server
-brew install redis
 ```
 
 #### Install backend (express)
@@ -75,7 +74,7 @@ npm run dev
     show conversation // show chanel conversation
     clean conversation // clean flow conversation
     # Prefixs
-    + ${message} // add messasge to the conversation but dont generate a bot response
+    + ${message} // add a message to the conversation without generating a bot responsee
 ```
 
 ## Slack Generate Image
