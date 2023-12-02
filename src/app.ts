@@ -12,6 +12,10 @@ import ImagesController from './modules/images/controller/images.controller'
 import { connectionSlackApp, slackListenersKey } from './config/slackConfig'
 import dotenv from 'dotenv'
 
+import http from 'http'
+import { Server } from 'socket.io'
+import ConversationsSocketController from './modules/conversations/controller/conversationsSocket.controller'
+
 dotenv.config()
 
 const slackPort = 3001
@@ -21,6 +25,7 @@ export default class App {
   #slackApp: SlackApp
 
   #conversationController: ConversationController
+  #conversationSocketController: ConversationsSocketController
   #imagesController: ImagesController
 
   constructor() {
@@ -33,11 +38,12 @@ export default class App {
     this.#slackApp = connectionSlackApp
 
     this.#conversationController = new ConversationController()
+    this.#conversationSocketController = new ConversationsSocketController()
     this.#imagesController = new ImagesController()
   }
 
   #config(): void {
-    this.#app.set('port', 3000)
+    this.#app.set('port', 4000)
 
     this.#app.use(morgan('dev'))
     this.#app.use(cors())
@@ -52,9 +58,58 @@ export default class App {
   }
 
   public async start(): Promise<void> {
+    // Socket io
+    const server = http.createServer(this.#app)
+    const io = new Server(server, {
+      cors: {
+        origin: 'http://localhost:3000',
+      },
+    })
+
+    io.on('connection', (socket) => {
+      console.log('a user connected: ', socket.id)
+
+      // void socket.join('clock-room')
+      socket.on('join_room', async (data) => {
+        console.log('JOIN ROOM')
+        const { username, room }: { username: string; room: string } = data // Data sent from client when join_room event emitted
+
+        void socket.join(room) // Join the user to a socket room
+
+        const joinResponse = await this.#conversationSocketController.joinChannel({
+          channel: room,
+          username,
+        })
+
+        socket.emit('join_response', joinResponse) // Send message to user that joined
+      })
+
+      socket.on('send_message', async (data) => {
+        const { message, username, room } = data
+
+        socket.to(room).emit('receive_message', {
+          content: message,
+          username,
+          role: 'user',
+        })
+
+        const conversationResponse = await this.#conversationSocketController.generateConversation({
+          username,
+          channel: room,
+          message,
+        })
+
+        io.in(room).emit('receive_message', conversationResponse) // Send to all users in room, including sender
+      })
+
+      socket.on('disconnect', (reason) => {
+        console.log('user disconnected= ', reason)
+      })
+    })
+
     // Start express
-    this.#app.listen(this.#app.get('port'), () => {
-      console.log('~ Server listening in port 3000!')
+    server.listen(this.#app.get('port'), () => {
+      console.log('~ Socket Server listening in port 4000!')
     })
 
     // Start slack bot

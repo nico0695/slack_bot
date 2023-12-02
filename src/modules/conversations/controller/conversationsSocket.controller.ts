@@ -1,11 +1,11 @@
 import { Router } from 'express'
 
 import ConversationsServices from '../services/conversations.services'
-import { roleTypes } from '../shared/constants/openai'
-import { IConversation } from '../shared/interfaces/converstions'
+
+import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
 import { FlowKeys } from '../shared/constants/conversationFlow'
 
-export default class ConversationsController {
+export default class ConversationsSocketController {
   public router: Router
 
   #conversationServices: ConversationsServices
@@ -20,31 +20,47 @@ export default class ConversationsController {
 
   /** Conversation Controllers Methods */
 
+  public joinChannel = async (data: {
+    channel: string
+    username: string
+  }): Promise<{
+    message: string
+    conversation: IUserConversation[]
+  }> => {
+    const response = await this.#conversationServices.startConversationFlow(data.channel)
+
+    const conversation = await this.#conversationServices.showConversationFlowWeb(data.channel)
+
+    return {
+      message: response ?? 'No se pudo iniciar la conversación 🤷‍♂️',
+      conversation: conversation ?? [],
+    }
+  }
+
   /**
    *
    * @param data slack response
    */
-  public generateConversation = async (data: any): Promise<void> => {
+  public generateConversation = async (data: {
+    username: string
+    channel: string
+    message: string
+  }): Promise<IConversation | null> => {
     console.log('### generateConversation ###')
-    const { payload, say }: any = data
 
     try {
-      const newMessage: string = payload.text.replace('cb', '').trimStart()
+      const newMessage: string = data.message
 
-      const newMessageFormated: IConversation = {
-        role: roleTypes.user,
-        content: newMessage,
-      }
-
-      const newResponse = await this.#conversationServices.generateConversation(
-        newMessageFormated,
-        payload.user,
-        payload.channel
+      const newResponse = await this.#conversationServices.generateConversationFlow(
+        newMessage,
+        data.username,
+        data.channel
       )
 
-      say(newResponse)
+      return newResponse
     } catch (error) {
       console.log('err= ', error)
+      return null
     }
   }
 
@@ -118,7 +134,7 @@ export default class ConversationsController {
           payload.channel,
           body.team_id
         )
-        say(conversation?.join('\n') ?? 'No hay ninguna conversación guardada 🤷‍♂️')
+        say(conversation ?? 'No hay ninguna conversación guardada 🤷‍♂️')
         break
       }
 
@@ -136,7 +152,9 @@ export default class ConversationsController {
             payload.channel
           )
 
-          say(newResponse?.content ?? 'No existe una conversación en curso en este canal.')
+          if (newResponse !== null) {
+            say(newResponse)
+          }
         }
 
         break

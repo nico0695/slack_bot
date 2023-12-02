@@ -203,13 +203,13 @@ export default class ConversationsServices {
     message: string,
     userSlackId: string,
     channelId: string
-  ): Promise<string | null> => {
+  ): Promise<IConversation | null> => {
     try {
       /** Get conversation */
       const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
-        return 'No existe una conversación en curso en este canal.'
+        return null
       }
 
       let skipGeneration = false
@@ -259,35 +259,51 @@ export default class ConversationsServices {
       /** Save conversation */
       await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
-      return messageResponse.content
+      return messageResponse
     } catch (error) {
       console.log('error= ', error.message)
       return null
     }
   }
 
-  showConversationFlow = async (channelId: string, teamId?: string): Promise<string | null> => {
+  showConversationFlow = async (channelId: string, teamId?: string): Promise<string[] | null> => {
     try {
       /** Get conversation */
       const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
-        return 'No existe una conversación en curso en este canal.'
+        return null
       }
 
       const { conversation: conversationStored } = conversationFlow
 
-      const membersNames = await this.#getTeamMembers(teamId)
+      const membersNames = teamId ? await this.#getTeamMembers(teamId) : {}
+
+      return conversationStored.map((message) => {
+        return `${
+          message.role === roleTypes.assistant
+            ? GlobalConstants.BOT_NAME
+            : membersNames[message.userSlackId] ?? message.userSlackId
+        }: ${message.content}`
+      })
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
+  showConversationFlowWeb = async (channelId: string): Promise<IUserConversation[] | null> => {
+    try {
+      /** Get conversation */
+      const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+
+      if (conversationFlow === null) {
+        return null
+      }
+
+      const { conversation: conversationStored } = conversationFlow
 
       return conversationStored
-        .map((message) => {
-          return `${
-            message.role === roleTypes.assistant
-              ? GlobalConstants.BOT_NAME
-              : membersNames[message.userSlackId] ?? message.userSlackId
-          }: ${message.content}`
-        })
-        .join('\n')
     } catch (error) {
       console.log('error= ', error.message)
       return null

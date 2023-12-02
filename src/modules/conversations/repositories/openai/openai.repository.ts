@@ -1,9 +1,5 @@
 import { Configuration, OpenAIApi } from 'openai'
-
-interface IChatCompletion {
-  role: string
-  content: string
-}
+import { IConversation } from '../../shared/interfaces/converstions'
 
 export default class OpenaiRepository {
   #openai
@@ -19,7 +15,7 @@ export default class OpenaiRepository {
     this.chatCompletion = this.chatCompletion.bind(this)
   }
 
-  chatCompletion = async (messages: any): Promise<IChatCompletion | null> => {
+  chatCompletion = async (messages: any): Promise<IConversation | null> => {
     try {
       const apiRequestBot = {
         model: 'gpt-3.5-turbo',
