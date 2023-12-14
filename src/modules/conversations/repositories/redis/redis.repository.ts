@@ -82,4 +82,15 @@ export default class RedisRepository {
       return false
     }
   }
+
+  getChannelsConversationFlow = async (): Promise<string[]> => {
+    try {
+      const response = await this.#redisClient.keys(rConversationFlow('*'))
+
+      return response
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
 }

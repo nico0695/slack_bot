@@ -6,7 +6,7 @@ import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
 
 import RedisRepository from '../repositories/redis/redis.repository'
-import { rConversationKey } from '../repositories/redis/redis.constatns'
+import { conversationFlowPrefix, rConversationKey } from '../repositories/redis/redis.constatns'
 
 import {
   IConversation,
@@ -304,6 +304,18 @@ export default class ConversationsServices {
       const { conversation: conversationStored } = conversationFlow
 
       return conversationStored
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
+  showChannelsConversationFlow = async (): Promise<string[] | null> => {
+    try {
+      /** Get conversation */
+      const channels = await this.#redisRepository.getChannelsConversationFlow()
+
+      return channels.map((channel) => channel.replace(conversationFlowPrefix, ''))
     } catch (error) {
       console.log('error= ', error.message)
       return null

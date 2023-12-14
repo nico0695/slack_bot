@@ -13,9 +13,17 @@ export default class ConversationsSocketController {
   constructor() {
     this.#conversationServices = new ConversationsServices()
 
+    this.router = Router()
+    this.registerRoutes()
+
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
     this.showConversation = this.showConversation.bind(this)
+  }
+
+  protected registerRoutes(): void {
+    this.router.get('/show-channels', this.showChannels)
+    this.router.post('/close-channel', this.closeChannel)
   }
 
   /** Conversation Controllers Methods */
@@ -160,5 +168,23 @@ export default class ConversationsSocketController {
         break
       }
     }
+  }
+
+  // ROUTES
+
+  public showChannels = async (req: any, res: any): Promise<void> => {
+    const response = await this.#conversationServices.showChannelsConversationFlow()
+
+    res.send(response)
+  }
+
+  public closeChannel = async (req: any, res: any): Promise<void> => {
+    console.log('req.params= ', req.body)
+
+    const { channelId } = req.body
+
+    const response = await this.#conversationServices.endConversationFlow(channelId)
+
+    res.send(response)
   }
 }

@@ -2,19 +2,22 @@ import express from 'express'
 import cors from 'cors'
 import morgan from 'morgan'
 
-import connectionSource from './config/ormconfig'
-
-import UsersController from './modules/users/controller/users.controller'
-
 import { App as SlackApp } from '@slack/bolt'
-import ConversationController from './modules/conversations/controller/conversations.controller'
-import ImagesController from './modules/images/controller/images.controller'
-import { connectionSlackApp, slackListenersKey } from './config/slackConfig'
+
 import dotenv from 'dotenv'
 
 import http from 'http'
 import { Server } from 'socket.io'
-import ConversationsSocketController from './modules/conversations/controller/conversationsSocket.controller'
+
+import connectionSource from './config/ormconfig'
+
+import { connectionSlackApp, slackListenersKey } from './config/slackConfig'
+
+import UsersController from './modules/users/controller/users.controller'
+import ImagesController from './modules/images/controller/images.controller'
+import ConversationController from './modules/conversations/controller/conversations.controller'
+import ConversationsSocketController from './modules/conversations/controller/conversationsWeb.controller'
+import { IJoinRoomData } from './modules/conversations/shared/interfaces/conversationSocket'
 
 dotenv.config()
 
@@ -55,6 +58,7 @@ export default class App {
 
   #router(): void {
     this.#app.use('/', [new UsersController().router])
+    this.#app.use('/conversations', [new ConversationsSocketController().router])
   }
 
   public async start(): Promise<void> {
@@ -69,25 +73,25 @@ export default class App {
     io.on('connection', (socket) => {
       console.log('a user connected: ', socket.id)
 
-      // void socket.join('clock-room')
       socket.on('join_room', async (data) => {
-        console.log('JOIN ROOM')
-        const { username, room }: { username: string; room: string } = data // Data sent from client when join_room event emitted
+        const { username, channel }: IJoinRoomData = data // Data sent from client when join_room event emitted
 
-        void socket.join(room) // Join the user to a socket room
+        void socket.join(channel) // Join the user to a socket room
 
         const joinResponse = await this.#conversationSocketController.joinChannel({
-          channel: room,
+          channel,
           username,
         })
+
+        console.log(`user ${username} joined channel ${channel}`)
 
         socket.emit('join_response', joinResponse) // Send message to user that joined
       })
 
       socket.on('send_message', async (data) => {
-        const { message, username, room } = data
+        const { message, username, channel } = data
 
-        socket.to(room).emit('receive_message', {
+        socket.to(channel).emit('receive_message', {
           content: message,
           username,
           role: 'user',
@@ -95,11 +99,11 @@ export default class App {
 
         const conversationResponse = await this.#conversationSocketController.generateConversation({
           username,
-          channel: room,
+          channel,
           message,
         })
 
-        io.in(room).emit('receive_message', conversationResponse) // Send to all users in room, including sender
+        io.in(channel).emit('receive_message', conversationResponse) // Send message to all users in channel, including sender
       })
 
       socket.on('disconnect', (reason) => {
