@@ -27,7 +27,7 @@ export default class LeapRepository {
         steps: 50,
         width: 512,
         height: 512,
-        numberOfImages: 2,
+        numberOfImages: 1,
         promptStrength: 7,
         enhancePrompt: false,
         restoreFaces: true,

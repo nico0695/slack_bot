@@ -22,6 +22,7 @@ export interface IImage {
   username?: string
   slackTeamId?: string
   slackId: string
+  prompt?: string
 }
 
 export interface IUserData {

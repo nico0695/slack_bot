@@ -2,8 +2,14 @@ import LeapRepository from '../repositories/leap/leap.repository'
 import ImagesDataSources from '../repositories/database/images.dataSource'
 import { LeapStatus } from '../shared/constants/leap'
 import { IImage, ILeapImages, IUserData } from '../shared/interfaces/images.interfaces'
+import {
+  IPaginationOptions,
+  IPaginationResponse,
+} from '../../../../src/shared/interfaces/pagination'
+import { GenericResponse } from '../../../../src/shared/interfaces/services'
+import { Images } from '../../../../src/entities/images'
 
-export default class ImagessServices {
+export default class ImagesServices {
   #leapRepository: LeapRepository
   #imagesDataSources: ImagesDataSources
 
@@ -14,13 +20,18 @@ export default class ImagessServices {
     this.generateImages = this.generateImages.bind(this)
   }
 
-  #storeUserImages = async (userData: IUserData, image: ILeapImages): Promise<void> => {
+  #storeUserImages = async (
+    userData: IUserData,
+    image: ILeapImages,
+    prompt?: string
+  ): Promise<void> => {
     const imageData: IImage = {
       imageUrl: image.uri,
       inferenceId: image.id,
       slackId: userData.slackId,
       slackTeamId: userData.slackTeamId,
       username: userData.username,
+      prompt,
     }
 
     await this.#imagesDataSources.createImages(imageData)
@@ -57,7 +68,7 @@ export default class ImagessServices {
         // Save images
         await Promise.all(
           returnValue.images.map(async (image) => {
-            await this.#storeUserImages(userData, image)
+            await this.#storeUserImages(userData, image, prompt)
           })
         )
 
@@ -70,6 +81,25 @@ export default class ImagessServices {
     } catch (error) {
       console.log('error= ', error.message)
       return 'No se pudo generar la imagen'
+    }
+  }
+
+  getImages = async (
+    page: number,
+    pageSize: number
+  ): Promise<GenericResponse<IPaginationResponse<Images>>> => {
+    try {
+      const options: IPaginationOptions = {
+        page,
+        pageSize,
+      }
+
+      const images = await this.#imagesDataSources.getAllImages(options)
+
+      return { data: images }
+    } catch (error) {
+      console.log('error= ', error.message)
+      return { error: 'Error al obtener las imagenes' }
     }
   }
 }

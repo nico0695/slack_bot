@@ -1,14 +1,14 @@
 import { Router } from 'express'
 
-import ImagessServices from '../services/images.services'
+import ImagesServices from '../services/images.services'
 
 export default class ImagessController {
   public router: Router
 
-  #imagesServices: ImagessServices
+  #imagesServices: ImagesServices
 
   constructor() {
-    this.#imagesServices = new ImagessServices()
+    this.#imagesServices = new ImagesServices()
 
     this.generateImages = this.generateImages.bind(this)
   }

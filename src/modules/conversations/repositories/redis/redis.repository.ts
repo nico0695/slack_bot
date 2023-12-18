@@ -2,7 +2,7 @@ import * as redis from 'redis'
 import { IConversation, IConversationFlow } from '../../shared/interfaces/converstions'
 import { rConversationFlow } from './redis.constatns'
 
-export default class RedisRepository {
+export class RedisRepository {
   #redisClient
 
   constructor() {
@@ -94,3 +94,5 @@ export default class RedisRepository {
     }
   }
 }
+
+export const RedisRepositoryInstance = new RedisRepository()

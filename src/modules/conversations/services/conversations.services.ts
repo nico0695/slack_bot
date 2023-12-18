@@ -5,7 +5,7 @@ import UsersServices from '../../users/services/users.services'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
 
-import RedisRepository from '../repositories/redis/redis.repository'
+import { RedisRepositoryInstance, RedisRepository } from '../repositories/redis/redis.repository'
 import { conversationFlowPrefix, rConversationKey } from '../repositories/redis/redis.constatns'
 
 import {
@@ -24,7 +24,7 @@ export default class ConversationsServices {
 
   constructor() {
     this.#openaiRepository = new OpenaiRepository()
-    this.#redisRepository = new RedisRepository()
+    this.#redisRepository = RedisRepositoryInstance
 
     this.#usersServices = new UsersServices()
 

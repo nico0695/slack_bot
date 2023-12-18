@@ -17,6 +17,8 @@ import UsersController from './modules/users/controller/users.controller'
 import ImagesController from './modules/images/controller/images.controller'
 import ConversationController from './modules/conversations/controller/conversations.controller'
 import ConversationsSocketController from './modules/conversations/controller/conversationsWeb.controller'
+import ImagesWebController from './modules/images/controller/imagesWeb.controller'
+
 import { IJoinRoomData } from './modules/conversations/shared/interfaces/conversationSocket'
 
 dotenv.config()
@@ -29,6 +31,7 @@ export default class App {
 
   #conversationController: ConversationController
   #conversationSocketController: ConversationsSocketController
+
   #imagesController: ImagesController
 
   constructor() {
@@ -59,6 +62,7 @@ export default class App {
   #router(): void {
     this.#app.use('/', [new UsersController().router])
     this.#app.use('/conversations', [new ConversationsSocketController().router])
+    this.#app.use('/images', [new ImagesWebController().router])
   }
 
   public async start(): Promise<void> {

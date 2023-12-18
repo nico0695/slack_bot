@@ -20,6 +20,9 @@ export class Images extends BaseEntity {
   @Column()
   slackId: string
 
+  @Column({ default: '', nullable: false })
+  prompt: string
+
   @CreateDateColumn()
   createdAt: Date
 }
