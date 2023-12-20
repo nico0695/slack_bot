@@ -266,6 +266,43 @@ export default class ConversationsServices {
     }
   }
 
+  sendMessageToConversationFlow = async (
+    message: string,
+    userSlackId: string,
+    channelId: string
+  ): Promise<IConversation | null> => {
+    try {
+      /** Get conversation */
+      const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+
+      if (conversationFlow === null) {
+        return null
+      }
+
+      const newConversation: IUserConversation = {
+        role: roleTypes.user,
+        content: message,
+        userSlackId,
+      }
+
+      const { conversation: conversationStored } = conversationFlow
+
+      const newConversationUser = [...conversationStored, newConversation]
+
+      /** Save conversation */
+      await this.#redisRepository.saveConversationFlow(channelId, {
+        ...conversationFlow,
+        conversation: newConversationUser,
+        updatedAt: new Date(),
+      })
+
+      return newConversation
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
   showConversationFlow = async (channelId: string, teamId?: string): Promise<string[] | null> => {
     try {
       /** Get conversation */

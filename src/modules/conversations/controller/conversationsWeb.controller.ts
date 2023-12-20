@@ -53,19 +53,30 @@ export default class ConversationsSocketController {
     username: string
     channel: string
     message: string
+    iaEnabled?: boolean
   }): Promise<IConversation | null> => {
     console.log('### generateConversation ###')
 
     try {
       const newMessage: string = data.message
 
-      const newResponse = await this.#conversationServices.generateConversationFlow(
+      if (data.iaEnabled) {
+        const newResponse = await this.#conversationServices.generateConversationFlow(
+          newMessage,
+          data.username,
+          data.channel
+        )
+
+        return newResponse
+      }
+
+      await this.#conversationServices.sendMessageToConversationFlow(
         newMessage,
         data.username,
         data.channel
       )
 
-      return newResponse
+      return null
     } catch (error) {
       console.log('err= ', error)
       return null
