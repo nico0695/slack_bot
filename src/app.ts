@@ -93,11 +93,11 @@ export default class App {
       })
 
       socket.on('send_message', async (data) => {
-        const { message, username, channel } = data
+        const { message, username, channel, iaEnabled } = data
 
         socket.to(channel).emit('receive_message', {
           content: message,
-          username,
+          userSlackId: username,
           role: 'user',
         })
 
@@ -105,9 +105,12 @@ export default class App {
           username,
           channel,
           message,
+          iaEnabled,
         })
 
-        io.in(channel).emit('receive_message', conversationResponse) // Send message to all users in channel, including sender
+        if (conversationResponse !== null) {
+          io.in(channel).emit('receive_message', conversationResponse) // Send message to all users in channel, including sender
+        }
       })
 
       socket.on('disconnect', (reason) => {
