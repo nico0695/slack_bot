@@ -6,14 +6,25 @@ import { IUsers } from '../interfaces/users.interfaces'
 import SlackRepository from '../repositories/slack/slack.repository'
 
 export default class UsersServices {
+  static #instance: UsersServices
+
   #usersDataSource: UsersDataSource
   #slackRepository: SlackRepository
 
-  constructor() {
-    this.#usersDataSource = new UsersDataSource()
-    this.#slackRepository = new SlackRepository()
+  private constructor() {
+    this.#usersDataSource = UsersDataSource.getInstance()
+    this.#slackRepository = SlackRepository.getInstance()
 
     this.createUser = this.createUser.bind(this)
+  }
+
+  static getInstance(): UsersServices {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new UsersServices()
+    return this.#instance
   }
 
   /**

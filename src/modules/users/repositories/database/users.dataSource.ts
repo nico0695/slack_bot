@@ -3,6 +3,19 @@ import { Users } from '../../../../entities/users'
 import { IUsers } from '../../interfaces/users.interfaces'
 
 export default class UsersDataSources {
+  static #instance: UsersDataSources
+
+  private constructor() {}
+
+  static getInstance(): UsersDataSources {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new UsersDataSources()
+    return this.#instance
+  }
+
   /**
    * Verify if email exist in database
    * @param email string - Email user

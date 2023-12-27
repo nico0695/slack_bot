@@ -5,7 +5,7 @@ import UsersServices from '../../users/services/users.services'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
 
-import { RedisRepositoryInstance, RedisRepository } from '../repositories/redis/redis.repository'
+import { RedisRepository } from '../repositories/redis/redis.repository'
 import { conversationFlowPrefix, rConversationKey } from '../repositories/redis/redis.constatns'
 
 import {
@@ -17,18 +17,27 @@ import {
 type TMembersNames = Record<string, string>
 
 export default class ConversationsServices {
+  static #instance: ConversationsServices
+
   #openaiRepository: OpenaiRepository
   #redisRepository: RedisRepository
 
   #usersServices: UsersServices
 
-  constructor() {
-    this.#openaiRepository = new OpenaiRepository()
-    this.#redisRepository = RedisRepositoryInstance
+  private constructor() {
+    this.#openaiRepository = OpenaiRepository.getInstance()
+    this.#redisRepository = RedisRepository.getInstance()
 
-    this.#usersServices = new UsersServices()
+    this.#usersServices = UsersServices.getInstance()
+  }
 
-    this.generateConversation = this.generateConversation.bind(this)
+  static getInstance(): ConversationsServices {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new ConversationsServices()
+    return this.#instance
   }
 
   #generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {

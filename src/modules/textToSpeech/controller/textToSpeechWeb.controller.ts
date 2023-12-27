@@ -6,15 +6,26 @@ import path from 'path'
 import TextToSpeechServices from '../services/textToSpeech.services'
 
 export default class TextToSpeechWebController {
+  static #instance: TextToSpeechWebController
+
   public router: Router
 
   #textToSpeechServices: TextToSpeechServices
 
-  constructor() {
-    this.#textToSpeechServices = new TextToSpeechServices()
+  private constructor() {
+    this.#textToSpeechServices = TextToSpeechServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
+  }
+
+  static getInstance(): TextToSpeechWebController {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new TextToSpeechWebController()
+    return this.#instance
   }
 
   protected registerRoutes(): void {

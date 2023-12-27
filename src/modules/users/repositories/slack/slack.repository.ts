@@ -3,12 +3,23 @@ import { UsersListResponse } from '@slack/web-api'
 import { connectionSlackApp } from '../../../../config/slackConfig'
 
 export default class SlackRepository {
+  static #instance: SlackRepository
+
   #slackApp: SlackApp
 
-  constructor() {
+  private constructor() {
     this.getTeamMembers = this.getTeamMembers.bind(this)
 
     this.#slackApp = connectionSlackApp
+  }
+
+  static getInstance(): SlackRepository {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new SlackRepository()
+    return this.#instance
   }
 
   getTeamMembers = async (teamId: string): Promise<any | null> => {

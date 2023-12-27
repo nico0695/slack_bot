@@ -5,11 +5,13 @@ import {
 } from '../../shared/interfaces/images.interfaces'
 
 export default class LeapRepository {
+  static #instance: LeapRepository
+
   #header
 
   #modelId = 'eab32df0-de26-4b83-a908-a83f3015e971'
 
-  constructor() {
+  private constructor() {
     this.generateImage = this.generateImage.bind(this)
 
     this.#header = {
@@ -17,6 +19,15 @@ export default class LeapRepository {
       'Content-Type': 'application/json',
       authorization: `Bearer ${process.env.LEAP_API_KEY}`,
     }
+  }
+
+  static getInstance(): LeapRepository {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new LeapRepository()
+    return this.#instance
   }
 
   // generate image and get inference id

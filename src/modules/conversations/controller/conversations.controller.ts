@@ -6,16 +6,27 @@ import { IConversation } from '../shared/interfaces/converstions'
 import { FlowKeys } from '../shared/constants/conversationFlow'
 
 export default class ConversationsController {
+  static #instance: ConversationsController
+
   public router: Router
 
   #conversationServices: ConversationsServices
 
-  constructor() {
-    this.#conversationServices = new ConversationsServices()
+  private constructor() {
+    this.#conversationServices = ConversationsServices.getInstance()
 
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
     this.showConversation = this.showConversation.bind(this)
+  }
+
+  static getInstance(): ConversationsController {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new ConversationsController()
+    return this.#instance
   }
 
   /** Conversation Controllers Methods */

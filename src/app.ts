@@ -16,7 +16,7 @@ import { connectionSlackApp, slackListenersKey } from './config/slackConfig'
 import UsersController from './modules/users/controller/users.controller'
 import ImagesController from './modules/images/controller/images.controller'
 import ConversationController from './modules/conversations/controller/conversations.controller'
-import ConversationsSocketController from './modules/conversations/controller/conversationsWeb.controller'
+import ConversationsWebController from './modules/conversations/controller/conversationsWeb.controller'
 import ImagesWebController from './modules/images/controller/imagesWeb.controller'
 import TextToSpeechWebController from './modules/textToSpeech/controller/textToSpeechWeb.controller'
 
@@ -30,23 +30,35 @@ export default class App {
   #app: express.Application
   #slackApp: SlackApp
 
+  #usersController: UsersController
+
   #conversationController: ConversationController
-  #conversationSocketController: ConversationsSocketController
+  #conversationWebController: ConversationsWebController
 
   #imagesController: ImagesController
+  #imagesWebController: ImagesWebController
+
+  #textToSpeechWebController: TextToSpeechWebController
 
   constructor() {
     // Express
     this.#app = express()
     this.#config()
-    this.#router()
 
     // Slack
     this.#slackApp = connectionSlackApp
 
-    this.#conversationController = new ConversationController()
-    this.#conversationSocketController = new ConversationsSocketController()
-    this.#imagesController = new ImagesController()
+    this.#usersController = UsersController.getInstance()
+
+    this.#conversationController = ConversationController.getInstance()
+    this.#conversationWebController = ConversationsWebController.getInstance()
+
+    this.#imagesController = ImagesController.getInstance()
+    this.#imagesWebController = ImagesWebController.getInstance()
+
+    this.#textToSpeechWebController = TextToSpeechWebController.getInstance()
+
+    this.#router()
   }
 
   #config(): void {
@@ -61,10 +73,10 @@ export default class App {
   }
 
   #router(): void {
-    this.#app.use('/', [new UsersController().router])
-    this.#app.use('/conversations', [new ConversationsSocketController().router])
-    this.#app.use('/images', [new ImagesWebController().router])
-    this.#app.use('/text-to-speech', [new TextToSpeechWebController().router])
+    this.#app.use('/', [this.#usersController.router])
+    this.#app.use('/conversations', [this.#conversationWebController.router])
+    this.#app.use('/images', [this.#imagesWebController.router])
+    this.#app.use('/text-to-speech', [this.#textToSpeechWebController.router])
   }
 
   public async start(): Promise<void> {
@@ -84,7 +96,7 @@ export default class App {
 
         void socket.join(channel) // Join the user to a socket room
 
-        const joinResponse = await this.#conversationSocketController.joinChannel({
+        const joinResponse = await this.#conversationWebController.joinChannel({
           channel,
           username,
         })
@@ -103,7 +115,7 @@ export default class App {
           role: 'user',
         })
 
-        const conversationResponse = await this.#conversationSocketController.generateConversation({
+        const conversationResponse = await this.#conversationWebController.generateConversation({
           username,
           channel,
           message,

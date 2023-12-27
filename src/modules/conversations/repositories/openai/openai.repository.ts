@@ -2,9 +2,11 @@ import { Configuration, OpenAIApi } from 'openai'
 import { IConversation } from '../../shared/interfaces/converstions'
 
 export default class OpenaiRepository {
+  static #instance: OpenaiRepository
+
   #openai
 
-  constructor() {
+  private constructor() {
     const configuration = new Configuration({
       apiKey: process.env.OPENAI_API_KEY,
       organization: 'org-dlzE8QUXcRrvBN096fSCdHBf',
@@ -13,6 +15,15 @@ export default class OpenaiRepository {
     this.#openai = new OpenAIApi(configuration)
 
     this.chatCompletion = this.chatCompletion.bind(this)
+  }
+
+  static getInstance(): OpenaiRepository {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new OpenaiRepository()
+    return this.#instance
   }
 
   chatCompletion = async (messages: any): Promise<IConversation | null> => {

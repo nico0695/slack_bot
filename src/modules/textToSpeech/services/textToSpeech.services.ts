@@ -6,14 +6,25 @@ import { IPaginationOptions, IPaginationResponse } from '../../../shared/interfa
 import { TextToSpeech } from '../../../entities/textToSpeech'
 
 export default class TextToSpeechServices {
+  static #instance: TextToSpeechServices
+
   #transformersRepository: TransformersRepository
   #textToSpeechDataSources: TextToSpeechDataSources
 
-  constructor() {
-    this.#transformersRepository = new TransformersRepository()
-    this.#textToSpeechDataSources = new TextToSpeechDataSources()
+  private constructor() {
+    this.#transformersRepository = TransformersRepository.getInstance()
+    this.#textToSpeechDataSources = TextToSpeechDataSources.getInstance()
 
     this.generateSpeech = this.generateSpeech.bind(this)
+  }
+
+  static getInstance(): TextToSpeechServices {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new TextToSpeechServices()
+    return this.#instance
   }
 
   generateSpeech = async (phrase: string): Promise<GenericResponse<string>> => {

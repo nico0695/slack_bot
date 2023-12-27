@@ -3,11 +3,22 @@ import { IConversation, IConversationFlow } from '../../shared/interfaces/conver
 import { rConversationFlow } from './redis.constatns'
 
 export class RedisRepository {
+  static #instance: RedisRepository
+
   #redisClient
 
-  constructor() {
+  private constructor() {
     this.#redisClient = redis.createClient()
     void this.#connect()
+  }
+
+  static getInstance(): RedisRepository {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new RedisRepository()
+    return this.#instance
   }
 
   #connect = async (): Promise<void> => {
@@ -94,5 +105,3 @@ export class RedisRepository {
     }
   }
 }
-
-export const RedisRepositoryInstance = new RedisRepository()

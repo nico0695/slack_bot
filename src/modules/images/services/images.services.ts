@@ -10,14 +10,25 @@ import { GenericResponse } from '../../../../src/shared/interfaces/services'
 import { Images } from '../../../../src/entities/images'
 
 export default class ImagesServices {
+  static #instance: ImagesServices
+
   #leapRepository: LeapRepository
   #imagesDataSources: ImagesDataSources
 
-  constructor() {
-    this.#leapRepository = new LeapRepository()
-    this.#imagesDataSources = new ImagesDataSources()
+  private constructor() {
+    this.#leapRepository = LeapRepository.getInstance()
+    this.#imagesDataSources = ImagesDataSources.getInstance()
 
     this.generateImages = this.generateImages.bind(this)
+  }
+
+  static getInstance(): ImagesServices {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new ImagesServices()
+    return this.#instance
   }
 
   #storeUserImages = async (

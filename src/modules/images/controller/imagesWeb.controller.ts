@@ -3,15 +3,26 @@ import { Router } from 'express'
 import ImagesServices from '../services/images.services'
 
 export default class ImagesWebController {
+  static #instance: ImagesWebController
+
   public router: Router
 
   #imagesServices: ImagesServices
 
-  constructor() {
-    this.#imagesServices = new ImagesServices()
+  private constructor() {
+    this.#imagesServices = ImagesServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
+  }
+
+  static getInstance(): ImagesWebController {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new ImagesWebController()
+    return this.#instance
   }
 
   protected registerRoutes(): void {

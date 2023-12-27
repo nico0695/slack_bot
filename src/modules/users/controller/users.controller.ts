@@ -6,17 +6,28 @@ import UsersServices from '../services/users.services'
 import { IUsers } from '../interfaces/users.interfaces'
 
 export default class UsersController {
+  static #instance: UsersController
+
   public router: Router
 
   #usersServices: UsersServices
 
-  constructor() {
+  private constructor() {
     this.createUser = this.createUser.bind(this)
 
-    this.#usersServices = new UsersServices()
+    this.#usersServices = UsersServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
+  }
+
+  static getInstance(): UsersController {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new UsersController()
+    return this.#instance
   }
 
   /** Users Routes */

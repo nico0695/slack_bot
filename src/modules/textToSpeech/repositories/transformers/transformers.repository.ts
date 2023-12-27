@@ -6,6 +6,19 @@ const EMBED =
   'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin'
 
 export default class TransformersRepository {
+  static #instance: TransformersRepository
+
+  private constructor() {}
+
+  static getInstance(): TransformersRepository {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new TransformersRepository()
+    return this.#instance
+  }
+
   generateSpeech = async (
     phrase: string
   ): Promise<{

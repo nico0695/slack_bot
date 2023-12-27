@@ -3,14 +3,25 @@ import { Router } from 'express'
 import ImagesServices from '../services/images.services'
 
 export default class ImagessController {
+  static #instance: ImagessController
+
   public router: Router
 
   #imagesServices: ImagesServices
 
-  constructor() {
-    this.#imagesServices = new ImagesServices()
+  private constructor() {
+    this.#imagesServices = ImagesServices.getInstance()
 
     this.generateImages = this.generateImages.bind(this)
+  }
+
+  static getInstance(): ImagessController {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new ImagessController()
+    return this.#instance
   }
 
   /** Images Controllers Methods */

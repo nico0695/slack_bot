@@ -5,13 +5,15 @@ import ConversationsServices from '../services/conversations.services'
 import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
 import { FlowKeys } from '../shared/constants/conversationFlow'
 
-export default class ConversationsSocketController {
+export default class ConversationsWebController {
+  static #instance: ConversationsWebController
+
   public router: Router
 
   #conversationServices: ConversationsServices
 
-  constructor() {
-    this.#conversationServices = new ConversationsServices()
+  private constructor() {
+    this.#conversationServices = ConversationsServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
@@ -19,6 +21,15 @@ export default class ConversationsSocketController {
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
     this.showConversation = this.showConversation.bind(this)
+  }
+
+  static getInstance(): ConversationsWebController {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new ConversationsWebController()
+    return this.#instance
   }
 
   protected registerRoutes(): void {

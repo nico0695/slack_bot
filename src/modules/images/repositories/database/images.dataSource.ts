@@ -4,6 +4,19 @@ import { IImage } from '../../shared/interfaces/images.interfaces'
 import { IPaginationOptions, IPaginationResponse } from '../../../../shared/interfaces/pagination'
 
 export default class ImagesDataSources {
+  static #instance: ImagesDataSources
+
+  private constructor() {}
+
+  static getInstance(): ImagesDataSources {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new ImagesDataSources()
+    return this.#instance
+  }
+
   /**
    * Save user in database
    * @param data IImage - Data image

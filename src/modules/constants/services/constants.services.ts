@@ -5,10 +5,21 @@ import { setGlobalConfigValue } from '../../../config/globalConfig'
 import { GlobalConfigKey } from '../shared/constants/constants.interfaces'
 
 export default class ConstantsServices {
+  static #instance: ConstantsServices
+
   #constantsDataSources: ConstantsDataSources
 
-  constructor() {
-    this.#constantsDataSources = new ConstantsDataSources()
+  private constructor() {
+    this.#constantsDataSources = ConstantsDataSources.getInstance()
+  }
+
+  static getInstance(): ConstantsServices {
+    if (this.#instance) {
+      return this.#instance
+    }
+
+    this.#instance = new ConstantsServices()
+    return this.#instance
   }
 
   getAllConstants = async (): Promise<Constants[]> => {
