@@ -18,6 +18,7 @@ import ImagesController from './modules/images/controller/images.controller'
 import ConversationController from './modules/conversations/controller/conversations.controller'
 import ConversationsSocketController from './modules/conversations/controller/conversationsWeb.controller'
 import ImagesWebController from './modules/images/controller/imagesWeb.controller'
+import TextToSpeechWebController from './modules/textToSpeech/controller/textToSpeechWeb.controller'
 
 import { IJoinRoomData } from './modules/conversations/shared/interfaces/conversationSocket'
 
@@ -63,6 +64,7 @@ export default class App {
     this.#app.use('/', [new UsersController().router])
     this.#app.use('/conversations', [new ConversationsSocketController().router])
     this.#app.use('/images', [new ImagesWebController().router])
+    this.#app.use('/text-to-speech', [new TextToSpeechWebController().router])
   }
 
   public async start(): Promise<void> {
