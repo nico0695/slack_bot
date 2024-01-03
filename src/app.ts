@@ -21,6 +21,7 @@ import ImagesWebController from './modules/images/controller/imagesWeb.controlle
 import TextToSpeechWebController from './modules/textToSpeech/controller/textToSpeechWeb.controller'
 
 import { IJoinRoomData } from './modules/conversations/shared/interfaces/conversationSocket'
+import SummaryWebController from './modules/summary/controller/summary.controller'
 
 dotenv.config()
 
@@ -39,6 +40,7 @@ export default class App {
   #imagesWebController: ImagesWebController
 
   #textToSpeechWebController: TextToSpeechWebController
+  #summaryWebController: SummaryWebController
 
   constructor() {
     // Express
@@ -57,6 +59,7 @@ export default class App {
     this.#imagesWebController = ImagesWebController.getInstance()
 
     this.#textToSpeechWebController = TextToSpeechWebController.getInstance()
+    this.#summaryWebController = SummaryWebController.getInstance()
 
     this.#router()
   }
@@ -77,6 +80,32 @@ export default class App {
     this.#app.use('/conversations', [this.#conversationWebController.router])
     this.#app.use('/images', [this.#imagesWebController.router])
     this.#app.use('/text-to-speech', [this.#textToSpeechWebController.router])
+    this.#app.use('/summary', [this.#summaryWebController.router])
+  }
+
+  #slackListeners(): void {
+    // Start slack bot
+    void this.#slackApp.start(process.env.PORT ?? slackPort).then(() => {
+      console.log(`~ Slack Bot is running on port ${slackPort}!`)
+    })
+
+    // Listener slack bot
+    this.#slackApp.message(
+      slackListenersKey.generateConversation,
+      this.#conversationController.generateConversation
+    )
+    this.#slackApp.message(
+      slackListenersKey.cleanConversation,
+      this.#conversationController.cleanConversation
+    )
+    this.#slackApp.message(
+      slackListenersKey.showConversation,
+      this.#conversationController.showConversation
+    )
+
+    this.#slackApp.message('', this.#conversationController.conversationFlow)
+
+    this.#slackApp.message(slackListenersKey.generateImages, this.#imagesController.generateImages)
   }
 
   public async start(): Promise<void> {
@@ -137,27 +166,6 @@ export default class App {
       console.log('~ Socket Server listening in port 4000!')
     })
 
-    // Start slack bot
-    void this.#slackApp.start(process.env.PORT ?? slackPort).then(() => {
-      console.log(`~ Slack Bot is running on port ${slackPort}!`)
-    })
-
-    // Listener slack bot
-    this.#slackApp.message(
-      slackListenersKey.generateConversation,
-      this.#conversationController.generateConversation
-    )
-    this.#slackApp.message(
-      slackListenersKey.cleanConversation,
-      this.#conversationController.cleanConversation
-    )
-    this.#slackApp.message(
-      slackListenersKey.showConversation,
-      this.#conversationController.showConversation
-    )
-
-    this.#slackApp.message('', this.#conversationController.conversationFlow)
-
-    this.#slackApp.message(slackListenersKey.generateImages, this.#imagesController.generateImages)
+    this.#slackListeners()
   }
 }
