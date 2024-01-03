@@ -3,3 +3,8 @@ export enum FlowKeys {
   END = 'end conversation',
   SHOW = 'show conversation',
 }
+
+export enum ChannelType {
+  SLACK = 'slack',
+  WEB = 'web',
+}

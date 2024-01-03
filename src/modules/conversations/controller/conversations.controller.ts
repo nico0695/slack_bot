@@ -3,7 +3,7 @@ import { Router } from 'express'
 import ConversationsServices from '../services/conversations.services'
 import { roleTypes } from '../shared/constants/openai'
 import { IConversation } from '../shared/interfaces/converstions'
-import { FlowKeys } from '../shared/constants/conversationFlow'
+import { ChannelType, FlowKeys } from '../shared/constants/conversationFlow'
 
 export default class ConversationsController {
   static #instance: ConversationsController
@@ -115,7 +115,10 @@ export default class ConversationsController {
 
     switch (message) {
       case FlowKeys.START: {
-        const response = await this.#conversationServices.startConversationFlow(payload.channel)
+        const response = await this.#conversationServices.startConversationFlow(
+          payload.channel,
+          ChannelType.SLACK
+        )
         say(response ?? 'No se pudo iniciar la conversación 🤷‍♂️')
         break
       }

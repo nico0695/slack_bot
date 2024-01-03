@@ -13,6 +13,7 @@ import {
   IConversationFlow,
   IUserConversation,
 } from '../shared/interfaces/converstions'
+import { ChannelType } from '../shared/constants/conversationFlow'
 
 type TMembersNames = Record<string, string>
 
@@ -159,7 +160,10 @@ export default class ConversationsServices {
     return false
   }
 
-  startConversationFlow = async (channelId?: string): Promise<string | null> => {
+  startConversationFlow = async (
+    channelId?: string,
+    channelType: ChannelType = ChannelType.SLACK
+  ): Promise<string> => {
     try {
       const conversationStarted = await this.conversationFlowStarted(channelId)
 
@@ -172,6 +176,7 @@ export default class ConversationsServices {
         updatedAt: new Date(),
         chanelId: channelId ?? '',
         conversation: [],
+        channelType,
       }
 
       const response = await this.#redisRepository.saveConversationFlow(channelId, newConversation)

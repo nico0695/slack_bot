@@ -1,3 +1,5 @@
+import { ChannelType } from '../constants/conversationFlow'
+
 export interface IConversation {
   role: string
   content: string
@@ -12,4 +14,5 @@ export interface IConversationFlow {
   updatedAt: Date
   chanelId: string
   conversation: IUserConversation[]
+  channelType: ChannelType
 }

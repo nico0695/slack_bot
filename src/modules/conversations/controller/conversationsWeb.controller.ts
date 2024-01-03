@@ -3,7 +3,7 @@ import { Router } from 'express'
 import ConversationsServices from '../services/conversations.services'
 
 import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
-import { FlowKeys } from '../shared/constants/conversationFlow'
+import { ChannelType, FlowKeys } from '../shared/constants/conversationFlow'
 
 export default class ConversationsWebController {
   static #instance: ConversationsWebController
@@ -46,7 +46,10 @@ export default class ConversationsWebController {
     message: string
     conversation: IUserConversation[]
   }> => {
-    const response = await this.#conversationServices.startConversationFlow(data.channel)
+    const response = await this.#conversationServices.startConversationFlow(
+      data.channel,
+      ChannelType.WEB
+    )
 
     const conversation = await this.#conversationServices.showConversationFlowWeb(data.channel)
 
@@ -150,7 +153,10 @@ export default class ConversationsWebController {
 
     switch (message) {
       case FlowKeys.START: {
-        const response = await this.#conversationServices.startConversationFlow(payload.channel)
+        const response = await this.#conversationServices.startConversationFlow(
+          payload.channel,
+          ChannelType.WEB
+        )
         say(response ?? 'No se pudo iniciar la conversación 🤷‍♂️')
         break
       }
