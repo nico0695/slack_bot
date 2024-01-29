@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import ImagesServices from '../services/images.services'
+import { verifyToken } from '../../../shared/middleware/auth'
 
 export default class ImagesWebController {
   static #instance: ImagesWebController
@@ -26,7 +27,7 @@ export default class ImagesWebController {
   }
 
   protected registerRoutes(): void {
-    this.router.get('/get-images', this.getImages)
+    this.router.get('/get-images', verifyToken, this.getImages)
   }
 
   // ROUTES

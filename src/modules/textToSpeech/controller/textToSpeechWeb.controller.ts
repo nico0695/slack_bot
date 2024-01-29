@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 
 import TextToSpeechServices from '../services/textToSpeech.services'
+import { verifyToken } from '../../../shared/middleware/auth'
 
 export default class TextToSpeechWebController {
   static #instance: TextToSpeechWebController
@@ -29,9 +30,9 @@ export default class TextToSpeechWebController {
   }
 
   protected registerRoutes(): void {
-    this.router.get('/', this.getTextToSpeechList)
-    this.router.get('/:id/audio', this.getAudio)
-    this.router.post('/generate', this.generateTextoToSpeech)
+    this.router.get('/', verifyToken, this.getTextToSpeechList)
+    this.router.get('/:id/audio', verifyToken, this.getAudio)
+    this.router.post('/generate', verifyToken, this.generateTextoToSpeech)
   }
 
   // ROUTES

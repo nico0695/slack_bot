@@ -6,6 +6,9 @@ export interface IUsers {
   phone: string
   email: string
   createdAt?: Date
+
   slackId?: string
   slackTeamId?: string
+
+  supabaseId?: string
 }

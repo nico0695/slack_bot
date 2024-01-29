@@ -39,6 +39,7 @@ export default class UsersDataSources {
   public async createUser(data: IUsers): Promise<Users> {
     try {
       const newUser = new Users()
+
       newUser.username = data.username
       newUser.name = data.name
       newUser.lastName = data.lastName
@@ -46,10 +47,28 @@ export default class UsersDataSources {
       newUser.phone = data.phone
       newUser.slackId = data.slackId
       newUser.slackTeamId = data.slackTeamId
+      newUser.supabaseId = data.supabaseId
 
       await newUser.save()
 
       return newUser
+    } catch (error) {
+      return error
+    }
+  }
+
+  /**
+   * Update user by id
+   * @param data Partial<IUsers>
+   * @returns IUser
+   */
+  public async updateUserById(id: number, data: Partial<IUsers>): Promise<IUsers | undefined> {
+    try {
+      await Users.update(id, data)
+
+      const user = await Users.findOne({ where: { id: data.id } })
+
+      return user
     } catch (error) {
       return error
     }
@@ -65,8 +84,7 @@ export default class UsersDataSources {
       const user = await Users.findOne({ where: { slackId } })
 
       if (user) {
-        const { username, name, lastName, email, phone, slackId, slackTeamId } = user
-        return { username, name, lastName, email, phone, slackId, slackTeamId }
+        return user
       }
 
       return undefined
@@ -84,10 +102,23 @@ export default class UsersDataSources {
     try {
       const users = await Users.find({ where: { slackTeamId } })
 
-      return users.map((user) => {
-        const { username, name, lastName, email, phone, slackId, slackTeamId } = user
-        return { username, name, lastName, email, phone, slackId, slackTeamId }
-      })
+      if (users) {
+        return users
+      }
+    } catch (error) {
+      return error
+    }
+  }
+
+  public async getUserByEmail(email: string): Promise<IUsers | undefined> {
+    try {
+      const user = await Users.findOne({ where: { email } })
+
+      if (user) {
+        return user
+      }
+
+      return undefined
     } catch (error) {
       return error
     }
