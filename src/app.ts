@@ -2,8 +2,6 @@ import express from 'express'
 import cors from 'cors'
 import morgan from 'morgan'
 
-import { App as SlackApp } from '@slack/bolt'
-
 import dotenv from 'dotenv'
 
 import http from 'http'
@@ -11,6 +9,7 @@ import { Server } from 'socket.io'
 
 import connectionSource from './config/ormconfig'
 
+import { App as SlackApp } from '@slack/bolt'
 import { connectionSlackApp, slackListenersKey } from './config/slackConfig'
 
 import UsersController from './modules/users/controller/users.controller'
@@ -50,6 +49,7 @@ export default class App {
     // Slack
     this.#slackApp = connectionSlackApp
 
+    // Web
     this.#usersController = UsersController.getInstance()
 
     this.#conversationController = ConversationController.getInstance()
@@ -108,9 +108,7 @@ export default class App {
     this.#slackApp.message(slackListenersKey.generateImages, this.#imagesController.generateImages)
   }
 
-  public async start(): Promise<void> {
-    // Socket io
-    const server = http.createServer(this.#app)
+  #socketListeners(server: http.Server): void {
     const io = new Server(server, {
       cors: {
         origin: 'http://localhost:3000',
@@ -121,7 +119,7 @@ export default class App {
       console.log('a user connected: ', socket.id)
 
       socket.on('join_room', async (data) => {
-        const { username, channel }: IJoinRoomData = data // Data sent from client when join_room event emitted
+        const { username, channel }: IJoinRoomData = data
 
         void socket.join(channel) // Join the user to a socket room
 
@@ -160,12 +158,21 @@ export default class App {
         console.log('user disconnected= ', reason)
       })
     })
+  }
+
+  // Start server
+  public async start(): Promise<void> {
+    const server = http.createServer(this.#app)
+
+    // Socket io
+    this.#socketListeners(server)
 
     // Start express
     server.listen(this.#app.get('port'), () => {
       console.log('~ Socket Server listening in port 4000!')
     })
 
+    // Slack
     this.#slackListeners()
   }
 }

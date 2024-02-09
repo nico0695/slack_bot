@@ -1,3 +1,4 @@
+import { Profiles } from '../shared/constants/auth.constants'
 import { Entity, BaseEntity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm'
 
 @Entity()
@@ -31,4 +32,7 @@ export class Users extends BaseEntity {
 
   @Column({ default: null, nullable: true })
   supabaseId: string
+
+  @Column({ default: Profiles.USER, nullable: true })
+  profile: Profiles
 }

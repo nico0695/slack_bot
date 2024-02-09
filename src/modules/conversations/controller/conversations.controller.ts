@@ -18,6 +18,7 @@ export default class ConversationsController {
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
     this.showConversation = this.showConversation.bind(this)
+    this.conversationFlow = this.conversationFlow.bind(this)
   }
 
   static getInstance(): ConversationsController {
@@ -35,7 +36,7 @@ export default class ConversationsController {
    *
    * @param data slack response
    */
-  public generateConversation = async (data: any): Promise<void> => {
+  public async generateConversation(data: any): Promise<void> {
     console.log('### generateConversation ###')
     const { payload, say }: any = data
 
@@ -63,7 +64,7 @@ export default class ConversationsController {
    * Clean conversation
    * @param data slack response
    */
-  public cleanConversation = async (data: any): Promise<void> => {
+  public async cleanConversation(data: any): Promise<void> {
     console.log('### cleanConversation ###')
     const { payload, say }: any = data
 
@@ -88,7 +89,7 @@ export default class ConversationsController {
    * Clean conversation
    * @param data slack response
    */
-  public showConversation = async (data: any): Promise<void> => {
+  public async showConversation(data: any): Promise<void> {
     console.log('### showConversation ###')
     const { payload, say, body }: any = data
 
@@ -108,7 +109,7 @@ export default class ConversationsController {
   /**
    * Manage conversation flow between users and bot
    */
-  public conversationFlow = async (data: any): Promise<void> => {
+  public async conversationFlow(data: any): Promise<void> {
     const { payload, say, body }: any = data
 
     const message: string = payload.text

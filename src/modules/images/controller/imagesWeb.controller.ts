@@ -1,7 +1,8 @@
 import { Router } from 'express'
 
+import { HttpAuth } from '../../../shared/middleware/auth'
+
 import ImagesServices from '../services/images.services'
-import { verifyToken } from '../../../shared/middleware/auth'
 
 export default class ImagesWebController {
   static #instance: ImagesWebController
@@ -11,6 +12,8 @@ export default class ImagesWebController {
   #imagesServices: ImagesServices
 
   private constructor() {
+    this.getImages = this.getImages.bind(this)
+
     this.#imagesServices = ImagesServices.getInstance()
 
     this.router = Router()
@@ -27,12 +30,13 @@ export default class ImagesWebController {
   }
 
   protected registerRoutes(): void {
-    this.router.get('/get-images', verifyToken, this.getImages)
+    this.router.get('/get-images', this.getImages)
   }
 
   // ROUTES
 
-  public getImages = async (req: any, res: any): Promise<void> => {
+  @HttpAuth
+  public async getImages(req: any, res: any): Promise<void> {
     const {
       query: { page = 1, pageSize = 6 },
     } = req

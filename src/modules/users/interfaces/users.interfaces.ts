@@ -1,3 +1,5 @@
+import { Profiles } from '../../../shared/constants/auth.constants'
+
 export interface IUsers {
   id?: number
   username: string
@@ -11,4 +13,6 @@ export interface IUsers {
   slackTeamId?: string
 
   supabaseId?: string
+
+  profile?: Profiles
 }

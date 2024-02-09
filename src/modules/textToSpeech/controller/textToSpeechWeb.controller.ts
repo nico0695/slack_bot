@@ -4,7 +4,8 @@ import fs from 'fs'
 import path from 'path'
 
 import TextToSpeechServices from '../services/textToSpeech.services'
-import { verifyToken } from '../../../shared/middleware/auth'
+import { HttpAuth, Permission } from '../../../shared/middleware/auth'
+import { Profiles } from '../../../shared/constants/auth.constants'
 
 export default class TextToSpeechWebController {
   static #instance: TextToSpeechWebController
@@ -14,6 +15,10 @@ export default class TextToSpeechWebController {
   #textToSpeechServices: TextToSpeechServices
 
   private constructor() {
+    this.generateTextoToSpeech = this.generateTextoToSpeech.bind(this)
+    this.getTextToSpeechList = this.getTextToSpeechList.bind(this)
+    this.getAudio = this.getAudio.bind(this)
+
     this.#textToSpeechServices = TextToSpeechServices.getInstance()
 
     this.router = Router()
@@ -30,17 +35,18 @@ export default class TextToSpeechWebController {
   }
 
   protected registerRoutes(): void {
-    this.router.get('/', verifyToken, this.getTextToSpeechList)
-    this.router.get('/:id/audio', verifyToken, this.getAudio)
-    this.router.post('/generate', verifyToken, this.generateTextoToSpeech)
+    this.router.get('/', this.getTextToSpeechList)
+    this.router.get('/:id/audio', this.getAudio)
+    this.router.post('/generate', this.generateTextoToSpeech)
   }
 
   // ROUTES
 
-  public generateTextoToSpeech = async (req: any, res: any): Promise<void> => {
+  @HttpAuth
+  @Permission([Profiles.ADMIN, Profiles.USER_PREMIUM])
+  public async generateTextoToSpeech(req: any, res: any): Promise<void> {
     const { body } = req
     const { phrase } = body
-
     try {
       if (!phrase) {
         res.status(400).send({ error: 'Prompt is required' })
@@ -51,12 +57,13 @@ export default class TextToSpeechWebController {
 
       res.status(200).send(response.data)
     } catch (error) {
-      console.log('error= ', error.message)
       res.status(500).send({ error: error.message })
     }
   }
 
-  public getTextToSpeechList = async (req: any, res: any): Promise<void> => {
+  @HttpAuth
+  @Permission()
+  public async getTextToSpeechList(req: any, res: any): Promise<void> {
     const {
       query: { page = 1, pageSize = 6 },
     } = req
@@ -76,7 +83,9 @@ export default class TextToSpeechWebController {
     }
   }
 
-  getAudio = async (req: any, res: any): Promise<void> => {
+  @HttpAuth
+  @Permission()
+  public async getAudio(req: any, res: any): Promise<void> {
     const {
       params: { id },
     } = req
@@ -99,7 +108,6 @@ export default class TextToSpeechWebController {
         })
       }
     } catch (error) {
-      console.log('error= ', error.message)
       res.status(500).send({ error: error.message })
     }
   }

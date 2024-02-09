@@ -4,7 +4,8 @@ import { Router } from 'express'
 import UsersServices from '../services/users.services'
 
 import { IUsers } from '../interfaces/users.interfaces'
-import { verifyToken } from '../../../shared/middleware/auth'
+import { HttpAuth, Permission } from '../../../shared/middleware/auth'
+import { Profiles } from '../../../shared/constants/auth.constants'
 
 export default class UsersController {
   static #instance: UsersController
@@ -15,6 +16,7 @@ export default class UsersController {
 
   private constructor() {
     this.createUser = this.createUser.bind(this)
+    this.getUsers = this.getUsers.bind(this)
 
     this.#usersServices = UsersServices.getInstance()
 
@@ -34,12 +36,14 @@ export default class UsersController {
   /** Users Routes */
 
   protected registerRoutes(): void {
-    this.router.get('/', verifyToken, this.getUsers)
+    this.router.get('/', this.getUsers)
     this.router.post('/create_user', this.createUser)
   }
 
   /** Users Controllers Methods */
 
+  @HttpAuth
+  @Permission([Profiles.ADMIN])
   public async createUser(req: any, res: any): Promise<void> {
     const dataUser: IUsers = {
       username: req.body.username,
@@ -64,7 +68,9 @@ export default class UsersController {
     res.send(response.data)
   }
 
-  public getUsers = async (req: any, res: any): Promise<void> => {
+  @HttpAuth
+  @Permission([Profiles.ADMIN])
+  public async getUsers(req: any, res: any, _next: any): Promise<void> {
     const {
       query: { page = 1, pageSize = 6 },
     } = req
