@@ -1,6 +1,7 @@
 import { Users } from '../../../../entities/users'
-
 import { IUsers } from '../../interfaces/users.interfaces'
+
+import { IPaginationOptions, IPaginationResponse } from '../../../../shared/interfaces/pagination'
 
 export default class UsersDataSources {
   static #instance: UsersDataSources
@@ -119,6 +120,31 @@ export default class UsersDataSources {
       }
 
       return undefined
+    } catch (error) {
+      return error
+    }
+  }
+
+  /**
+   * Get all users with pagination
+   * @param page number - Page
+   * @param pageSize number - Limit
+   * @returns IPaginationResponse<IUsers[]>
+   */
+  public async getAllUsers(options: IPaginationOptions): Promise<IPaginationResponse<IUsers>> {
+    const response = new IPaginationResponse<IUsers>(options)
+
+    const skip = (options.page - 1) * options.pageSize
+
+    try {
+      const users = await Users.findAndCount({
+        skip: skip > 0 ? skip : 0,
+        take: options.pageSize,
+      })
+
+      response.setData(users[0], users[1])
+
+      return response
     } catch (error) {
       return error
     }

@@ -4,6 +4,7 @@ import { Router } from 'express'
 import UsersServices from '../services/users.services'
 
 import { IUsers } from '../interfaces/users.interfaces'
+import { verifyToken } from '../../../shared/middleware/auth'
 
 export default class UsersController {
   static #instance: UsersController
@@ -33,6 +34,7 @@ export default class UsersController {
   /** Users Routes */
 
   protected registerRoutes(): void {
+    this.router.get('/', verifyToken, this.getUsers)
     this.router.post('/create_user', this.createUser)
   }
 
@@ -60,5 +62,24 @@ export default class UsersController {
     }
 
     res.send(response.data)
+  }
+
+  public getUsers = async (req: any, res: any): Promise<void> => {
+    const {
+      query: { page = 1, pageSize = 6 },
+    } = req
+
+    try {
+      const pageInt = parseInt(page, 10)
+      const sizeInt = parseInt(pageSize, 10)
+
+      const response = await this.#usersServices.getUsers(pageInt, sizeInt)
+
+      if (response.error) res.status(500).send(response)
+
+      res.status(200).send(response.data)
+    } catch (error) {
+      res.status(500).send({ error: error.message })
+    }
   }
 }

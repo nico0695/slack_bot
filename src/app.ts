@@ -76,7 +76,7 @@ export default class App {
   }
 
   #router(): void {
-    this.#app.use('/', [this.#usersController.router])
+    this.#app.use('/users', [this.#usersController.router])
     this.#app.use('/conversations', [this.#conversationWebController.router])
     this.#app.use('/images', [this.#imagesWebController.router])
     this.#app.use('/text-to-speech', [this.#textToSpeechWebController.router])

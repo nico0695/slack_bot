@@ -4,6 +4,7 @@ import UsersDataSource from '../repositories/database/users.dataSource'
 
 import { IUsers } from '../interfaces/users.interfaces'
 import SlackRepository from '../repositories/slack/slack.repository'
+import { IPaginationResponse, IPaginationOptions } from '../../../shared/interfaces/pagination'
 
 export default class UsersServices {
   static #instance: UsersServices
@@ -159,6 +160,27 @@ export default class UsersServices {
     } catch (error) {
       return {
         error: 'Error al recuperar los usuarios del equipo',
+      }
+    }
+  }
+
+  // Admin users
+  public async getUsers(
+    page: number,
+    pageSize: number
+  ): Promise<GenericResponse<IPaginationResponse<IUsers>>> {
+    try {
+      const options: IPaginationOptions = {
+        page,
+        pageSize,
+      }
+
+      const usersDb = await this.#usersDataSource.getAllUsers(options)
+
+      return { data: usersDb }
+    } catch (error) {
+      return {
+        error: 'Error al recuperar los usuarios',
       }
     }
   }

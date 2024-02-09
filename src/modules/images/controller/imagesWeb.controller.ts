@@ -47,7 +47,6 @@ export default class ImagesWebController {
 
       res.status(200).send(response.data)
     } catch (error) {
-      console.log('error= ', error.message)
       res.status(500).send({ error: error.message })
     }
   }
