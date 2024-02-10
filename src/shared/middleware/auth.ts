@@ -71,7 +71,7 @@ export function HttpAuth(target: any, propertyKey: string, descriptor: PropertyD
 
       return originalMethod.apply(this, args)
     } catch (error) {
-      return res.status(401).json({ message: 'Unauthorized' })
+      return res.status(401).json({ message: 'Server Error' })
     }
   }
 }

@@ -72,6 +72,24 @@ export default class UsersServices {
     }
   }
 
+  public async getUserById(id: number): Promise<GenericResponse<IUsers>> {
+    try {
+      const userDb = await this.#usersDataSource.getUserById(id)
+
+      if (userDb !== undefined) {
+        return { data: userDb }
+      }
+
+      return {
+        error: 'Usuario no encontrado',
+      }
+    } catch (error) {
+      return {
+        error: 'Error al recuperar el usuario',
+      }
+    }
+  }
+
   public async getOrCreateUserSupabase({
     email,
     supabaseId,
@@ -117,6 +135,31 @@ export default class UsersServices {
     } catch (error) {
       return {
         error: 'Error al crear el usuario',
+      }
+    }
+  }
+
+  public async updateUserById(
+    id: number,
+    data: Partial<IUsers>
+  ): Promise<GenericResponse<IUsers | undefined>> {
+    try {
+      const userDb = await this.#usersDataSource.getUserById(id)
+
+      if (userDb === undefined) {
+        return {
+          error: 'Usuario no encontrado',
+        }
+      }
+
+      const response = await this.#usersDataSource.updateUserById(id, data)
+
+      return {
+        data: response,
+      }
+    } catch (error) {
+      return {
+        error: 'Error al actualizar el usuario',
       }
     }
   }

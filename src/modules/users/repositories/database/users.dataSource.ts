@@ -125,6 +125,20 @@ export default class UsersDataSources {
     }
   }
 
+  public async getUserById(id: number): Promise<IUsers | undefined> {
+    try {
+      const user = await Users.findOne({ where: { id } })
+
+      if (user) {
+        return user
+      }
+
+      return undefined
+    } catch (error) {
+      return error
+    }
+  }
+
   /**
    * Get all users with pagination
    * @param page number - Page
