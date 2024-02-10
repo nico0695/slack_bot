@@ -43,10 +43,10 @@ export default class UsersController extends GenericController {
 
   protected registerRoutes(): void {
     this.router.get('/', this.getUsers)
-    this.router.get('/:id', this.getUserById)
-    this.router.put('/:id', this.updateUser)
     this.router.get('/me', this.getUserMe)
     this.router.post('/create_user', this.createUser)
+    this.router.get('/:id', this.getUserById)
+    this.router.put('/:id', this.updateUser)
   }
 
   /** Users Controllers Methods */
