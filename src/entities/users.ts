@@ -35,4 +35,10 @@ export class Users extends BaseEntity {
 
   @Column({ default: Profiles.USER, nullable: true })
   profile: Profiles
+
+  @Column({ default: null, nullable: true })
+  image: string
+
+  @Column({ default: false })
+  enabled: boolean
 }

@@ -119,6 +119,7 @@ export default class UsersServices {
         email,
         phone: '',
         supabaseId,
+        enabled: false,
       }
 
       const responseCreateUser = await this.#usersDataSource.createUser(newUser)
@@ -190,6 +191,7 @@ export default class UsersServices {
             phone: '',
             slackId: member.id,
             slackTeamId: member.team_id,
+            enabled: false,
           }
 
           const responseCreateUser = await this.createUser(newUser)
@@ -224,6 +226,61 @@ export default class UsersServices {
     } catch (error) {
       return {
         error: 'Error al recuperar los usuarios',
+      }
+    }
+  }
+
+  // get or create user by user slack id
+  public async getOrCreateUserBySlackId(slackId: string): Promise<GenericResponse<IUsers>> {
+    try {
+      const userDb = await this.#usersDataSource.getUserBySlackId(slackId)
+
+      if (userDb) {
+        return { data: userDb }
+      }
+
+      // If user not exist in database get user from slack and create user
+      const userSlack = await this.#slackRepository.getUserInfo(slackId)
+
+      if (!userSlack) {
+        return {
+          error: 'Error al crear el usuario',
+        }
+      }
+
+      // Check if user exist in database by email
+      const user = await this.#usersDataSource.getUserByEmail(userSlack.profile.email)
+
+      if (user) {
+        const responseUpdateUser = await this.#usersDataSource.updateUserById(user.id, {
+          slackId,
+          slackTeamId: userSlack.team_id,
+          image: userSlack.profile.image_original,
+        })
+
+        return { data: responseUpdateUser }
+      }
+
+      // Create user
+      const newUser: IUsers = {
+        username: userSlack.name,
+        name: userSlack.profile.first_name,
+        lastName: userSlack.profile.last_name,
+        email: userSlack.profile.email,
+        phone: '',
+        slackId,
+        slackTeamId: userSlack.team_id,
+        enabled: true,
+      }
+
+      const responseCreateUser = await this.createUser(newUser)
+
+      if (responseCreateUser?.data !== undefined) {
+        return { data: responseCreateUser.data }
+      }
+    } catch (error) {
+      return {
+        error: 'Error al recuperar el usuario',
       }
     }
   }

@@ -33,4 +33,17 @@ export default class SlackRepository {
       return null
     }
   }
+
+  getUserInfo = async (userId: string): Promise<any | null> => {
+    try {
+      const response = await this.#slackApp.client.users.info({
+        user: userId,
+      })
+
+      return response.user
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
 }

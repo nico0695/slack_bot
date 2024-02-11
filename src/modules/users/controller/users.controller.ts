@@ -60,6 +60,7 @@ export default class UsersController extends GenericController {
       lastName: req.body.lastName,
       email: req.body.email,
       phone: req.body.phone,
+      enabled: false, // ? set enabled to false by default
     }
 
     if (!dataUser.name || !dataUser.email || !dataUser.phone) {
@@ -140,6 +141,7 @@ export default class UsersController extends GenericController {
       lastName: req.body.lastName,
       email: req.body.email,
       phone: req.body.phone,
+      enabled: req.body.enabled,
     }
 
     if (!dataUser.name || !dataUser.email) {

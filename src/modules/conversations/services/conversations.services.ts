@@ -103,6 +103,44 @@ export default class ConversationsServices {
     }
   }
 
+  generateAssistantConversation = async (
+    conversation: IConversation,
+    userId: number
+  ): Promise<string | null> => {
+    try {
+      const conversationKey = rConversationKey(userId.toString().padStart(8, '9'))
+
+      /** Get conversation */
+      const conversationStored = await this.#redisRepository.getConversationMessages(
+        conversationKey
+      )
+
+      const newConversation = [...(conversationStored ?? []), conversation]
+
+      // const promptGenerated = await this.#generatePrompt(newConversation)
+      // TODO: Implement ia chat completion
+      /** Generate conversation */
+      // const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+
+      const newConversationGenerated = [
+        ...newConversation,
+        // messageResponse
+      ]
+
+      /** Save conversation */
+      await this.#redisRepository.saveConversationMessages(
+        conversationKey,
+        newConversationGenerated
+      )
+
+      // return messageResponse.content
+      return 'OpenAI no disponible'
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
+    }
+  }
+
   cleanConversation = async (userId: string, channelId?: string): Promise<boolean> => {
     try {
       const conversationKey = rConversationKey(userId, channelId)

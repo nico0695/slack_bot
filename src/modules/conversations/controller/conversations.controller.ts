@@ -1,6 +1,8 @@
 import { Router } from 'express'
 
 import ConversationsServices from '../services/conversations.services'
+import UsersServices from '../../users/services/users.services'
+
 import { roleTypes } from '../shared/constants/openai'
 import { IConversation } from '../shared/interfaces/converstions'
 import { ChannelType, FlowKeys } from '../shared/constants/conversationFlow'
@@ -11,9 +13,11 @@ export default class ConversationsController {
   public router: Router
 
   #conversationServices: ConversationsServices
+  #usersServices: UsersServices
 
   private constructor() {
     this.#conversationServices = ConversationsServices.getInstance()
+    this.#usersServices = UsersServices.getInstance()
 
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
@@ -111,6 +115,30 @@ export default class ConversationsController {
    */
   public async conversationFlow(data: any): Promise<void> {
     const { payload, say, body }: any = data
+
+    if (payload.channel_type === 'im') {
+      const newMessage: string = payload.text.replace('cb', '').trimStart()
+
+      const newMessageFormated: IConversation = {
+        role: roleTypes.user,
+        content: newMessage,
+      }
+
+      const userData = await this.#usersServices.getOrCreateUserBySlackId(payload.user)
+
+      if (!userData.data) {
+        say('Ups! No se pudo obtener tu información 🤷‍♂️')
+        return
+      }
+
+      const newResponse = await this.#conversationServices.generateAssistantConversation(
+        newMessageFormated,
+        userData?.data?.id ?? payload.user
+      )
+
+      say(newResponse)
+      return
+    }
 
     const message: string = payload.text
 

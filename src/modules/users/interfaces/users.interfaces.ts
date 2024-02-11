@@ -15,4 +15,7 @@ export interface IUsers {
   supabaseId?: string
 
   profile?: Profiles
+
+  image?: string
+  enabled: boolean
 }
