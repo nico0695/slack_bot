@@ -36,7 +36,7 @@ export default class OpenaiRepository {
 
       const completion = await this.#openai.createChatCompletion(apiRequestBot)
 
-      return completion.data.choices[0].message
+      return completion.data.choices[0].message as IConversation
     } catch (error) {
       console.log('error= ', error.message)
       return null

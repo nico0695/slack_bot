@@ -5,7 +5,8 @@ import morgan from 'morgan'
 import dotenv from 'dotenv'
 
 import http from 'http'
-import { Server } from 'socket.io'
+
+import { IoServer } from './config/socketConfig'
 
 import connectionSource from './config/ormconfig'
 
@@ -103,17 +104,17 @@ export default class App {
       this.#conversationController.showConversation
     )
 
-    this.#slackApp.message('', this.#conversationController.conversationFlow)
-
     this.#slackApp.message(slackListenersKey.generateImages, this.#imagesController.generateImages)
+
+    this.#slackApp.message('', this.#conversationController.conversationFlow)
   }
 
   #socketListeners(server: http.Server): void {
-    const io = new Server(server, {
-      cors: {
-        origin: 'http://localhost:3000',
-      },
-    })
+    let io = IoServer.io
+
+    if (!io) {
+      io = IoServer.setServer(server)
+    }
 
     io.on('connection', (socket) => {
       console.log('a user connected: ', socket.id)
@@ -156,6 +157,41 @@ export default class App {
 
       socket.on('disconnect', (reason) => {
         console.log('user disconnected= ', reason)
+      })
+
+      // Assistant
+      socket.on('join_assistant_room', async (data) => {
+        const { username, channel: channelId }: IJoinRoomData = data
+
+        const channel = channelId.toString().padStart(8, '9')
+
+        void socket.join(channel) // Join the user to a socket room
+
+        const joinResponse = await this.#conversationWebController.joinAssistantChannel({
+          username,
+          channel,
+        })
+
+        console.log(`user ${username} joined self channel ${channel}: `, joinResponse)
+
+        socket.emit('join_assistant_response', joinResponse) // Send message to user that joined
+      })
+
+      socket.on('send_assistant_message', async (data) => {
+        const { message, userId, iaEnabled } = data
+
+        const channel = userId.toString().padStart(8, '9')
+
+        const conversationResponse =
+          await this.#conversationWebController.conversationAssistantFlow(
+            userId,
+            message,
+            iaEnabled
+          )
+
+        if (conversationResponse !== null) {
+          io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender
+        }
       })
     })
   }

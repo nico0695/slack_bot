@@ -7,4 +7,11 @@ export enum FlowKeys {
 export enum ChannelType {
   SLACK = 'slack',
   WEB = 'web',
+  ASSISTANT = 'assistant',
+}
+
+export enum ConversationProviders {
+  SLACK = 'slack',
+  WEB = 'web',
+  ASSISTANT = 'assistant',
 }

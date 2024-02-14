@@ -3,7 +3,9 @@ import { Router } from 'express'
 import ConversationsServices from '../services/conversations.services'
 
 import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
-import { ChannelType, FlowKeys } from '../shared/constants/conversationFlow'
+import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
+import { roleTypes } from '../shared/constants/openai'
+import UsersServices from '../../users/services/users.services'
 
 export default class ConversationsWebController {
   static #instance: ConversationsWebController
@@ -11,9 +13,11 @@ export default class ConversationsWebController {
   public router: Router
 
   #conversationServices: ConversationsServices
+  #usersServices: UsersServices
 
   private constructor() {
     this.#conversationServices = ConversationsServices.getInstance()
+    this.#usersServices = UsersServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
@@ -55,6 +59,21 @@ export default class ConversationsWebController {
 
     return {
       message: response ?? 'No se pudo iniciar la conversación 🤷‍♂️',
+      conversation: conversation ?? [],
+    }
+  }
+
+  public joinAssistantChannel = async (data: {
+    channel: string
+    username: string
+  }): Promise<{
+    message: string
+    conversation: IUserConversation[]
+  }> => {
+    const conversation = await this.#conversationServices.showConversationFlowWeb(data.channel)
+
+    return {
+      message: 'Conversación iniciada',
       conversation: conversation ?? [],
     }
   }
@@ -146,56 +165,29 @@ export default class ConversationsWebController {
   /**
    * Manage conversation flow between users and bot
    */
-  public conversationFlow = async (data: any): Promise<void> => {
-    const { payload, say, body }: any = data
+  public conversationAssistantFlow = async (
+    userId: number,
+    message: string,
+    iaEnabled: boolean
+  ): Promise<IConversation> => {
+    const userData = await this.#usersServices.getUserById(userId)
 
-    const message: string = payload.text
-
-    switch (message) {
-      case FlowKeys.START: {
-        const response = await this.#conversationServices.startConversationFlow(
-          payload.channel,
-          ChannelType.WEB
-        )
-        say(response ?? 'No se pudo iniciar la conversación 🤷‍♂️')
-        break
-      }
-      case FlowKeys.END: {
-        const response = await this.#conversationServices.endConversationFlow(payload.channel)
-        say(response ?? 'No se pudo finalizar la conversación 🤷‍♂️')
-        break
-      }
-      case FlowKeys.SHOW: {
-        const conversation = await this.#conversationServices.showConversationFlow(
-          payload.channel,
-          body.team_id
-        )
-        say(conversation ?? 'No hay ninguna conversación guardada 🤷‍♂️')
-        break
-      }
-
-      default: {
-        const conversationStarted = await this.#conversationServices.conversationFlowStarted(
-          payload.channel
-        )
-
-        if (conversationStarted) {
-          console.log('### generateConversationFlow ###')
-
-          const newResponse = await this.#conversationServices.generateConversationFlow(
-            message,
-            payload.user,
-            payload.channel
-          )
-
-          if (newResponse !== null) {
-            say(newResponse)
-          }
-        }
-
-        break
+    if (!userData.data) {
+      return {
+        role: roleTypes.assistant,
+        content: 'No se pudo obtener el usuario 🤷‍♂️',
+        provider: ConversationProviders.ASSISTANT,
       }
     }
+
+    const newResponse = await this.#conversationServices.generateAssistantConversation(
+      message,
+      userId,
+      userId.toString().padStart(8, '9'),
+      ConversationProviders.WEB
+    )
+
+    return newResponse
   }
 
   // ROUTES

@@ -1,4 +1,5 @@
 import { GlobalConstants } from '../../../shared/constants/global'
+import { IoServer } from '../../../config/socketConfig'
 
 import UsersServices from '../../users/services/users.services'
 
@@ -13,7 +14,7 @@ import {
   IConversationFlow,
   IUserConversation,
 } from '../shared/interfaces/converstions'
-import { ChannelType } from '../shared/constants/conversationFlow'
+import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
 
 type TMembersNames = Record<string, string>
 
@@ -43,13 +44,20 @@ export default class ConversationsServices {
 
   #generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {
     const requestMessages = conversation.map((message) => {
-      return { role: message.role, content: message.content }
+      return { role: message.role, content: message.content, provider: message.provider }
     })
 
     const initialPrompt =
       'Eres un asistente basado en IA con el que puedes chatear sobre cualquier cosa.'
 
-    return [{ role: roleTypes.system, content: initialPrompt }, ...requestMessages]
+    return [
+      {
+        role: roleTypes.system,
+        content: initialPrompt,
+        provider: ConversationProviders.ASSISTANT,
+      },
+      ...requestMessages,
+    ]
   }
 
   #getTeamMembers = async (teamId: string): Promise<TMembersNames> => {
@@ -104,37 +112,116 @@ export default class ConversationsServices {
   }
 
   generateAssistantConversation = async (
-    conversation: IConversation,
-    userId: number
-  ): Promise<string | null> => {
+    message: string,
+    userId: number,
+    channelId: string,
+    provider: ConversationProviders
+  ): Promise<IConversation | null> => {
     try {
-      const conversationKey = rConversationKey(userId.toString().padStart(8, '9'))
-
       /** Get conversation */
-      const conversationStored = await this.#redisRepository.getConversationMessages(
-        conversationKey
-      )
+      let conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
 
-      const newConversation = [...(conversationStored ?? []), conversation]
+      if (conversationFlow === null) {
+        const newConversation: IConversationFlow = {
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          chanelId: channelId ?? '',
+          conversation: [],
+          channelType: ChannelType.ASSISTANT,
+          socketChannel: channelId,
+        }
 
-      // const promptGenerated = await this.#generatePrompt(newConversation)
-      // TODO: Implement ia chat completion
+        const response = await this.#redisRepository.saveConversationFlow(
+          channelId,
+          newConversation
+        )
+
+        if (!response) {
+          return null
+        }
+
+        conversationFlow = newConversation
+      }
+
+      // TODO: change to update socketChanel when join in
+      if (conversationFlow.socketChannel === undefined) {
+        const newConversation: IConversationFlow = {
+          ...conversationFlow,
+          socketChannel: channelId,
+        }
+
+        await this.#redisRepository.saveConversationFlow(channelId, newConversation)
+
+        conversationFlow = newConversation
+      }
+
+      console.log('message= ', message)
+
+      let skipGeneration = false
+      if (message.startsWith('+')) {
+        skipGeneration = true
+      }
+
+      const messageFormated = message.replace('+', '').trimStart()
+
+      const newConversation: IUserConversation = {
+        role: roleTypes.user,
+        content: messageFormated,
+        userId,
+        provider,
+      }
+
+      if (provider === ConversationProviders.SLACK && conversationFlow.socketChannel) {
+        const io = IoServer.io
+        if (io) {
+          io.in(conversationFlow.socketChannel).emit('receive_assistant_message', newConversation)
+        }
+      }
+
+      const { conversation: conversationStored } = conversationFlow
+
+      const newConversationUser = [...conversationStored, newConversation]
+
+      // save message and skip generation with open ia
+      if (skipGeneration) {
+        /** Save conversation */
+        await this.#redisRepository.saveConversationFlow(channelId, {
+          ...conversationFlow,
+          conversation: newConversationUser,
+          updatedAt: new Date(),
+        })
+
+        return null
+      }
+
+      // const promptGenerated = await this.#generatePrompt(
+      //   newConversationUser.map((message) => ({
+      //     role: message.role,
+      //     content: message.content,
+      //   }))
+      // )
+
       /** Generate conversation */
       // const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
 
-      const newConversationGenerated = [
-        ...newConversation,
-        // messageResponse
-      ]
+      const newConversationGenerated: IConversationFlow = {
+        ...conversationFlow,
+        conversation: [
+          ...newConversationUser,
+          // messageResponse
+        ],
+        updatedAt: new Date(),
+      }
 
       /** Save conversation */
-      await this.#redisRepository.saveConversationMessages(
-        conversationKey,
-        newConversationGenerated
-      )
+      await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
-      // return messageResponse.content
-      return 'OpenAI no disponible'
+      // return messageResponse
+      return {
+        role: roleTypes.assistant,
+        content: 'OpenAI no disponible',
+        provider: ConversationProviders.ASSISTANT,
+      }
     } catch (error) {
       console.log('error= ', error.message)
       return null
@@ -264,6 +351,7 @@ export default class ConversationsServices {
         return null
       }
 
+      console.log('message= ', message)
       let skipGeneration = false
       if (message.startsWith('+')) {
         skipGeneration = true
@@ -274,6 +362,7 @@ export default class ConversationsServices {
         role: roleTypes.user,
         content: messageFormated,
         userSlackId,
+        provider: ConversationProviders.SLACK,
       }
 
       const { conversation: conversationStored } = conversationFlow
@@ -292,26 +381,34 @@ export default class ConversationsServices {
         return null
       }
 
-      const promptGenerated = await this.#generatePrompt(
-        newConversationUser.map((message) => ({
-          role: message.role,
-          content: message.content,
-        }))
-      )
+      // const promptGenerated = await this.#generatePrompt(
+      //   newConversationUser.map((message) => ({
+      //     role: message.role,
+      //     content: message.content,
+      //   }))
+      // )
 
       /** Generate conversation */
-      const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+      // const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated: IConversationFlow = {
         ...conversationFlow,
-        conversation: [...newConversationUser, messageResponse],
+        conversation: [
+          ...newConversationUser,
+          // messageResponse
+        ],
         updatedAt: new Date(),
       }
 
       /** Save conversation */
       await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
-      return messageResponse
+      // return messageResponse
+      return {
+        role: roleTypes.assistant,
+        content: 'OpenAI no disponible',
+        provider: ConversationProviders.ASSISTANT,
+      }
     } catch (error) {
       console.log('error= ', error.message)
       return null
@@ -335,6 +432,7 @@ export default class ConversationsServices {
         role: roleTypes.user,
         content: message,
         userSlackId,
+        provider: ConversationProviders.SLACK,
       }
 
       const { conversation: conversationStored } = conversationFlow

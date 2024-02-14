@@ -5,7 +5,7 @@ import UsersServices from '../../users/services/users.services'
 
 import { roleTypes } from '../shared/constants/openai'
 import { IConversation } from '../shared/interfaces/converstions'
-import { ChannelType, FlowKeys } from '../shared/constants/conversationFlow'
+import { ChannelType, ConversationProviders, FlowKeys } from '../shared/constants/conversationFlow'
 
 export default class ConversationsController {
   static #instance: ConversationsController
@@ -41,7 +41,6 @@ export default class ConversationsController {
    * @param data slack response
    */
   public async generateConversation(data: any): Promise<void> {
-    console.log('### generateConversation ###')
     const { payload, say }: any = data
 
     try {
@@ -50,6 +49,7 @@ export default class ConversationsController {
       const newMessageFormated: IConversation = {
         role: roleTypes.user,
         content: newMessage,
+        provider: ConversationProviders.SLACK,
       }
 
       const newResponse = await this.#conversationServices.generateConversation(
@@ -116,13 +116,9 @@ export default class ConversationsController {
   public async conversationFlow(data: any): Promise<void> {
     const { payload, say, body }: any = data
 
+    // Personal conversation
     if (payload.channel_type === 'im') {
-      const newMessage: string = payload.text.replace('cb', '').trimStart()
-
-      const newMessageFormated: IConversation = {
-        role: roleTypes.user,
-        content: newMessage,
-      }
+      const newMessage: string = payload.text
 
       const userData = await this.#usersServices.getOrCreateUserBySlackId(payload.user)
 
@@ -132,14 +128,19 @@ export default class ConversationsController {
       }
 
       const newResponse = await this.#conversationServices.generateAssistantConversation(
-        newMessageFormated,
-        userData?.data?.id ?? payload.user
+        newMessage,
+        userData?.data?.id ?? payload.user,
+        userData?.data?.id.toString().padStart(8, '9') ?? payload.user,
+        ConversationProviders.SLACK
       )
 
-      say(newResponse)
+      if (newResponse) {
+        say(newResponse.content)
+      }
       return
     }
 
+    // Channel conversation
     const message: string = payload.text
 
     switch (message) {
