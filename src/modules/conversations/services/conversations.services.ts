@@ -15,8 +15,17 @@ import {
   IUserConversation,
 } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
+import { extractVariablesAndFlags } from '../shared/utils/conversation.utils'
+import AlertsServices from '../../alerts/services/alerts.services'
 
 type TMembersNames = Record<string, string>
+
+interface IManageAssistantMessage {
+  cleanMessage: string
+  variables: Record<string, string>
+  flags: string[]
+  responseMessage?: string
+}
 
 export default class ConversationsServices {
   static #instance: ConversationsServices
@@ -25,12 +34,14 @@ export default class ConversationsServices {
   #redisRepository: RedisRepository
 
   #usersServices: UsersServices
+  #alertsServices: AlertsServices
 
   private constructor() {
     this.#openaiRepository = OpenaiRepository.getInstance()
     this.#redisRepository = RedisRepository.getInstance()
 
     this.#usersServices = UsersServices.getInstance()
+    this.#alertsServices = AlertsServices.getInstance()
   }
 
   static getInstance(): ConversationsServices {
@@ -111,6 +122,65 @@ export default class ConversationsServices {
     }
   }
 
+  #getOrInitConversationFlow = async (channelId?: string): Promise<IConversationFlow> => {
+    /** Get conversation */
+    let conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+
+    if (conversationFlow === null) {
+      const newConversation: IConversationFlow = {
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        chanelId: channelId ?? '',
+        conversation: [],
+        channelType: ChannelType.ASSISTANT,
+        socketChannel: channelId,
+      }
+
+      const response = await this.#redisRepository.saveConversationFlow(channelId, newConversation)
+
+      if (!response) {
+        return null
+      }
+
+      conversationFlow = newConversation
+    }
+
+    // TODO: change to update socketChanel when join in
+    if (conversationFlow.socketChannel === undefined) {
+      const newConversation: IConversationFlow = {
+        ...conversationFlow,
+        socketChannel: channelId,
+      }
+
+      await this.#redisRepository.saveConversationFlow(channelId, newConversation)
+
+      conversationFlow = newConversation
+    }
+
+    return conversationFlow
+  }
+
+  #manageAssistantVariables = async (
+    userId: number,
+    message: string
+  ): Promise<IManageAssistantMessage> => {
+    const { cleanMessage, variables, flags } = extractVariablesAndFlags(message)
+
+    const returnValue: IManageAssistantMessage = { cleanMessage, variables, flags }
+
+    for (const [key, value] of Object.entries(variables)) {
+      console.log(`${key}: ${value}`)
+
+      if (key === 'alert' || key === 'a') {
+        const alert = await this.#alertsServices.createAssistantAlert(userId, value, cleanMessage)
+
+        returnValue.responseMessage = `Alerta creada correctamente con id: #${alert.data.id}`
+      }
+    }
+
+    return returnValue
+  }
+
   generateAssistantConversation = async (
     message: string,
     userId: number,
@@ -118,55 +188,16 @@ export default class ConversationsServices {
     provider: ConversationProviders
   ): Promise<IConversation | null> => {
     try {
-      /** Get conversation */
-      let conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+      const conversationFlow = await this.#getOrInitConversationFlow(channelId)
 
-      if (conversationFlow === null) {
-        const newConversation: IConversationFlow = {
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          chanelId: channelId ?? '',
-          conversation: [],
-          channelType: ChannelType.ASSISTANT,
-          socketChannel: channelId,
-        }
-
-        const response = await this.#redisRepository.saveConversationFlow(
-          channelId,
-          newConversation
-        )
-
-        if (!response) {
-          return null
-        }
-
-        conversationFlow = newConversation
-      }
-
-      // TODO: change to update socketChanel when join in
-      if (conversationFlow.socketChannel === undefined) {
-        const newConversation: IConversationFlow = {
-          ...conversationFlow,
-          socketChannel: channelId,
-        }
-
-        await this.#redisRepository.saveConversationFlow(channelId, newConversation)
-
-        conversationFlow = newConversation
-      }
-
-      console.log('message= ', message)
-
-      let skipGeneration = false
-      if (message.startsWith('+')) {
-        skipGeneration = true
-      }
-
-      const messageFormated = message.replace('+', '').trimStart()
+      const { cleanMessage, responseMessage } = await this.#manageAssistantVariables(
+        userId,
+        message
+      )
 
       const newConversation: IUserConversation = {
         role: roleTypes.user,
-        content: messageFormated,
+        content: cleanMessage,
         userId,
         provider,
       }
@@ -182,22 +213,10 @@ export default class ConversationsServices {
 
       const newConversationUser = [...conversationStored, newConversation]
 
-      // save message and skip generation with open ia
-      if (skipGeneration) {
-        /** Save conversation */
-        await this.#redisRepository.saveConversationFlow(channelId, {
-          ...conversationFlow,
-          conversation: newConversationUser,
-          updatedAt: new Date(),
-        })
-
-        return null
-      }
-
       // const promptGenerated = await this.#generatePrompt(
-      //   newConversationUser.map((message) => ({
-      //     role: message.role,
-      //     content: message.content,
+      //   newConversationUser.map((msg) => ({
+      //     role: msg.role,
+      //     content: msg.content,
       //   }))
       // )
 
@@ -215,6 +234,15 @@ export default class ConversationsServices {
 
       /** Save conversation */
       await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
+
+      // Send alert message
+      if (responseMessage) {
+        return {
+          role: roleTypes.assistant,
+          content: responseMessage,
+          provider: ConversationProviders.ASSISTANT,
+        }
+      }
 
       // return messageResponse
       return {
