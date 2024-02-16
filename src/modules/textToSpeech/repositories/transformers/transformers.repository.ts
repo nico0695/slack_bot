@@ -1,6 +1,6 @@
 import fs from 'fs'
 import { transformerApi } from '../../../../config/xenovaImport'
-import { generateRandomFileName } from '../../../../shared/utils/generators'
+import { generateRandomFileName } from '../../../../shared/utils/generators.utils'
 
 const EMBED =
   'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin'

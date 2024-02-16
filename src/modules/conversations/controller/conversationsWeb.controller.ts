@@ -21,10 +21,6 @@ export default class ConversationsWebController {
 
     this.router = Router()
     this.registerRoutes()
-
-    this.generateConversation = this.generateConversation.bind(this)
-    this.cleanConversation = this.cleanConversation.bind(this)
-    this.showConversation = this.showConversation.bind(this)
   }
 
   static getInstance(): ConversationsWebController {
@@ -113,52 +109,6 @@ export default class ConversationsWebController {
     } catch (error) {
       console.log('err= ', error)
       return null
-    }
-  }
-
-  /**
-   * Clean conversation
-   * @param data slack response
-   */
-  public cleanConversation = async (data: any): Promise<void> => {
-    console.log('### cleanConversation ###')
-    const { payload, say }: any = data
-
-    try {
-      const message: string = payload.text
-
-      if (message !== 'clean_cb') {
-        const newResponse = await this.#conversationServices.cleanConversation(
-          payload.user,
-          payload.channel
-        )
-
-        console.log('newResponse= ', newResponse)
-        say('Se borro la conversación con éxito 🎉')
-      }
-    } catch (error) {
-      console.log('err= ', error)
-    }
-  }
-
-  /**
-   * Clean conversation
-   * @param data slack response
-   */
-  public showConversation = async (data: any): Promise<void> => {
-    console.log('### showConversation ###')
-    const { payload, say, body }: any = data
-
-    try {
-      const conversation = await this.#conversationServices.showConversation(
-        payload.user,
-        payload.channel,
-        body.team_id
-      )
-
-      say(conversation ?? 'No hay ninguna conversación guardada 🤷‍♂️')
-    } catch (error) {
-      console.log('err= ', error)
     }
   }
 

@@ -107,6 +107,10 @@ export default class App {
     this.#slackApp.message(slackListenersKey.generateImages, this.#imagesController.generateImages)
 
     this.#slackApp.message('', this.#conversationController.conversationFlow)
+
+    this.#slackApp.command('/help', async ({ ack, body, client }: any): Promise<void> => {
+      ack('List of commands \n - `-alert/-a` = Generate alert. ex. "-alert 1d14h12m Hello World"')
+    })
   }
 
   #socketListeners(server: http.Server): void {
@@ -172,8 +176,6 @@ export default class App {
           channel,
         })
 
-        console.log(`user ${username} joined self channel ${channel}: `, joinResponse)
-
         socket.emit('join_assistant_response', joinResponse) // Send message to user that joined
       })
 
@@ -192,6 +194,14 @@ export default class App {
         if (conversationResponse !== null) {
           io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender
         }
+      })
+
+      socket.on('leave_assistant_room', async (data) => {
+        const { channel: channelId }: IJoinRoomData = data
+
+        const channel = channelId.toString().padStart(8, '9')
+
+        void socket.leave(channel)
       })
     })
   }

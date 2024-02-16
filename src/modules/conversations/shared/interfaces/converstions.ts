@@ -1,7 +1,8 @@
 import { ChannelType, ConversationProviders } from '../constants/conversationFlow'
+import { roleTypes } from '../constants/openai'
 
 export interface IConversation {
-  role: string
+  role: roleTypes
   content: string
   provider: ConversationProviders
 }

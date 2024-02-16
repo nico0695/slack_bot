@@ -24,7 +24,7 @@ interface IManageAssistantMessage {
   cleanMessage: string
   variables: Record<string, string>
   flags: string[]
-  responseMessage?: string
+  responseMessage?: IConversation
 }
 
 export default class ConversationsServices {
@@ -174,7 +174,30 @@ export default class ConversationsServices {
       if (key === 'alert' || key === 'a') {
         const alert = await this.#alertsServices.createAssistantAlert(userId, value, cleanMessage)
 
-        returnValue.responseMessage = `Alerta creada correctamente con id: #${alert.data.id}`
+        returnValue.responseMessage = {
+          role: roleTypes.assistant,
+          content: `Alerta creada correctamente con id: #${alert.data.id}`,
+          provider: ConversationProviders.ASSISTANT,
+        }
+      }
+
+      if (key === 'question' || key === 'q') {
+        const promptGenerated = await this.#generatePrompt([
+          {
+            role: roleTypes.user,
+            content: cleanMessage,
+            provider: ConversationProviders.ASSISTANT,
+          },
+        ])
+
+        /** Generate conversation */
+        const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+
+        if (messageResponse) {
+          returnValue.responseMessage = messageResponse
+        } else {
+          throw new Error('No se pudo generar la respuesta')
+        }
       }
     }
 
@@ -190,14 +213,9 @@ export default class ConversationsServices {
     try {
       const conversationFlow = await this.#getOrInitConversationFlow(channelId)
 
-      const { cleanMessage, responseMessage } = await this.#manageAssistantVariables(
-        userId,
-        message
-      )
-
       const newConversation: IUserConversation = {
         role: roleTypes.user,
-        content: cleanMessage,
+        content: message,
         userId,
         provider,
       }
@@ -213,22 +231,16 @@ export default class ConversationsServices {
 
       const newConversationUser = [...conversationStored, newConversation]
 
-      // const promptGenerated = await this.#generatePrompt(
-      //   newConversationUser.map((msg) => ({
-      //     role: msg.role,
-      //     content: msg.content,
-      //   }))
-      // )
+      const { responseMessage } = await this.#manageAssistantVariables(userId, message)
 
-      /** Generate conversation */
-      // const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+      // if bot response message, add to conversation
+      if (responseMessage) {
+        newConversationUser.push(responseMessage)
+      }
 
       const newConversationGenerated: IConversationFlow = {
         ...conversationFlow,
-        conversation: [
-          ...newConversationUser,
-          // messageResponse
-        ],
+        conversation: [...newConversationUser],
         updatedAt: new Date(),
       }
 
@@ -237,22 +249,14 @@ export default class ConversationsServices {
 
       // Send alert message
       if (responseMessage) {
-        return {
-          role: roleTypes.assistant,
-          content: responseMessage,
-          provider: ConversationProviders.ASSISTANT,
-        }
-      }
-
-      // return messageResponse
-      return {
-        role: roleTypes.assistant,
-        content: 'OpenAI no disponible',
-        provider: ConversationProviders.ASSISTANT,
+        return responseMessage
       }
     } catch (error) {
-      console.log('error= ', error.message)
-      return null
+      return {
+        role: roleTypes.assistant,
+        content: 'Ups! No pude procesar tu mensaje. 😅',
+        provider: ConversationProviders.ASSISTANT,
+      }
     }
   }
 
@@ -409,34 +413,27 @@ export default class ConversationsServices {
         return null
       }
 
-      // const promptGenerated = await this.#generatePrompt(
-      //   newConversationUser.map((message) => ({
-      //     role: message.role,
-      //     content: message.content,
-      //   }))
-      // )
+      const promptGenerated = await this.#generatePrompt(
+        newConversationUser.map((message) => ({
+          role: message.role,
+          content: message.content,
+          provider: message.provider,
+        }))
+      )
 
       /** Generate conversation */
-      // const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+      const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated: IConversationFlow = {
         ...conversationFlow,
-        conversation: [
-          ...newConversationUser,
-          // messageResponse
-        ],
+        conversation: [...newConversationUser, messageResponse],
         updatedAt: new Date(),
       }
 
       /** Save conversation */
       await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
-      // return messageResponse
-      return {
-        role: roleTypes.assistant,
-        content: 'OpenAI no disponible',
-        provider: ConversationProviders.ASSISTANT,
-      }
+      return messageResponse
     } catch (error) {
       console.log('error= ', error.message)
       return null
