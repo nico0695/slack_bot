@@ -1,16 +1,21 @@
 import { Router } from 'express'
 
+import { App as SlackApp } from '@slack/bolt'
+
 import ConversationsServices from '../services/conversations.services'
 
 import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
 import { roleTypes } from '../shared/constants/openai'
 import UsersServices from '../../users/services/users.services'
+import { connectionSlackApp } from '../../../config/slackConfig'
 
 export default class ConversationsWebController {
   static #instance: ConversationsWebController
 
   public router: Router
+
+  #slackApp: SlackApp
 
   #conversationServices: ConversationsServices
   #usersServices: UsersServices
@@ -21,6 +26,8 @@ export default class ConversationsWebController {
 
     this.router = Router()
     this.registerRoutes()
+
+    this.#slackApp = connectionSlackApp
   }
 
   static getInstance(): ConversationsWebController {
@@ -51,11 +58,11 @@ export default class ConversationsWebController {
       ChannelType.WEB
     )
 
-    const conversation = await this.#conversationServices.showConversationFlowWeb(data.channel)
+    const conversationFlow = await this.#conversationServices.showConversationFlowWeb(data.channel)
 
     return {
       message: response ?? 'No se pudo iniciar la conversación 🤷‍♂️',
-      conversation: conversation ?? [],
+      conversation: conversationFlow.conversation ?? [],
     }
   }
 
@@ -66,11 +73,11 @@ export default class ConversationsWebController {
     message: string
     conversation: IUserConversation[]
   }> => {
-    const conversation = await this.#conversationServices.showConversationFlowWeb(data.channel)
+    const conversationFlow = await this.#conversationServices.showConversationFlowWeb(data.channel)
 
     return {
       message: 'Conversación iniciada',
-      conversation: conversation ?? [],
+      conversation: conversationFlow.conversation ?? [],
     }
   }
 
@@ -149,8 +156,6 @@ export default class ConversationsWebController {
   }
 
   public closeChannel = async (req: any, res: any): Promise<void> => {
-    console.log('req.params= ', req.body)
-
     const { channelId } = req.body
 
     const response = await this.#conversationServices.endConversationFlow(channelId)

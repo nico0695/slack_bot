@@ -62,16 +62,46 @@ export function HttpAuth(target: any, propertyKey: string, descriptor: PropertyD
 
       const userServices = UsersServices.getInstance()
 
-      const user = await userServices.getOrCreateUserSupabase({
+      const { data: user } = await userServices.getOrCreateUserSupabase({
         email: supabaseUser.email,
         supabaseId: supabaseUser.id,
       })
 
-      this.userData = user.data
+      if (!user.enabled) {
+        return res.status(401).json({ message: 'Unauthorized' })
+      }
+
+      this.userData = user
 
       return originalMethod.apply(this, args)
     } catch (error) {
       return res.status(401).json({ message: 'Server Error' })
+    }
+  }
+}
+
+export function SlackAuth(target: any, propertyKey: string, descriptor: PropertyDescriptor): void {
+  const originalMethod = descriptor.value
+
+  descriptor.value = async function (...args: any[]) {
+    const [{ payload, say }] = args
+
+    try {
+      const userServices = UsersServices.getInstance()
+
+      const meChannelId = payload.channel_type === 'im' ? payload.channel : undefined
+
+      const { data: user } = await userServices.getOrCreateUserBySlackId(payload.user, meChannelId)
+
+      if (!user.enabled) {
+        return say('Ups! No tienes permisos para usar el bot 🤷‍♂️')
+      }
+
+      this.userData = user
+
+      return originalMethod.apply(this, args)
+    } catch (error) {
+      return say('Ups! No se pudo obtener tu información 🤷‍♂️')
     }
   }
 }

@@ -231,11 +231,23 @@ export default class UsersServices {
   }
 
   // get or create user by user slack id
-  public async getOrCreateUserBySlackId(slackId: string): Promise<GenericResponse<IUsers>> {
+  public async getOrCreateUserBySlackId(
+    slackId: string,
+    channelId?: string
+  ): Promise<GenericResponse<IUsers>> {
     try {
       const userDb = await this.#usersDataSource.getUserBySlackId(slackId)
 
       if (userDb) {
+        // If user exist in database without channel id update channel id
+        if (channelId && userDb.slackChannelId !== channelId) {
+          const responseUpdateUser = await this.#usersDataSource.updateUserById(userDb.id, {
+            slackChannelId: channelId,
+          })
+
+          return { data: responseUpdateUser }
+        }
+
         return { data: userDb }
       }
 
@@ -271,6 +283,10 @@ export default class UsersServices {
         slackId,
         slackTeamId: userSlack.team_id,
         enabled: true,
+      }
+
+      if (channelId) {
+        newUser.slackChannelId = channelId
       }
 
       const responseCreateUser = await this.createUser(newUser)

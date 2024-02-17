@@ -146,7 +146,7 @@ export default class ConversationsServices {
     }
 
     // TODO: change to update socketChanel when join in
-    if (conversationFlow.socketChannel === undefined) {
+    if (!conversationFlow.socketChannel) {
       const newConversation: IConversationFlow = {
         ...conversationFlow,
         socketChannel: channelId,
@@ -504,7 +504,7 @@ export default class ConversationsServices {
     }
   }
 
-  showConversationFlowWeb = async (channelId: string): Promise<IUserConversation[] | null> => {
+  showConversationFlowWeb = async (channelId: string): Promise<IConversationFlow | null> => {
     try {
       /** Get conversation */
       const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
@@ -513,9 +513,7 @@ export default class ConversationsServices {
         return null
       }
 
-      const { conversation: conversationStored } = conversationFlow
-
-      return conversationStored
+      return conversationFlow
     } catch (error) {
       console.log('error= ', error.message)
       return null

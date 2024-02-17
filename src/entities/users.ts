@@ -30,6 +30,9 @@ export class Users extends BaseEntity {
   @Column({ default: '' })
   slackId: string
 
+  @Column({ default: '' })
+  slackChannelId: string
+
   @Column({ default: null, nullable: true })
   supabaseId: string
 

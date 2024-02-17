@@ -11,6 +11,7 @@ export interface IUsers {
 
   slackId?: string
   slackTeamId?: string
+  slackChannelId?: string
 
   supabaseId?: string
 

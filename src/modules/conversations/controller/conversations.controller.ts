@@ -1,13 +1,16 @@
 import { Router } from 'express'
 
+import GenericController from '../../../shared/modules/genericController'
+
 import ConversationsServices from '../services/conversations.services'
 import UsersServices from '../../users/services/users.services'
 
 import { roleTypes } from '../shared/constants/openai'
 import { IConversation } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders, FlowKeys } from '../shared/constants/conversationFlow'
+import { SlackAuth } from '../../../shared/middleware/auth'
 
-export default class ConversationsController {
+export default class ConversationsController extends GenericController {
   static #instance: ConversationsController
 
   public router: Router
@@ -16,6 +19,8 @@ export default class ConversationsController {
   #usersServices: UsersServices
 
   private constructor() {
+    super()
+
     this.#conversationServices = ConversationsServices.getInstance()
     this.#usersServices = UsersServices.getInstance()
 
@@ -40,6 +45,7 @@ export default class ConversationsController {
    *
    * @param data slack response
    */
+  @SlackAuth
   public async generateConversation(data: any): Promise<void> {
     const { payload, say }: any = data
 
@@ -68,6 +74,7 @@ export default class ConversationsController {
    * Clean conversation
    * @param data slack response
    */
+  @SlackAuth
   public async cleanConversation(data: any): Promise<void> {
     console.log('### cleanConversation ###')
     const { payload, say }: any = data
@@ -93,6 +100,7 @@ export default class ConversationsController {
    * Clean conversation
    * @param data slack response
    */
+  @SlackAuth
   public async showConversation(data: any): Promise<void> {
     console.log('### showConversation ###')
     const { payload, say, body }: any = data
@@ -113,6 +121,7 @@ export default class ConversationsController {
   /**
    * Manage conversation flow between users and bot
    */
+  @SlackAuth
   public async conversationFlow(data: any): Promise<void> {
     const { payload, say, body }: any = data
 
@@ -120,19 +129,18 @@ export default class ConversationsController {
     if (payload.channel_type === 'im') {
       const newMessage: string = payload.text
 
-      const userData = await this.#usersServices.getOrCreateUserBySlackId(payload.user)
+      const userData = this.userData
 
-      if (!userData.data) {
+      if (!userData) {
         say('Ups! No se pudo obtener tu información 🤷‍♂️')
         return
       }
 
       const newResponse = await this.#conversationServices.generateAssistantConversation(
         newMessage,
-        userData?.data?.id ?? payload.user,
-        userData?.data?.id.toString().padStart(8, '9') ?? payload.user,
-        ConversationProviders.SLACK,
-        payload.channel
+        userData?.id ?? payload.user,
+        userData?.id.toString().padStart(8, '9') ?? payload.user,
+        ConversationProviders.SLACK
       )
 
       if (newResponse) {
