@@ -131,7 +131,8 @@ export default class ConversationsController {
         newMessage,
         userData?.data?.id ?? payload.user,
         userData?.data?.id.toString().padStart(8, '9') ?? payload.user,
-        ConversationProviders.SLACK
+        ConversationProviders.SLACK,
+        payload.channel
       )
 
       if (newResponse) {
