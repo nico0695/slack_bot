@@ -1,7 +1,9 @@
+import { In, LessThan } from 'typeorm'
+
 import { Alerts } from '../../../../entities/alerts'
 import { Users } from '../../../../entities/users'
 
-import { IAlerts } from '../../shared/interfaces/alerts.interfaces'
+import { IAlertToNotify, IAlerts } from '../../shared/interfaces/alerts.interfaces'
 
 export default class AlertsDataSource {
   static #instance: AlertsDataSource
@@ -48,9 +50,44 @@ export default class AlertsDataSource {
    */
   async getAlertsByUserId(userId: number): Promise<Alerts[]> {
     try {
-      const alerts = await Alerts.find({ where: { user: { id: userId } } })
+      const alerts = await Alerts.find({
+        where: { user: { id: userId } },
+      })
 
       return alerts
+    } catch (error) {
+      return error
+    }
+  }
+
+  async getAlertsByDate(date: Date): Promise<IAlertToNotify[]> {
+    try {
+      const alerts = await Alerts.find({
+        select: {
+          id: true,
+          message: true,
+          date: true,
+          user: {
+            id: true,
+            username: true,
+            email: true,
+            slackId: true,
+            slackChannelId: true,
+          },
+        },
+        relations: ['user'],
+        where: { date: LessThan(date), sent: false },
+      })
+
+      return alerts as unknown as IAlertToNotify[]
+    } catch (error) {
+      return error
+    }
+  }
+
+  async updateAlertAsNotified(alerts: number[]): Promise<void> {
+    try {
+      await Alerts.update({ id: In(alerts) }, { sent: true })
     } catch (error) {
       return error
     }

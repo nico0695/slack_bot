@@ -2,6 +2,7 @@ import { GlobalConstants } from '../../../shared/constants/global'
 import { IoServer } from '../../../config/socketConfig'
 
 import UsersServices from '../../users/services/users.services'
+import AlertsServices from '../../alerts/services/alerts.services'
 
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
@@ -16,7 +17,8 @@ import {
 } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
 import { extractVariablesAndFlags } from '../shared/utils/conversation.utils'
-import AlertsServices from '../../alerts/services/alerts.services'
+
+import { formatDateToText } from '../../../shared/utils/dates.utils'
 
 type TMembersNames = Record<string, string>
 
@@ -174,9 +176,15 @@ export default class ConversationsServices {
       if (key === 'alert' || key === 'a') {
         const alert = await this.#alertsServices.createAssistantAlert(userId, value, cleanMessage)
 
+        if (alert.error) {
+          throw new Error(alert.error)
+        }
+
         returnValue.responseMessage = {
           role: roleTypes.assistant,
-          content: `Alerta creada correctamente con id: #${alert.data.id}`,
+          content: `Alerta creada correctamente para el ${formatDateToText(
+            alert.data.date
+          )} con id: #${alert.data.id}`,
           provider: ConversationProviders.ASSISTANT,
         }
       }

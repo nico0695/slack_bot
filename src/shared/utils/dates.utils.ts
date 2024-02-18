@@ -36,3 +36,16 @@ export function formatTextToDate(dateText: string): Date {
 
   return newDate
 }
+
+export const formatDateToText = (date: Date, local: 'es' | 'en' = 'es', options?: any): string => {
+  return new Intl.DateTimeFormat(
+    local,
+    options ?? {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+    }
+  ).format(date)
+}

@@ -5,6 +5,7 @@ import morgan from 'morgan'
 import dotenv from 'dotenv'
 
 import http from 'http'
+import cron from 'node-cron'
 
 import { IoServer } from './config/socketConfig'
 
@@ -22,6 +23,7 @@ import TextToSpeechWebController from './modules/textToSpeech/controller/textToS
 
 import { IJoinRoomData } from './modules/conversations/shared/interfaces/conversationSocket'
 import SummaryWebController from './modules/summary/controller/summary.controller'
+import { alertCronJob } from './modules/alerts/utils/cronJob'
 
 dotenv.config()
 
@@ -206,6 +208,17 @@ export default class App {
     })
   }
 
+  #cronJobs(): void {
+    try {
+      const cronJob = cron.schedule('* * * * *', alertCronJob)
+
+      console.log('~ Cron Job is running')
+
+      // Iniciar el cron
+      cronJob.start()
+    } catch (error) {}
+  }
+
   // Start server
   public async start(): Promise<void> {
     const server = http.createServer(this.#app)
@@ -220,5 +233,7 @@ export default class App {
 
     // Slack
     this.#slackListeners()
+
+    this.#cronJobs()
   }
 }

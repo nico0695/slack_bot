@@ -1,6 +1,6 @@
 import { Alerts } from '../../../entities/alerts'
 import { GenericResponse } from '../../../shared/interfaces/services'
-import { IAlerts } from '../shared/interfaces/alerts.interfaces'
+import { IAlertToNotify, IAlerts } from '../shared/interfaces/alerts.interfaces'
 import AlertsDataSource from '../repositories/database/alerts.dataSource'
 import { formatTextToDate } from '../../../shared/utils/dates.utils'
 
@@ -87,6 +87,36 @@ export default class AlertsServices {
     } catch (error) {
       return {
         error: 'Error al obtener las alertas',
+      }
+    }
+  }
+
+  public async getAlertsToNotify(): Promise<GenericResponse<IAlertToNotify[]>> {
+    try {
+      const date = new Date()
+
+      const response = await this.#alertsDataSource.getAlertsByDate(date)
+
+      return {
+        data: response,
+      }
+    } catch (error) {
+      return {
+        error: 'Error al obtener las alertas',
+      }
+    }
+  }
+
+  public async updateAlertAsNotified(alertId: number[]): Promise<GenericResponse<boolean>> {
+    try {
+      await this.#alertsDataSource.updateAlertAsNotified(alertId)
+
+      return {
+        data: true,
+      }
+    } catch (error) {
+      return {
+        error: 'Error al actualizar la alerta',
       }
     }
   }
