@@ -1,16 +1,21 @@
 import { Alerts } from '../../../entities/alerts'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { IAlertToNotify, IAlerts } from '../shared/interfaces/alerts.interfaces'
+
 import AlertsDataSource from '../repositories/database/alerts.dataSource'
+import { UsersRedis } from '../../users/repositories/redis/users.redis'
+
 import { formatTextToDate } from '../../../shared/utils/dates.utils'
 
 export default class AlertsServices {
   static #instance: AlertsServices
 
   #alertsDataSource: AlertsDataSource
+  #usersRedis: UsersRedis
 
   private constructor() {
     this.#alertsDataSource = AlertsDataSource.getInstance()
+    this.#usersRedis = UsersRedis.getInstance()
   }
 
   static getInstance(): AlertsServices {
@@ -95,7 +100,19 @@ export default class AlertsServices {
     try {
       const date = new Date()
 
-      const response = await this.#alertsDataSource.getAlertsByDate(date)
+      let response = await this.#alertsDataSource.getAlertsByDate(date)
+
+      const usersSubscriptions = await this.#usersRedis.getUsersSubscriptions()
+
+      if (usersSubscriptions) {
+        response = response.map((alert) => ({
+          ...alert,
+          user: {
+            ...alert.user,
+            pwSubscription: usersSubscriptions[alert.user.id.toString()],
+          },
+        }))
+      }
 
       return {
         data: response,

@@ -1,6 +1,6 @@
-import * as redis from 'redis'
 import { IConversation, IConversationFlow } from '../../shared/interfaces/converstions'
 import { rConversationFlow } from './redis.constatns'
+import { RedisConfig } from '../../../../config/redisConfig'
 
 export class RedisRepository {
   static #instance: RedisRepository
@@ -8,8 +8,7 @@ export class RedisRepository {
   #redisClient
 
   private constructor() {
-    this.#redisClient = redis.createClient()
-    void this.#connect()
+    this.#redisClient = RedisConfig.getClient()
   }
 
   static getInstance(): RedisRepository {
@@ -19,15 +18,6 @@ export class RedisRepository {
 
     this.#instance = new RedisRepository()
     return this.#instance
-  }
-
-  #connect = async (): Promise<void> => {
-    try {
-      await this.#redisClient.connect()
-      console.log('~ Redis connected!')
-    } catch (error) {
-      console.error('x Redis - connect error= ', error.message)
-    }
   }
 
   saveConversationMessages = async (key: string, value: IConversation[]): Promise<boolean> => {

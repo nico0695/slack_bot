@@ -23,6 +23,7 @@ export default class UsersController extends GenericController {
     this.getUserMe = this.getUserMe.bind(this)
     this.getUserById = this.getUserById.bind(this)
     this.updateUser = this.updateUser.bind(this)
+    this.subscribeNotifications = this.subscribeNotifications.bind(this)
 
     this.#usersServices = UsersServices.getInstance()
 
@@ -44,6 +45,7 @@ export default class UsersController extends GenericController {
   protected registerRoutes(): void {
     this.router.get('/', this.getUsers)
     this.router.get('/me', this.getUserMe)
+    this.router.post('/subscribe_notifications', this.subscribeNotifications)
     this.router.post('/create_user', this.createUser)
     this.router.get('/:id', this.getUserById)
     this.router.put('/:id', this.updateUser)
@@ -150,6 +152,22 @@ export default class UsersController extends GenericController {
     }
 
     const response = await this.#usersServices.updateUserById(parseInt(id, 10), dataUser)
+
+    if (response.error) {
+      res.status(400).send({ message: response.error })
+      return
+    }
+
+    res.send(response.data)
+  }
+
+  @HttpAuth
+  public async subscribeNotifications(req: any, res: any): Promise<void> {
+    const subscription = req.body
+
+    const user = this.userData
+
+    const response = await this.#usersServices.subscribeNotifications(user.id, subscription)
 
     if (response.error) {
       res.status(400).send({ message: response.error })

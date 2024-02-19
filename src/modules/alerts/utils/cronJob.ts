@@ -1,3 +1,5 @@
+import webpush from 'web-push'
+
 import { connectionSlackApp } from '../../../config/slackConfig'
 import AlertsServices from '../services/alerts.services'
 
@@ -23,15 +25,35 @@ export const alertCronJob = async (): Promise<void> => {
 
     alerts?.data.forEach(async (alert) => {
       if (alert.user.slackChannelId) {
+        // Send message to slack
         await slackApp.client.chat.postMessage({
           channel: alert.user.slackChannelId,
           text: `💬 ${alert.message}`,
         })
+
+        // Send notification to web
+        if (alert.user.pwSubscription) {
+          try {
+            await webpush.sendNotification(
+              alert.user.pwSubscription,
+              JSON.stringify({
+                title: alert.message,
+                body: alert.message,
+                url: 'https://localhost:3000/',
+                tag: `new-alert-${alert.id}`,
+              })
+            )
+          } catch (error) {
+            console.log('Error sending web notification= ', error)
+          }
+        }
       }
     })
 
     await alertsServices.updateAlertAsNotified(alerts?.data.map((alert) => alert.id))
 
-    console.log(`${alerts?.data.length} lerts notified successfully 🚀`)
-  } catch (error) {}
+    console.log(`${alerts?.data.length} alerts notified successfully 🚀`)
+  } catch (error) {
+    console.log('Error in alertCronJob= ', error)
+  }
 }

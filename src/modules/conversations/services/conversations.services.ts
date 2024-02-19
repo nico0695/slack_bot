@@ -7,7 +7,7 @@ import AlertsServices from '../../alerts/services/alerts.services'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
 
-import { RedisRepository } from '../repositories/redis/redis.repository'
+import { RedisRepository } from '../repositories/redis/conversations.redis'
 import { conversationFlowPrefix, rConversationKey } from '../repositories/redis/redis.constatns'
 
 import {

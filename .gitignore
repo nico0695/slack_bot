@@ -5,6 +5,7 @@
 .vscode/
 .env
 
-dump.rdb
+/*.rdb
+/src/database/*
 
 /src/assets/*

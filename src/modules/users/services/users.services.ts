@@ -4,6 +4,8 @@ import UsersDataSource from '../repositories/database/users.dataSource'
 
 import { IUsers } from '../interfaces/users.interfaces'
 import SlackRepository from '../repositories/slack/slack.repository'
+import { UsersRedis } from '../repositories/redis/users.redis'
+
 import { IPaginationResponse, IPaginationOptions } from '../../../shared/interfaces/pagination'
 
 export default class UsersServices {
@@ -11,10 +13,12 @@ export default class UsersServices {
 
   #usersDataSource: UsersDataSource
   #slackRepository: SlackRepository
+  #userRedis: UsersRedis
 
   private constructor() {
     this.#usersDataSource = UsersDataSource.getInstance()
     this.#slackRepository = SlackRepository.getInstance()
+    this.#userRedis = UsersRedis.getInstance()
 
     this.createUser = this.createUser.bind(this)
   }
@@ -205,6 +209,36 @@ export default class UsersServices {
     } catch (error) {
       return {
         error: 'Error al recuperar los usuarios del equipo',
+      }
+    }
+  }
+
+  // Push Notifications
+  public async subscribeNotifications(
+    userId: number,
+    subscription: any
+  ): Promise<GenericResponse<boolean>> {
+    try {
+      const userDb = await this.#usersDataSource.getUserById(userId)
+
+      if (userDb === undefined) {
+        return {
+          error: 'Usuario no encontrado',
+        }
+      }
+
+      const response = await this.#userRedis.addOrUpdateUserSubscription(userId, subscription)
+
+      if (!response) {
+        throw new Error('Error al suscribir al usuario')
+      }
+
+      return {
+        data: response,
+      }
+    } catch (error) {
+      return {
+        error: 'Error al suscribir al usuario',
       }
     }
   }

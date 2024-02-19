@@ -6,6 +6,7 @@ import dotenv from 'dotenv'
 
 import http from 'http'
 import cron from 'node-cron'
+import webpush from 'web-push'
 
 import { IoServer } from './config/socketConfig'
 
@@ -219,6 +220,15 @@ export default class App {
     } catch (error) {}
   }
 
+  #webPushConfig(): void {
+    const vapidKeys = {
+      publicKey: process.env.VAPID_PUBLIC_KEY,
+      privateKey: process.env.VAPID_PRIVATE_KEY,
+    }
+    console.log('~ Web Push Configured!')
+    webpush.setVapidDetails('mailto: test@gmail.com', vapidKeys.publicKey, vapidKeys.privateKey)
+  }
+
   // Start server
   public async start(): Promise<void> {
     const server = http.createServer(this.#app)
@@ -234,6 +244,8 @@ export default class App {
     // Slack
     this.#slackListeners()
 
+    // Notifications
     this.#cronJobs()
+    this.#webPushConfig()
   }
 }
