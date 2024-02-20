@@ -1,6 +1,6 @@
 import TransformersRepository from '../repositories/transformers/transformers.repository'
 
-import { GenericResponse } from '../../../../src/shared/interfaces/services'
+import { GenericResponse } from '../../../shared/interfaces/services'
 import TextToSpeechDataSources from '../repositories/database/textToSpeech.dataSource'
 import { IPaginationOptions, IPaginationResponse } from '../../../shared/interfaces/pagination'
 import { TextToSpeech } from '../../../entities/textToSpeech'
@@ -32,6 +32,10 @@ export default class TextToSpeechServices {
     try {
       const speechGenerated = await this.#transformersRepository.generateSpeech(phrase)
 
+      if (!speechGenerated) {
+        throw new Error('Error generating speech')
+      }
+
       const dataToSave = {
         path: speechGenerated.path,
         phrase,
@@ -40,7 +44,7 @@ export default class TextToSpeechServices {
 
       await this.#textToSpeechDataSources.saveTextToSpeech(dataToSave)
 
-      res.data = speechGenerated.fileName
+      res.data = speechGenerated?.fileName
       return res
     } catch (error) {
       res.error = 'Error generating speech'

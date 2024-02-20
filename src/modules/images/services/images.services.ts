@@ -2,12 +2,9 @@ import LeapRepository from '../repositories/leap/leap.repository'
 import ImagesDataSources from '../repositories/database/images.dataSource'
 import { LeapStatus } from '../shared/constants/leap'
 import { IImage, ILeapImages, IUserData } from '../shared/interfaces/images.interfaces'
-import {
-  IPaginationOptions,
-  IPaginationResponse,
-} from '../../../../src/shared/interfaces/pagination'
-import { GenericResponse } from '../../../../src/shared/interfaces/services'
-import { Images } from '../../../../src/entities/images'
+import { IPaginationOptions, IPaginationResponse } from '../../../shared/interfaces/pagination'
+import { GenericResponse } from '../../../shared/interfaces/services'
+import { Images } from '../../../entities/images'
 
 export default class ImagesServices {
   static #instance: ImagesServices

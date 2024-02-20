@@ -2,13 +2,12 @@
   "name": "slack-bot",
   "version": "1.0.0",
   "description": "",
-  "main": "build/index.js",
   "scripts": {
+    "dev": "nodemon --exec ts-node ./src/index.ts",
     "prebuild": "tslint -c tslint.json -p tsconfig.json --fix",
     "build": "tsc",
     "prestart": "npm run build",
-    "start": "ts-node node .",
-    "dev": "nodemon --exec ts-node ./src/index.ts",
+    "start": "node build/index.js",
     "lint": "eslint --ext .ts ."
   },
   "keywords": [],

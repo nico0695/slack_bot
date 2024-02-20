@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "CommonJS",
+    "module": "commonjs",
     "esModuleInterop": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
@@ -9,6 +9,7 @@
     "moduleResolution": "node",
     "sourceMap": true,
     "outDir": "build",
+    "rootDir": "src",
     "baseUrl": ".",
     "paths": {
       "*": ["node_modules/*"]
@@ -18,5 +19,6 @@
     "esm": true,
     "experimentalSpecifierResolution": "node"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
 }

@@ -8,8 +8,8 @@ const connectionSource = new DataSource({
 
   synchronize: true,
   name: 'default',
-  entities: ['src/entities/*{.ts,.js}'],
-  database: 'src/database/database.sqlite',
+  entities: ['../entities/*{.ts,.js}'],
+  database: '../database/database.sqlite',
 })
 
 export default connectionSource
