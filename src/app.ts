@@ -217,7 +217,9 @@ export default class App {
 
       // Iniciar el cron
       cronJob.start()
-    } catch (error) {}
+    } catch (error) {
+      console.log('Error cron job init', error)
+    }
   }
 
   #webPushConfig(): void {
