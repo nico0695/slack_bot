@@ -7,6 +7,11 @@ export class RedisConfig {
 
   private constructor() {
     this.#redisClient = redis.createClient()
+    // TODO: Fix to docker
+    // this.#redisClient = redis.createClient({
+    //   url: 'redis://127.0.0.1:6379',
+    // })
+
     void this.#connect()
   }
 
@@ -15,7 +20,7 @@ export class RedisConfig {
       await this.#redisClient.connect()
       console.log('~ Redis connected!')
     } catch (error) {
-      console.error('x Redis - connect error= ', error.message)
+      console.error('x Redis - connect erro= ', error.message)
     }
   }
 
