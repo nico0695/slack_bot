@@ -3,6 +3,7 @@ import { IUsers } from '../../interfaces/users.interfaces'
 
 import { IPaginationOptions, IPaginationResponse } from '../../../../shared/interfaces/pagination'
 
+const adminMail = process.env.ADMIN_MAIL
 export default class UsersDataSources {
   static #instance: UsersDataSources
 
@@ -49,6 +50,9 @@ export default class UsersDataSources {
       newUser.slackId = data.slackId
       newUser.slackTeamId = data.slackTeamId
       newUser.supabaseId = data.supabaseId
+      // TODO: Change this logic to initial user
+      newUser.profile = data.email === adminMail ? 1 : 3
+      newUser.enabled = data.email === adminMail
 
       await newUser.save()
 

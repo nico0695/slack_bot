@@ -70,7 +70,7 @@ export default class ConversationsWebController {
 
     return {
       message: 'Conversación iniciada',
-      conversation: conversationFlow.conversation ?? [],
+      conversation: conversationFlow?.conversation ?? [],
     }
   }
 

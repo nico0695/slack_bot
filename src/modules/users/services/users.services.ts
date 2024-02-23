@@ -128,14 +128,12 @@ export default class UsersServices {
 
       const responseCreateUser = await this.#usersDataSource.createUser(newUser)
 
-      if (responseCreateUser) {
-        return {
-          data: responseCreateUser,
-        }
+      if (!responseCreateUser) {
+        throw new Error()
       }
 
       return {
-        error: 'Error al crear el usuario',
+        data: responseCreateUser,
       }
     } catch (error) {
       return {
