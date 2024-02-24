@@ -37,7 +37,7 @@ VAPID_PRIVATE_KEY="VAPID_PRIVATE_KEY"
 
 ```
 // Redis (linux - macos)
-sudo apt-get install redis-
+sudo apt-get install redis-server
 
 // Dependence
 npm install
