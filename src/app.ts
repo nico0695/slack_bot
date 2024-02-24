@@ -194,7 +194,7 @@ export default class App {
             iaEnabled
           )
 
-        if (conversationResponse !== null) {
+        if (conversationResponse) {
           io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender
         }
       })

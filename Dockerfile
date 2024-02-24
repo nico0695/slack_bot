@@ -1,4 +1,5 @@
 FROM node:18
+
 ARG NODE_ENV=production
 
 ENV NODE_ENV $NODE_ENV
@@ -32,6 +33,8 @@ ENV VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY_ARG}
 ENV BASE_PATH=/app/build
 ENV DB_URL=/database/database.sqlite
 ENV ADMIN_MAIL="admin@bot.com"
+
+ENV REDIS_HOST "redis://host.docker.internal"
 
 
 COPY ./build /app/build

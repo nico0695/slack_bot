@@ -6,11 +6,10 @@ export class RedisConfig {
   #redisClient
 
   private constructor() {
-    this.#redisClient = redis.createClient()
-    // TODO: Fix to docker
-    // this.#redisClient = redis.createClient({
-    //   url: 'redis://127.0.0.1:6379',
-    // })
+    const REDIS_HOST = process.env.REDIS_HOST ? process.env.REDIS_HOST : ''
+    this.#redisClient = redis.createClient({
+      url: REDIS_HOST,
+    })
 
     void this.#connect()
   }
