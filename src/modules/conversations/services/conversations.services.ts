@@ -3,6 +3,7 @@ import { IoServer } from '../../../config/socketConfig'
 
 import UsersServices from '../../users/services/users.services'
 import AlertsServices from '../../alerts/services/alerts.services'
+import TasksServices from '../../tasks/services/tasks.services'
 
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
@@ -37,6 +38,7 @@ export default class ConversationsServices {
 
   #usersServices: UsersServices
   #alertsServices: AlertsServices
+  #tasksServices: TasksServices
 
   private constructor() {
     this.#openaiRepository = OpenaiRepository.getInstance()
@@ -44,6 +46,7 @@ export default class ConversationsServices {
 
     this.#usersServices = UsersServices.getInstance()
     this.#alertsServices = AlertsServices.getInstance()
+    this.#tasksServices = TasksServices.getInstance()
   }
 
   static getInstance(): ConversationsServices {
@@ -189,7 +192,22 @@ export default class ConversationsServices {
         }
       }
 
+      if (key === 'task' || key === 't') {
+        const task = await this.#tasksServices.createAssistantTask(userId, value, cleanMessage)
+
+        if (task.error) {
+          throw new Error(task.error)
+        }
+
+        returnValue.responseMessage = {
+          role: roleTypes.assistant,
+          content: `Tarea creada correctamente con id: #${task.data.id}`,
+          provider: ConversationProviders.ASSISTANT,
+        }
+      }
+
       if (key === 'question' || key === 'q') {
+        console.log('question= ', { cleanMessage, variables, flags })
         const promptGenerated = await this.#generatePrompt([
           {
             role: roleTypes.user,
