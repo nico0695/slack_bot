@@ -24,6 +24,7 @@ export const assistantsVariablesKey: {
 
 export enum AssistantsFlags {
   DESCRIPTION = 'description',
+  LIST = 'list',
 }
 
 export const assistantFlagsKey: {
@@ -31,6 +32,9 @@ export const assistantFlagsKey: {
 } = {
   description: AssistantsFlags.DESCRIPTION,
   d: AssistantsFlags.DESCRIPTION,
+
+  list: AssistantsFlags.LIST,
+  l: AssistantsFlags.LIST,
 }
 
 interface IFlagOptions {
@@ -41,7 +45,7 @@ export interface IVariableOptions {
   defaultValue: boolean | null
   manyWords?: boolean
   flags?: {
-    [key in AssistantsFlags]: IFlagOptions
+    [key in AssistantsFlags]?: IFlagOptions
   }
 }
 
@@ -59,6 +63,9 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
     flags: {
       [AssistantsFlags.DESCRIPTION]: {
         defaultValue: null,
+      },
+      [AssistantsFlags.LIST]: {
+        defaultValue: true,
       },
     },
   },

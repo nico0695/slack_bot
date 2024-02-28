@@ -204,10 +204,29 @@ export default class ConversationsServices {
         }
 
         case AssistantsVariables.TASK: {
+          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+            const tasks = await this.#tasksServices.getTasksByUserId(userId)
+
+            const messageToResponse =
+              tasks?.data?.length > 0
+                ? tasks?.data
+                    ?.map((task) => `• Id: _#${task.id}_ - *${task.title}*: ${task.description}`)
+                    .join('\n')
+                : 'No tienes tareas'
+
+            returnValue.responseMessage = {
+              role: roleTypes.assistant,
+              content: messageToResponse,
+              provider: ConversationProviders.ASSISTANT,
+            }
+
+            break
+          }
+
           const task = await this.#tasksServices.createAssistantTask(
             userId,
             assistantMessage.value as string,
-            (assistantMessage.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? ''
+            (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? ''
           )
 
           if (task.error) {

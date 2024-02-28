@@ -80,10 +80,15 @@ export class AssistantMessage {
       }
 
       if (word.startsWith(assistantsPrefix.flags)) {
-        const flagKeyFormated = assistantFlagsKey[word.slice(1)] ?? null
+        const flagKeyFormated = assistantFlagsKey[word.slice(1)]
 
-        if (messageConfig?.flags[flagKeyFormated].defaultValue !== null) {
-          this.flags[flagKeyFormated] = messageConfig.flags[flagKeyFormated].defaultValue
+        // if flagKey does not exist in messageConfig flags, continue
+        if (!messageConfig?.flags[flagKeyFormated]) {
+          continue
+        }
+
+        if (messageConfig?.flags[flagKeyFormated]?.defaultValue !== null) {
+          this.flags[flagKeyFormated] = messageConfig?.flags[flagKeyFormated].defaultValue
         } else {
           flagKey = flagKeyFormated
           flagValue = []
