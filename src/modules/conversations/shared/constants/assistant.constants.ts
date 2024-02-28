@@ -56,6 +56,11 @@ type IAssistantMessageConfig = {
 export const assistantMessageConfig: IAssistantMessageConfig = {
   [AssistantsVariables.ALERT]: {
     defaultValue: null,
+    flags: {
+      [AssistantsFlags.LIST]: {
+        defaultValue: true,
+      },
+    },
   },
   [AssistantsVariables.TASK]: {
     defaultValue: null,

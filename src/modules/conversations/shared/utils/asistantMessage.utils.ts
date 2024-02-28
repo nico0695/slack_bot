@@ -83,7 +83,7 @@ export class AssistantMessage {
         const flagKeyFormated = assistantFlagsKey[word.slice(1)]
 
         // if flagKey does not exist in messageConfig flags, continue
-        if (!messageConfig?.flags[flagKeyFormated]) {
+        if (!messageConfig?.flags?.[flagKeyFormated]) {
           continue
         }
 

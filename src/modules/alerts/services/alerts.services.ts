@@ -82,9 +82,12 @@ export default class AlertsServices {
    * @param userId number - User id
    * @returns
    */
-  public async getAlertsByUserId(userId: number): Promise<GenericResponse<Alerts[]>> {
+  public async getAlertsByUserId(
+    userId: number,
+    options: Partial<IAlerts> = { sent: false }
+  ): Promise<GenericResponse<Alerts[]>> {
     try {
-      const response = await this.#alertsDataSource.getAlertsByUserId(userId)
+      const response = await this.#alertsDataSource.getAlertsByUserId(userId, options)
 
       return {
         data: response,

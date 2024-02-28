@@ -48,10 +48,10 @@ export default class AlertsDataSource {
    * @param userId number - User id
    * @returns
    */
-  async getAlertsByUserId(userId: number): Promise<Alerts[]> {
+  async getAlertsByUserId(userId: number, options: Partial<IAlerts> = {}): Promise<Alerts[]> {
     try {
       const alerts = await Alerts.find({
-        where: { user: { id: userId } },
+        where: { user: { id: userId }, ...options },
       })
 
       return alerts

@@ -5,6 +5,8 @@ export interface IAlerts {
   message: string
   date: Date
   userId: number
+
+  sent?: boolean
 }
 
 export interface IAlertToNotify extends IAlerts {

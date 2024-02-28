@@ -182,6 +182,32 @@ export default class ConversationsServices {
     if (assistantMessage.variable) {
       switch (assistantMessage.variable) {
         case AssistantsVariables.ALERT: {
+          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+            const alerts = await this.#alertsServices.getAlertsByUserId(userId)
+
+            const messageToResponse =
+              alerts?.data?.length > 0
+                ? alerts?.data
+                    ?.map(
+                      (alert) =>
+                        `• Id: _#${alert.id}_ - *${alert.message}*: ${formatDateToText(alert.date)}`
+                    )
+                    .join('\n')
+                : 'No tienes alertas'
+
+            returnValue.responseMessage = {
+              role: roleTypes.assistant,
+              content: messageToResponse,
+              provider: ConversationProviders.ASSISTANT,
+            }
+
+            break
+          }
+
+          if (!assistantMessage.value || !assistantMessage.cleanMessage) {
+            throw new Error('Ups! No se pudo crear la alerta, debes ingresar una hora,. 😅')
+          }
+
           const alert = await this.#alertsServices.createAssistantAlert(
             userId,
             assistantMessage.value as string,
@@ -221,6 +247,10 @@ export default class ConversationsServices {
             }
 
             break
+          }
+
+          if (!assistantMessage.value) {
+            throw new Error('Ups! No se pudo crear la tarea, debes ingresar un título. 😅')
           }
 
           const task = await this.#tasksServices.createAssistantTask(
