@@ -17,7 +17,9 @@ import {
   IUserConversation,
 } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
-import { extractVariablesAndFlags } from '../shared/utils/conversation.utils'
+
+import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
+import { AssistantsFlags, AssistantsVariables } from '../shared/constants/assistant.constants'
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
 
@@ -169,61 +171,81 @@ export default class ConversationsServices {
     userId: number,
     message: string
   ): Promise<IManageAssistantMessage> => {
-    const { cleanMessage, variables, flags } = extractVariablesAndFlags(message)
+    const assistantMessage = new AssistantMessage(message)
 
-    const returnValue: IManageAssistantMessage = { cleanMessage, variables, flags }
+    const returnValue: IManageAssistantMessage = {
+      cleanMessage: assistantMessage.cleanMessage,
+      variables: {},
+      flags: [],
+    }
 
-    for (const [key, value] of Object.entries(variables)) {
-      console.log(`${key}: ${value}`)
+    if (assistantMessage.variable) {
+      switch (assistantMessage.variable) {
+        case AssistantsVariables.ALERT: {
+          const alert = await this.#alertsServices.createAssistantAlert(
+            userId,
+            assistantMessage.value as string,
+            assistantMessage.cleanMessage
+          )
 
-      if (key === 'alert' || key === 'a') {
-        const alert = await this.#alertsServices.createAssistantAlert(userId, value, cleanMessage)
+          if (alert.error) {
+            throw new Error(alert.error)
+          }
 
-        if (alert.error) {
-          throw new Error(alert.error)
-        }
-
-        returnValue.responseMessage = {
-          role: roleTypes.assistant,
-          content: `Alerta creada correctamente para el ${formatDateToText(
-            alert.data.date
-          )} con id: #${alert.data.id}`,
-          provider: ConversationProviders.ASSISTANT,
-        }
-      }
-
-      if (key === 'task' || key === 't') {
-        const task = await this.#tasksServices.createAssistantTask(userId, value, cleanMessage)
-
-        if (task.error) {
-          throw new Error(task.error)
-        }
-
-        returnValue.responseMessage = {
-          role: roleTypes.assistant,
-          content: `Tarea creada correctamente con id: #${task.data.id}`,
-          provider: ConversationProviders.ASSISTANT,
-        }
-      }
-
-      if (key === 'question' || key === 'q') {
-        console.log('question= ', { cleanMessage, variables, flags })
-        const promptGenerated = await this.#generatePrompt([
-          {
-            role: roleTypes.user,
-            content: cleanMessage,
+          returnValue.responseMessage = {
+            role: roleTypes.assistant,
+            content: `Alerta creada correctamente para el ${formatDateToText(
+              alert.data.date
+            )} con id: #${alert.data.id}`,
             provider: ConversationProviders.ASSISTANT,
-          },
-        ])
+          }
 
-        /** Generate conversation */
-        const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
-
-        if (messageResponse) {
-          returnValue.responseMessage = messageResponse
-        } else {
-          throw new Error('No se pudo generar la respuesta')
+          break
         }
+
+        case AssistantsVariables.TASK: {
+          const task = await this.#tasksServices.createAssistantTask(
+            userId,
+            assistantMessage.value as string,
+            (assistantMessage.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? ''
+          )
+
+          if (task.error) {
+            throw new Error(task.error)
+          }
+
+          returnValue.responseMessage = {
+            role: roleTypes.assistant,
+            content: `Tarea creada correctamente con id: #${task.data.id}`,
+            provider: ConversationProviders.ASSISTANT,
+          }
+
+          break
+        }
+
+        case AssistantsVariables.QUESTION: {
+          const promptGenerated = await this.#generatePrompt([
+            {
+              role: roleTypes.user,
+              content: assistantMessage.cleanMessage,
+              provider: ConversationProviders.ASSISTANT,
+            },
+          ])
+
+          /** Generate conversation */
+          const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+
+          if (messageResponse) {
+            returnValue.responseMessage = messageResponse
+          } else {
+            throw new Error('No se pudo generar la respuesta')
+          }
+
+          break
+        }
+
+        default:
+          break
       }
     }
 
