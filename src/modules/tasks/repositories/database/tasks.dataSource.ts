@@ -60,18 +60,26 @@ export default class TasksDataSource {
     }
   }
 
-  async updateTaskStatus(taskId: number, status: string): Promise<void> {
+  async updateTask(taskId: number, dataUpdate: Partial<ITask>): Promise<void> {
     try {
-      await Tasks.update(
-        {
-          id: taskId,
-        },
-        {
-          status,
-        }
-      )
+      const data = { ...dataUpdate }
+      delete data.userId
+      delete data.id
+
+      await Tasks.update(taskId, data)
     } catch (error) {
-      return error
+      throw new Error('Error al actualizar la tarea')
+    }
+  }
+
+  async deleteTask(taskId: number, userId: number): Promise<void> {
+    try {
+      await Tasks.delete({
+        id: taskId,
+        user: { id: userId },
+      })
+    } catch (error) {
+      throw new Error(error)
     }
   }
 }

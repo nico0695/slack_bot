@@ -2,7 +2,6 @@ import { Tasks } from '../../../entities/tasks'
 import { GenericResponse } from '../../../shared/interfaces/services'
 
 import TasksDataSource from '../repositories/database/tasks.dataSource'
-import { UsersRedis } from '../../users/repositories/redis/users.redis'
 
 import { formatTextToDate } from '../../../shared/utils/dates.utils'
 import { TaskStatus } from '../shared/constants/tasks.constants'
@@ -12,11 +11,9 @@ export default class TasksServices {
   static #instance: TasksServices
 
   #tasksDataSource: TasksDataSource
-  #usersRedis: UsersRedis
 
   private constructor() {
     this.#tasksDataSource = TasksDataSource.getInstance()
-    this.#usersRedis = UsersRedis.getInstance()
   }
 
   static getInstance(): TasksServices {
@@ -101,12 +98,12 @@ export default class TasksServices {
     }
   }
 
-  public async updateTaskStatus(
+  public async updateTask(
     taskId: number,
-    status: TaskStatus
+    dataUpdate: Partial<ITask>
   ): Promise<GenericResponse<boolean>> {
     try {
-      await this.#tasksDataSource.updateTaskStatus(taskId, status)
+      await this.#tasksDataSource.updateTask(taskId, dataUpdate)
 
       return {
         data: true,
@@ -114,6 +111,20 @@ export default class TasksServices {
     } catch (error) {
       return {
         error: 'Error al actualizar la tarea',
+      }
+    }
+  }
+
+  public async deleteTask(taskId: number, userId: number): Promise<GenericResponse<boolean>> {
+    try {
+      await this.#tasksDataSource.deleteTask(taskId, userId)
+
+      return {
+        data: true,
+      }
+    } catch (error) {
+      return {
+        error: 'Error al eliminar la tarea',
       }
     }
   }
