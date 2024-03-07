@@ -1,6 +1,6 @@
 import { PushSubscription } from 'web-push'
 
-export interface IAlerts {
+export interface IAlert {
   id?: number
   message: string
   date: Date
@@ -9,7 +9,7 @@ export interface IAlerts {
   sent?: boolean
 }
 
-export interface IAlertToNotify extends IAlerts {
+export interface IAlertToNotify extends IAlert {
   user: {
     id: number
     username: string
