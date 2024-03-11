@@ -2,6 +2,7 @@
 import { Router } from 'express'
 
 import GenericController from '../../../shared/modules/genericController'
+import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 
 import TasksServices from '../services/tasks.services'
 
@@ -52,105 +53,83 @@ export default class TasksWebController extends GenericController {
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async createTask(req: any, res: any): Promise<void> {
-    try {
-      const user = this.userData
+    const user = this.userData
 
-      const dataTask: ITask = {
-        title: req.body.title,
-        description: req.body.description ?? '',
-        status: req.body.status,
-        alertDate: req.body.alertDate,
-        userId: user.id,
-      }
-
-      if (!dataTask.title) {
-        res.status(400).send({ message: 'Ingrese los datos correctos' })
-        return
-      }
-
-      const response = await this.#tasksServices.createTask(dataTask)
-
-      if (response.error) {
-        res.status(400).send({ message: response.error })
-        return
-      }
-
-      res.send(response.data)
-    } catch (error) {
-      res.status(400).send({ message: error.message })
+    const dataTask: ITask = {
+      title: req.body.title,
+      description: req.body.description ?? '',
+      status: req.body.status,
+      alertDate: req.body.alertDate,
+      userId: user.id,
     }
+
+    if (!dataTask.title) {
+      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
+    }
+
+    const response = await this.#tasksServices.createTask(dataTask)
+
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
+    }
+
+    res.send(response.data)
   }
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async getTasks(req: any, res: any): Promise<void> {
-    try {
-      const user = this.userData
+    const user = this.userData
 
-      const response = await this.#tasksServices.getTasksByUserId(user.id)
+    const response = await this.#tasksServices.getTasksByUserId(user.id)
 
-      if (response.error) {
-        res.status(400).send({ message: response.error })
-        return
-      }
-
-      res.send(response.data)
-    } catch (error) {
-      res.status(400).send({ message: error.message })
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
     }
+
+    res.send(response.data)
   }
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async updateTask(req: any, res: any): Promise<void> {
-    try {
-      const taskId = req.params.id
+    const taskId = req.params.id
 
-      const user = this.userData
+    const user = this.userData
 
-      const dataTask: ITask = {
-        id: req.params.id,
-        title: req.body.title,
-        description: req.body.description,
-        status: req.body.status,
-        alertDate: req.body.alertDate,
-        userId: user.id,
-      }
-
-      if (!dataTask.id || !dataTask.title) {
-        res.status(400).send({ message: 'Ingrese los datos correctos' })
-        return
-      }
-
-      const response = await this.#tasksServices.updateTask(taskId, dataTask)
-
-      if (response.error) {
-        res.status(400).send({ message: response.error })
-        return
-      }
-
-      res.send(response.data)
-    } catch (error) {
-      res.status(400).send({ message: error.message })
+    const dataTask: ITask = {
+      id: req.params.id,
+      title: req.body.title,
+      description: req.body.description,
+      status: req.body.status,
+      alertDate: req.body.alertDate,
+      userId: user.id,
     }
+
+    if (!dataTask.id || !dataTask.title) {
+      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
+    }
+
+    const response = await this.#tasksServices.updateTask(taskId, dataTask)
+
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
+    }
+
+    res.send(response.data)
   }
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async deleteTask(req: any, res: any): Promise<void> {
-    try {
-      const user = this.userData
+    const user = this.userData
 
-      const response = await this.#tasksServices.deleteTask(req.params.id, user.id)
+    const response = await this.#tasksServices.deleteTask(req.params.id, user.id)
 
-      if (response.error) {
-        res.status(400).send({ message: response.error })
-        return
-      }
-
-      res.send(response.data)
-    } catch (error) {
-      res.status(400).send({ message: error.message })
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
     }
+
+    res.send(response.data)
   }
 }

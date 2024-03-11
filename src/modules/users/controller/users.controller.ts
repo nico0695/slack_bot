@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-misused-promises */
 import { Router } from 'express'
 
 import GenericController from '../../../shared/modules/genericController'
@@ -8,6 +7,7 @@ import UsersServices from '../services/users.services'
 import { IUsers } from '../interfaces/users.interfaces'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
+import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 
 export default class UsersController extends GenericController {
   static #instance: UsersController
@@ -66,15 +66,13 @@ export default class UsersController extends GenericController {
     }
 
     if (!dataUser.name || !dataUser.email || !dataUser.phone) {
-      res.status(400).send({ message: 'Ingrese los datos correctos' })
-      return
+      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
     const response = await this.#usersServices.createUser(dataUser)
 
     if (response.error) {
-      res.status(400).send({ message: response.error })
-      return
+      throw new BadRequestError({ message: response.error })
     }
 
     res.send(response.data)
@@ -87,29 +85,23 @@ export default class UsersController extends GenericController {
       query: { page = 1, pageSize = 6 },
     } = req
 
-    try {
-      const pageInt = parseInt(page, 10)
-      const sizeInt = parseInt(pageSize, 10)
+    const pageInt = parseInt(page, 10)
+    const sizeInt = parseInt(pageSize, 10)
 
-      const response = await this.#usersServices.getUsers(pageInt, sizeInt)
+    const response = await this.#usersServices.getUsers(pageInt, sizeInt)
 
-      if (response.error) res.status(500).send(response)
-
-      res.status(200).send(response.data)
-    } catch (error) {
-      res.status(500).send({ error: error.message })
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
     }
+
+    res.status(200).send(response.data)
   }
 
   @HttpAuth
   public async getUserMe(req: any, res: any): Promise<void> {
-    try {
-      const user = this.userData
+    const user = this.userData
 
-      res.status(200).send(user)
-    } catch (error) {
-      res.status(500).send({ error: error.message })
-    }
+    res.status(200).send(user)
   }
 
   @HttpAuth
@@ -119,15 +111,13 @@ export default class UsersController extends GenericController {
       params: { id },
     } = req
 
-    try {
-      const response = await this.#usersServices.getUserById(parseInt(id, 10))
+    const response = await this.#usersServices.getUserById(parseInt(id, 10))
 
-      if (response.error) res.status(500).send(response)
-
-      res.status(200).send(response.data)
-    } catch (error) {
-      res.status(500).send({ error: error.message })
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
     }
+
+    res.status(200).send(response.data)
   }
 
   @HttpAuth
@@ -147,15 +137,13 @@ export default class UsersController extends GenericController {
     }
 
     if (!dataUser.name || !dataUser.email) {
-      res.status(400).send({ message: 'Datos incorrectos' })
-      return
+      throw new BadRequestError({ message: 'Datos incorrectos' })
     }
 
     const response = await this.#usersServices.updateUserById(parseInt(id, 10), dataUser)
 
     if (response.error) {
-      res.status(400).send({ message: response.error })
-      return
+      throw new BadRequestError({ message: response.error })
     }
 
     res.send(response.data)
@@ -170,8 +158,7 @@ export default class UsersController extends GenericController {
     const response = await this.#usersServices.subscribeNotifications(user.id, subscription)
 
     if (response.error) {
-      res.status(400).send({ message: response.error })
-      return
+      throw new BadRequestError({ message: response.error })
     }
 
     res.send(response.data)

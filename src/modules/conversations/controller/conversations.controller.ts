@@ -3,7 +3,6 @@ import { Router } from 'express'
 import GenericController from '../../../shared/modules/genericController'
 
 import ConversationsServices from '../services/conversations.services'
-import UsersServices from '../../users/services/users.services'
 
 import { roleTypes } from '../shared/constants/openai'
 import { IConversation } from '../shared/interfaces/converstions'
@@ -16,13 +15,11 @@ export default class ConversationsController extends GenericController {
   public router: Router
 
   #conversationServices: ConversationsServices
-  #usersServices: UsersServices
 
   private constructor() {
     super()
 
     this.#conversationServices = ConversationsServices.getInstance()
-    this.#usersServices = UsersServices.getInstance()
 
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)

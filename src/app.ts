@@ -8,6 +8,9 @@ import http from 'http'
 import cron from 'node-cron'
 import webpush from 'web-push'
 
+import 'express-async-errors'
+import { errorHandler } from './shared/middleware/errors'
+
 import { IoServer } from './config/socketConfig'
 
 import connectionSource from './config/ormconfig'
@@ -51,14 +54,7 @@ export default class App {
   #summaryWebController: SummaryWebController
 
   constructor() {
-    // Express
-    this.#app = express()
-    this.#config()
-
-    // Slack
-    this.#slackApp = connectionSlackApp
-
-    // Web
+    // Controllers Instances
     this.#usersController = UsersController.getInstance()
 
     this.#conversationController = ConversationController.getInstance()
@@ -73,7 +69,17 @@ export default class App {
     this.#textToSpeechWebController = TextToSpeechWebController.getInstance()
     this.#summaryWebController = SummaryWebController.getInstance()
 
+    // Express
+    this.#app = express()
+    this.#config()
+
+    // Slack
+    this.#slackApp = connectionSlackApp
+
     this.#router()
+
+    // Error handling
+    this.#app.use(errorHandler)
   }
 
   #config(): void {

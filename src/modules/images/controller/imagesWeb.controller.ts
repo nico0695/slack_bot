@@ -1,5 +1,7 @@
 import { Router } from 'express'
 
+import BadRequestError from '../../../shared/utils/errors/BadRequestError'
+
 import { HttpAuth } from '../../../shared/middleware/auth'
 
 import ImagesServices from '../services/images.services'
@@ -41,17 +43,15 @@ export default class ImagesWebController {
       query: { page = 1, pageSize = 6 },
     } = req
 
-    try {
-      const pageInt = parseInt(page, 10)
-      const sizeInt = parseInt(pageSize, 10)
+    const pageInt = parseInt(page, 10)
+    const sizeInt = parseInt(pageSize, 10)
 
-      const response = await this.#imagesServices.getImages(pageInt, sizeInt)
+    const response = await this.#imagesServices.getImages(pageInt, sizeInt)
 
-      if (response.error) res.status(500).send(response)
-
-      res.status(200).send(response.data)
-    } catch (error) {
-      res.status(500).send({ error: error.message })
+    if (response.error) {
+      throw new BadRequestError({ message: 'Error al obtener las imagenes' })
     }
+
+    res.status(200).send(response.data)
   }
 }

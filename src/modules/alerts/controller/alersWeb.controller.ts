@@ -2,6 +2,7 @@
 import { Router } from 'express'
 
 import GenericController from '../../../shared/modules/genericController'
+import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
@@ -50,68 +51,52 @@ export default class AlertsWebController extends GenericController {
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async createAlert(req: any, res: any): Promise<void> {
-    try {
-      const user = this.userData
+    const user = this.userData
 
-      const dataAlert: IAlert = {
-        message: req.body.message,
-        date: req.body.date,
-        userId: user.id,
-      }
-
-      if (!dataAlert.message || !dataAlert.date) {
-        res.status(400).send({ message: 'Ingrese los datos correctos' })
-        return
-      }
-
-      const response = await this.#alertsServices.createAlert(dataAlert)
-
-      if (response.error) {
-        res.status(400).send({ message: response.error })
-        return
-      }
-
-      res.send(response.data)
-    } catch (error) {
-      res.status(400).send({ message: error.message })
+    const dataAlert: IAlert = {
+      message: req.body.message,
+      date: req.body.date,
+      userId: user.id,
     }
+
+    if (!dataAlert.message || !dataAlert.date) {
+      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
+    }
+
+    const response = await this.#alertsServices.createAlert(dataAlert)
+
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
+    }
+
+    res.send(response.data)
   }
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async getAlerts(req: any, res: any): Promise<void> {
-    try {
-      const user = this.userData
+    const user = this.userData
 
-      const response = await this.#alertsServices.getAlertsByUserId(user.id)
+    const response = await this.#alertsServices.getAlertsByUserId(user.id)
 
-      if (response.error) {
-        res.status(400).send({ message: response.error })
-        return
-      }
-
-      res.send(response.data)
-    } catch (error) {
-      res.status(400).send({ message: error.message })
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
     }
+
+    res.send(response.data)
   }
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async deleteAlert(req: any, res: any): Promise<void> {
-    try {
-      const user = this.userData
+    const user = this.userData
 
-      const response = await this.#alertsServices.deleteAlert(req.params.id, user.id)
+    const response = await this.#alertsServices.deleteAlert(req.params.id, user.id)
 
-      if (response.error) {
-        res.status(400).send({ message: response.error })
-        return
-      }
-
-      res.send(response.data)
-    } catch (error) {
-      res.status(400).send({ message: error.message })
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
     }
+
+    res.send(response.data)
   }
 }
