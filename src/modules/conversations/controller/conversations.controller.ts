@@ -149,7 +149,7 @@ export default class ConversationsController extends GenericController {
     // Channel conversation
     const message: string = payload.text
 
-    switch (message) {
+    switch (message.toLocaleLowerCase()) {
       case FlowKeys.START: {
         const response = await this.#conversationServices.startConversationFlow(
           payload.channel,
