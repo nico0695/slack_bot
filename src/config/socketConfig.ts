@@ -8,7 +8,7 @@ export class IoServer {
   static setServer(server: http.Server): Server {
     const ioServer = new Server(server, {
       cors: {
-        origin: 'http://localhost:3000',
+        origin: process.env.SOCKET_URL || 'http://localhost:3000',
       },
     })
 
