@@ -76,7 +76,7 @@ export default class ConversationsWebController {
 
   /**
    *
-   * @param data slack response
+   * @param data { username, channel, message, iaEnabled }
    */
   public generateConversation = async (data: {
     username: string

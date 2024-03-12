@@ -52,7 +52,7 @@ export const alertCronJob = async (): Promise<void> => {
 
     await alertsServices.updateAlertAsNotified(alerts?.data.map((alert) => alert.id))
 
-    console.log(`${alerts?.data.length} alerts notified successfully 🚀`)
+    console.log(`${alerts?.data.length} alert/s notified successfully 🚀`)
   } catch (error) {
     console.log('Error in alertCronJob= ', error)
   }

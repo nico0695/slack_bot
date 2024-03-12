@@ -3,7 +3,7 @@ import { In, LessThan } from 'typeorm'
 import { Alerts } from '../../../../entities/alerts'
 import { Users } from '../../../../entities/users'
 
-import { IAlertToNotify, IAlerts } from '../../shared/interfaces/alerts.interfaces'
+import { IAlertToNotify, IAlert } from '../../shared/interfaces/alerts.interfaces'
 
 export default class AlertsDataSource {
   static #instance: AlertsDataSource
@@ -21,10 +21,10 @@ export default class AlertsDataSource {
 
   /**
    * Save alert in database
-   * @param data IAlerts - Data alert
+   * @param data IAlert - Data alert
    * @returns
    */
-  async createAlert(data: IAlerts): Promise<Alerts> {
+  async createAlert(data: IAlert): Promise<Alerts> {
     try {
       const user = new Users()
       user.id = data.userId
@@ -48,10 +48,10 @@ export default class AlertsDataSource {
    * @param userId number - User id
    * @returns
    */
-  async getAlertsByUserId(userId: number): Promise<Alerts[]> {
+  async getAlertsByUserId(userId: number, options: Partial<IAlert> = {}): Promise<Alerts[]> {
     try {
       const alerts = await Alerts.find({
-        where: { user: { id: userId } },
+        where: { user: { id: userId }, ...options },
       })
 
       return alerts
@@ -88,6 +88,14 @@ export default class AlertsDataSource {
   async updateAlertAsNotified(alerts: number[]): Promise<void> {
     try {
       await Alerts.update({ id: In(alerts) }, { sent: true })
+    } catch (error) {
+      return error
+    }
+  }
+
+  async deleteAlerts(alertId: number, userId: number): Promise<void> {
+    try {
+      await Alerts.delete({ id: alertId, user: { id: userId } })
     } catch (error) {
       return error
     }

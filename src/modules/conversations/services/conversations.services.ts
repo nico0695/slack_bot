@@ -3,6 +3,7 @@ import { IoServer } from '../../../config/socketConfig'
 
 import UsersServices from '../../users/services/users.services'
 import AlertsServices from '../../alerts/services/alerts.services'
+import TasksServices from '../../tasks/services/tasks.services'
 
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
@@ -16,7 +17,9 @@ import {
   IUserConversation,
 } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
-import { extractVariablesAndFlags } from '../shared/utils/conversation.utils'
+
+import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
+import { AssistantsFlags, AssistantsVariables } from '../shared/constants/assistant.constants'
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
 
@@ -37,6 +40,7 @@ export default class ConversationsServices {
 
   #usersServices: UsersServices
   #alertsServices: AlertsServices
+  #tasksServices: TasksServices
 
   private constructor() {
     this.#openaiRepository = OpenaiRepository.getInstance()
@@ -44,6 +48,7 @@ export default class ConversationsServices {
 
     this.#usersServices = UsersServices.getInstance()
     this.#alertsServices = AlertsServices.getInstance()
+    this.#tasksServices = TasksServices.getInstance()
   }
 
   static getInstance(): ConversationsServices {
@@ -166,46 +171,130 @@ export default class ConversationsServices {
     userId: number,
     message: string
   ): Promise<IManageAssistantMessage> => {
-    const { cleanMessage, variables, flags } = extractVariablesAndFlags(message)
+    const assistantMessage = new AssistantMessage(message)
 
-    const returnValue: IManageAssistantMessage = { cleanMessage, variables, flags }
+    const returnValue: IManageAssistantMessage = {
+      cleanMessage: assistantMessage.cleanMessage,
+      variables: {},
+      flags: [],
+    }
 
-    for (const [key, value] of Object.entries(variables)) {
-      console.log(`${key}: ${value}`)
+    if (assistantMessage.variable) {
+      switch (assistantMessage.variable) {
+        case AssistantsVariables.ALERT: {
+          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+            const alerts = await this.#alertsServices.getAlertsByUserId(userId)
 
-      if (key === 'alert' || key === 'a') {
-        const alert = await this.#alertsServices.createAssistantAlert(userId, value, cleanMessage)
+            const messageToResponse =
+              alerts?.data?.length > 0
+                ? alerts?.data
+                    ?.map(
+                      (alert) =>
+                        `• Id: _#${alert.id}_ - *${alert.message}*: ${formatDateToText(alert.date)}`
+                    )
+                    .join('\n')
+                : 'No tienes alertas'
 
-        if (alert.error) {
-          throw new Error(alert.error)
-        }
+            returnValue.responseMessage = {
+              role: roleTypes.assistant,
+              content: messageToResponse,
+              provider: ConversationProviders.ASSISTANT,
+            }
 
-        returnValue.responseMessage = {
-          role: roleTypes.assistant,
-          content: `Alerta creada correctamente para el ${formatDateToText(
-            alert.data.date
-          )} con id: #${alert.data.id}`,
-          provider: ConversationProviders.ASSISTANT,
-        }
-      }
+            break
+          }
 
-      if (key === 'question' || key === 'q') {
-        const promptGenerated = await this.#generatePrompt([
-          {
-            role: roleTypes.user,
-            content: cleanMessage,
+          if (!assistantMessage.value || !assistantMessage.cleanMessage) {
+            throw new Error('Ups! No se pudo crear la alerta, debes ingresar una hora,. 😅')
+          }
+
+          const alert = await this.#alertsServices.createAssistantAlert(
+            userId,
+            assistantMessage.value as string,
+            assistantMessage.cleanMessage
+          )
+
+          if (alert.error) {
+            throw new Error(alert.error)
+          }
+
+          returnValue.responseMessage = {
+            role: roleTypes.assistant,
+            content: `Alerta creada correctamente para el ${formatDateToText(
+              alert.data.date
+            )} con id: #${alert.data.id}`,
             provider: ConversationProviders.ASSISTANT,
-          },
-        ])
+          }
 
-        /** Generate conversation */
-        const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
-
-        if (messageResponse) {
-          returnValue.responseMessage = messageResponse
-        } else {
-          throw new Error('No se pudo generar la respuesta')
+          break
         }
+
+        case AssistantsVariables.TASK: {
+          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+            const tasks = await this.#tasksServices.getTasksByUserId(userId)
+
+            const messageToResponse =
+              tasks?.data?.length > 0
+                ? tasks?.data
+                    ?.map((task) => `• Id: _#${task.id}_ - *${task.title}*: ${task.description}`)
+                    .join('\n')
+                : 'No tienes tareas'
+
+            returnValue.responseMessage = {
+              role: roleTypes.assistant,
+              content: messageToResponse,
+              provider: ConversationProviders.ASSISTANT,
+            }
+
+            break
+          }
+
+          if (!assistantMessage.value) {
+            throw new Error('Ups! No se pudo crear la tarea, debes ingresar un título. 😅')
+          }
+
+          const task = await this.#tasksServices.createAssistantTask(
+            userId,
+            assistantMessage.value as string,
+            (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? ''
+          )
+
+          if (task.error) {
+            throw new Error(task.error)
+          }
+
+          returnValue.responseMessage = {
+            role: roleTypes.assistant,
+            content: `Tarea creada correctamente con id: #${task.data.id}`,
+            provider: ConversationProviders.ASSISTANT,
+          }
+
+          break
+        }
+
+        case AssistantsVariables.QUESTION: {
+          const promptGenerated = await this.#generatePrompt([
+            {
+              role: roleTypes.user,
+              content: assistantMessage.cleanMessage,
+              provider: ConversationProviders.ASSISTANT,
+            },
+          ])
+
+          /** Generate conversation */
+          const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+
+          if (messageResponse) {
+            returnValue.responseMessage = messageResponse
+          } else {
+            throw new Error('No se pudo generar la respuesta')
+          }
+
+          break
+        }
+
+        default:
+          break
       }
     }
 

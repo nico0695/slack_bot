@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 
 import SummaryServices from '../services/summary.services'
 
@@ -35,18 +36,15 @@ export default class SummaryWebController {
     const { body } = req
     const { text } = body
 
-    try {
-      if (!text) {
-        res.status(400).send({ error: 'Text is required' })
-      }
-      const response = await this.#summaryServices.generateSumary(text)
-
-      if (response.error) res.status(500).send(response)
-
-      res.status(200).send(response.data)
-    } catch (error) {
-      console.log('error= ', error.message)
-      res.status(500).send({ error: error.message })
+    if (!text) {
+      throw new BadRequestError({ message: 'Text is required' })
     }
+    const response = await this.#summaryServices.generateSumary(text)
+
+    if (response.error) {
+      throw new BadRequestError({ message: 'Error al generar el resumen' })
+    }
+
+    res.status(200).send(response.data)
   }
 }

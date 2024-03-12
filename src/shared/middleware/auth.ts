@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
+import UnauthorizedError from '../utils/errors/UnauthorizedError'
 
 import { createClient } from '@supabase/supabase-js'
 import UsersServices from '../../modules/users/services/users.services'
@@ -43,40 +44,36 @@ export function HttpAuth(target: any, propertyKey: string, descriptor: PropertyD
   const originalMethod = descriptor.value
 
   descriptor.value = async function (...args: any[]) {
-    const [req, res] = args
+    const [req] = args
 
-    try {
-      const token = req.headers.authorization
+    const token = req.headers.authorization
 
-      if (!token) {
-        return res.status(401).json({ message: 'Invalid token' })
-      }
-
-      const supabaseResponse = await supabase.auth.getUser(token.replace('Bearer ', ''))
-
-      const supabaseUser = supabaseResponse.data?.user
-
-      if (supabaseResponse.error || !supabaseUser) {
-        return res.status(401).json({ message: 'Invalid token' })
-      }
-
-      const userServices = UsersServices.getInstance()
-
-      const { data: user } = await userServices.getOrCreateUserSupabase({
-        email: supabaseUser.email,
-        supabaseId: supabaseUser.id,
-      })
-
-      if (!user.enabled) {
-        return res.status(401).json({ message: 'Unauthorized' })
-      }
-
-      this.userData = user
-
-      return originalMethod.apply(this, args)
-    } catch (error) {
-      return res.status(401).json({ message: 'Server Error' })
+    if (!token) {
+      throw new UnauthorizedError({ message: 'Unauthorized' })
     }
+
+    const supabaseResponse = await supabase.auth.getUser(token.replace('Bearer ', ''))
+
+    const supabaseUser = supabaseResponse.data?.user
+
+    if (supabaseResponse.error || !supabaseUser) {
+      throw new UnauthorizedError({ message: 'Unauthorized' })
+    }
+
+    const userServices = UsersServices.getInstance()
+
+    const { data: user } = await userServices.getOrCreateUserSupabase({
+      email: supabaseUser.email,
+      supabaseId: supabaseUser.id,
+    })
+
+    if (!user.enabled) {
+      throw new UnauthorizedError({ message: 'Unauthorized' })
+    }
+
+    this.userData = user
+
+    return originalMethod.apply(this, args)
   }
 }
 
@@ -115,12 +112,12 @@ export function Permission(profile: Profiles[] = []): any {
 
       try {
         if (profile.length > 0 && !profile.includes(this.userData.profile)) {
-          return res.status(403).json({ message: 'Unauthorized' })
+          return res.status(403).json({ message: 'You dont have permissions' })
         }
 
         return originalMethod.apply(this, args)
       } catch (error) {
-        return res.status(403).json({ message: 'Unauthorized' })
+        return res.status(403).json({ message: 'You dont have permissions' })
       }
     }
   }

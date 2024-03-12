@@ -3,6 +3,8 @@ import { Router } from 'express'
 import fs from 'fs'
 import path from 'path'
 
+import BadRequestError from '../../../shared/utils/errors/BadRequestError'
+
 import TextToSpeechServices from '../services/textToSpeech.services'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
@@ -47,18 +49,17 @@ export default class TextToSpeechWebController {
   public async generateTextoToSpeech(req: any, res: any): Promise<void> {
     const { body } = req
     const { phrase } = body
-    try {
-      if (!phrase) {
-        res.status(400).send({ error: 'Prompt is required' })
-      }
-      const response = await this.#textToSpeechServices.generateSpeech(phrase)
-
-      if (response.error) res.status(500).send(response)
-
-      res.status(200).send(response.data)
-    } catch (error) {
-      res.status(500).send({ error: error.message })
+    if (!phrase) {
+      throw new BadRequestError({ message: 'La frase es requerida' })
     }
+
+    const response = await this.#textToSpeechServices.generateSpeech(phrase)
+
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
+    }
+
+    res.status(200).send(response.data)
   }
 
   @HttpAuth
@@ -68,19 +69,16 @@ export default class TextToSpeechWebController {
       query: { page = 1, pageSize = 6 },
     } = req
 
-    try {
-      const pageInt = parseInt(page, 10)
-      const sizeInt = parseInt(pageSize, 10)
+    const pageInt = parseInt(page, 10)
+    const sizeInt = parseInt(pageSize, 10)
 
-      const response = await this.#textToSpeechServices.getTextToSpeechList(pageInt, sizeInt)
+    const response = await this.#textToSpeechServices.getTextToSpeechList(pageInt, sizeInt)
 
-      if (response.error) res.status(500).send(response)
-
-      res.status(200).send(response.data)
-    } catch (error) {
-      console.log('error= ', error.message)
-      res.status(500).send({ error: error.message })
+    if (response.error) {
+      throw new BadRequestError({ message: response.error })
     }
+
+    res.status(200).send(response.data)
   }
 
   @HttpAuth
@@ -90,25 +88,21 @@ export default class TextToSpeechWebController {
       params: { id },
     } = req
 
-    try {
-      const response = await this.#textToSpeechServices.getAudio(id)
+    const response = await this.#textToSpeechServices.getAudio(id)
 
-      if (response.error) return res.status(500).send(response)
+    if (response.error) return res.status(500).send(response)
 
-      if (response?.data && response?.data.length > 0) {
-        const filePath = path.join(process.cwd(), response?.data)
+    if (response?.data && response?.data.length > 0) {
+      const filePath = path.join(process.cwd(), response?.data)
 
-        fs.readFile(filePath, (err, data) => {
-          if (err) {
-            res.status(500).send({ error: err.message })
-          } else {
-            res.setHeader('Content-Type', 'audio/mpeg')
-            res.send(data)
-          }
-        })
-      }
-    } catch (error) {
-      res.status(500).send({ error: error.message })
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          throw new BadRequestError({ message: err.message })
+        } else {
+          res.setHeader('Content-Type', 'audio/mpeg')
+          res.send(data)
+        }
+      })
     }
   }
 }

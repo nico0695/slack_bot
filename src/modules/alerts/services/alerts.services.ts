@@ -1,6 +1,6 @@
 import { Alerts } from '../../../entities/alerts'
 import { GenericResponse } from '../../../shared/interfaces/services'
-import { IAlertToNotify, IAlerts } from '../shared/interfaces/alerts.interfaces'
+import { IAlertToNotify, IAlert } from '../shared/interfaces/alerts.interfaces'
 
 import AlertsDataSource from '../repositories/database/alerts.dataSource'
 import { UsersRedis } from '../../users/repositories/redis/users.redis'
@@ -60,10 +60,10 @@ export default class AlertsServices {
 
   /**
    * Save alert in database
-   * @param data IAlerts - Data alert
+   * @param data IAlert - Data alert
    * @returns
    */
-  public async createAlert(data: IAlerts): Promise<GenericResponse<Alerts>> {
+  public async createAlert(data: IAlert): Promise<GenericResponse<Alerts>> {
     try {
       const response = await this.#alertsDataSource.createAlert(data)
 
@@ -82,9 +82,12 @@ export default class AlertsServices {
    * @param userId number - User id
    * @returns
    */
-  public async getAlertsByUserId(userId: number): Promise<GenericResponse<Alerts[]>> {
+  public async getAlertsByUserId(
+    userId: number,
+    options: Partial<IAlert> = { sent: false }
+  ): Promise<GenericResponse<Alerts[]>> {
     try {
-      const response = await this.#alertsDataSource.getAlertsByUserId(userId)
+      const response = await this.#alertsDataSource.getAlertsByUserId(userId, options)
 
       return {
         data: response,
@@ -134,6 +137,20 @@ export default class AlertsServices {
     } catch (error) {
       return {
         error: 'Error al actualizar la alerta',
+      }
+    }
+  }
+
+  public async deleteAlert(alertId: number, userId: number): Promise<GenericResponse<boolean>> {
+    try {
+      await this.#alertsDataSource.deleteAlerts(alertId, userId)
+
+      return {
+        data: true,
+      }
+    } catch (error) {
+      return {
+        error: 'Error al eliminar la alerta',
       }
     }
   }
