@@ -134,6 +134,7 @@ export default class UsersController extends GenericController {
       email: req.body.email,
       phone: req.body.phone,
       enabled: req.body.enabled,
+      profile: req.body.profile,
     }
 
     if (!dataUser.name || !dataUser.email) {
