@@ -41,7 +41,7 @@ ENV REDIS_HOST "redis://host.docker.internal"
 # COPY ./build /app/build
 # COPY ./package.json /app/package.json
 # COPY ./package-lock.json /app/package-lock.json
-COPY . .
+COPY . /app
 
 RUN cd app && NODE_ENV=$NODE_ENV npm install
 
