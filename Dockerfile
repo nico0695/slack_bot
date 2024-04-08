@@ -34,6 +34,7 @@ ENV BASE_PATH=/app/build
 ENV DB_URL=/database/database.sqlite
 ENV ADMIN_MAIL="admin@bot.com"
 
+ENV SOCKET_URL = "http://localhost:3001"
 ENV REDIS_HOST "redis://host.docker.internal"
 
 
