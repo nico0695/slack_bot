@@ -43,9 +43,7 @@ ENV REDIS_HOST "redis://host.docker.internal"
 # COPY ./package-lock.json /app/package-lock.json
 COPY . /app
 
-RUN cd app && NODE_ENV=$NODE_ENV npm install
-
-RUN npm run build
+RUN cd app && NODE_ENV=$NODE_ENV npm install && npm run build
 
 
 # Expose the port your app is running on (e.g., 3000)
