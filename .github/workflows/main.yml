@@ -29,7 +29,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ./docker/Dockerfile
+          file: ./Dockerfile
           build-args: |
             SLACK_SIGNING_SECRET_ARG = ${{ secrets.SLACK_SIGNING_SECRET_ARG }}
             SLACK_BOT_TOKEN_ARG = ${{ secrets.SLACK_BOT_TOKEN_ARG }}
