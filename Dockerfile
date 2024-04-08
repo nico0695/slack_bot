@@ -38,11 +38,15 @@ ENV SOCKET_URL = "http://localhost:3001"
 ENV REDIS_HOST "redis://host.docker.internal"
 
 
-COPY ./build /app/build
-COPY ./package.json /app/package.json
-COPY ./package-lock.json /app/package-lock.json
+# COPY ./build /app/build
+# COPY ./package.json /app/package.json
+# COPY ./package-lock.json /app/package-lock.json
+COPY . .
 
 RUN cd app && NODE_ENV=$NODE_ENV npm install
+
+RUN npm run build
+
 
 # Expose the port your app is running on (e.g., 3000)
 EXPOSE 4000
