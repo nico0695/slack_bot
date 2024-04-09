@@ -30,7 +30,7 @@ ENV SUPABASE_TOKEN=${SUPABASE_TOKEN_ARG}
 ENV VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY_ARG}
 ENV VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY_ARG}
 
-ENV BASE_PATH=/app/build
+ENV BASE_PATH=/build
 ENV DB_URL=/database/database.sqlite
 ENV ADMIN_MAIL="admin@bot.com"
 
@@ -41,9 +41,10 @@ ENV REDIS_HOST "redis://host.docker.internal"
 # COPY ./build /app/build
 # COPY ./package.json /app/package.json
 # COPY ./package-lock.json /app/package-lock.json
-COPY . /app
+COPY . .
 
-RUN cd app && NODE_ENV=$NODE_ENV npm install && npm run build
+RUN NODE_ENV=$NODE_ENV npm install
+RUN npm run build
 
 
 # Expose the port your app is running on (e.g., 3000)
@@ -51,4 +52,4 @@ EXPOSE 4000
 EXPOSE 3001
 
 # Define the command to run your Node.js application
-CMD [ "node", "app/build/index.js" ]
+CMD [ "node", "build/index.js" ]
