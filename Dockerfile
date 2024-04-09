@@ -1,3 +1,18 @@
+FROM node:18 as builder
+
+# Create app directory
+WORKDIR /app_build
+
+# Install app dependencies
+COPY package*.json ./
+
+RUN npm ci
+
+COPY . .
+
+RUN npm run build
+
+
 FROM node:18
 
 ARG NODE_ENV=production
@@ -38,14 +53,15 @@ ENV SOCKET_URL = "http://localhost:3001"
 ENV REDIS_HOST "redis://host.docker.internal"
 
 
-# COPY ./build /app/build
-# COPY ./package.json /app/package.json
-# COPY ./package-lock.json /app/package-lock.json
-COPY . .
+WORKDIR /app
+
+COPY --from=builder /app_build/build ./build
+
+# COPY ./build ./build
+COPY ./package.json ./package.json
+COPY ./package-lock.json ./package-lock.json
 
 RUN NODE_ENV=$NODE_ENV npm install
-RUN npm run build
-
 
 # Expose the port your app is running on (e.g., 3000)
 EXPOSE 4000
