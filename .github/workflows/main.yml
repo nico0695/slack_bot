@@ -42,3 +42,23 @@ jobs:
             VAPID_PRIVATE_KEY_ARG = ${{ secrets.VAPID_PRIVATE_KEY_ARG }}
           push: true
           tags: niko0695/slack_bot:latest
+  deploy:
+    runs-on: ubuntu-latest
+    name: Continuous Deployment
+    needs: [docker_build]
+    steps:
+      - name: Deploy using ssh
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          script: |
+            cd /app/slack_bot/
+            git pull
+            npm run build
+            ./build-docker.sh
+            docker stop slack_bot
+            docker rm slack_bot
+            ./run-docker.sh
