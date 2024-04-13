@@ -17,6 +17,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     name: Continuous Deployment
+    needs: [build]
     steps:
       - name: Deploy using ssh
         uses: appleboy/ssh-action@master
