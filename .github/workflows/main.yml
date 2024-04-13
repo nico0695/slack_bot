@@ -14,34 +14,6 @@ jobs:
         with:
           node-version: 18
       - run: npm ci
-  # docker_build:
-  #   runs-on: ubuntu-latest
-  #   name: Docker Image Build
-  #   needs: [build]
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: Login to Docker Hub
-  #       uses: docker/login-action@v1
-  #       with:
-  #         username: ${{ secrets.DOCKER_USERNAME }}
-  #         password: ${{ secrets.DOCKER_PASSWORD }}
-  #     - name: Build Docker image
-  #       uses: docker/build-push-action@v2
-  #       with:
-  #         context: .
-  #         file: ./Dockerfile
-  #         build-args: |
-  #           SLACK_SIGNING_SECRET_ARG = ${{ secrets.SLACK_SIGNING_SECRET_ARG }}
-  #           SLACK_BOT_TOKEN_ARG = ${{ secrets.SLACK_BOT_TOKEN_ARG }}
-  #           APP_TOKEN_ARG = ${{ secrets.APP_TOKEN_ARG }}
-  #           OPENAI_API_KEY_ARG = ${{ secrets.OPENAI_API_KEY_ARG }}
-  #           LEAP_API_KEY_ARG = ${{ secrets.LEAP_API_KEY_ARG }}
-  #           SUPABASE_URL_ARG = ${{ secrets.SUPABASE_URL_ARG }}
-  #           SUPABASE_TOKEN_ARG = ${{ secrets.SUPABASE_TOKEN_ARG }}
-  #           VAPID_PUBLIC_KEY_ARG = ${{ secrets.VAPID_PUBLIC_KEY_ARG }}
-  #           VAPID_PRIVATE_KEY_ARG = ${{ secrets.VAPID_PRIVATE_KEY_ARG }}
-  #         push: true
-  #         tags: niko0695/slack_bot:latest
   deploy:
     runs-on: ubuntu-latest
     name: Continuous Deployment
