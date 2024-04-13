@@ -1,18 +1,3 @@
-FROM node:18 as builder
-
-# Create app directory
-WORKDIR /app_build
-
-# Install app dependencies
-COPY package*.json ./
-
-RUN npm ci
-
-COPY . .
-
-RUN npm run build
-
-
 FROM node:18
 
 ARG NODE_ENV=production
@@ -45,7 +30,7 @@ ENV SUPABASE_TOKEN=${SUPABASE_TOKEN_ARG}
 ENV VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY_ARG}
 ENV VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY_ARG}
 
-ENV BASE_PATH=/build
+ENV BASE_PATH=/app/build
 ENV DB_URL=/database/database.sqlite
 ENV ADMIN_MAIL="admin@bot.com"
 
@@ -53,19 +38,15 @@ ENV SOCKET_URL = "http://localhost:3001"
 ENV REDIS_HOST "redis://host.docker.internal"
 
 
-WORKDIR /app
+COPY ./build /app/build
+COPY ./package.json /app/package.json
+COPY ./package-lock.json /app/package-lock.json
 
-COPY --from=builder /app_build/build ./build
-
-# COPY ./build ./build
-COPY ./package.json ./package.json
-COPY ./package-lock.json ./package-lock.json
-
-RUN NODE_ENV=$NODE_ENV npm install
+RUN cd app && NODE_ENV=$NODE_ENV npm install
 
 # Expose the port your app is running on (e.g., 3000)
 EXPOSE 4000
 EXPOSE 3001
 
 # Define the command to run your Node.js application
-CMD [ "node", "build/index.js" ]
+CMD [ "node", "app/build/index.js" ]
