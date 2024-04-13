@@ -19,7 +19,6 @@ export const alertCronJob = async (): Promise<void> => {
     }
 
     if (alerts?.data.length === 0) {
-      console.log('No alerts to notify')
       return
     }
 
