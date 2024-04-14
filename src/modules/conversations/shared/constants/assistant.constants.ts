@@ -19,6 +19,9 @@ export const assistantsVariablesKey: {
   task: AssistantsVariables.TASK,
   t: AssistantsVariables.TASK,
 
+  note: AssistantsVariables.NOTE,
+  n: AssistantsVariables.NOTE,
+
   question: AssistantsVariables.QUESTION,
   q: AssistantsVariables.QUESTION,
 }
