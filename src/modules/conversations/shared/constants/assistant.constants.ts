@@ -30,6 +30,7 @@ export enum AssistantsFlags {
   DESCRIPTION = 'description',
   LIST = 'list',
   LIST_TAG = 'list_tag',
+  TAG = 'tag',
 }
 
 export const assistantFlagsKey: {
@@ -37,6 +38,9 @@ export const assistantFlagsKey: {
 } = {
   description: AssistantsFlags.DESCRIPTION,
   d: AssistantsFlags.DESCRIPTION,
+
+  tag: AssistantsFlags.TAG,
+  t: AssistantsFlags.TAG,
 
   list: AssistantsFlags.LIST,
   l: AssistantsFlags.LIST,
