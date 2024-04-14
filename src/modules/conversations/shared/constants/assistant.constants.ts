@@ -6,6 +6,7 @@ export const assistantsPrefix = {
 export enum AssistantsVariables {
   ALERT = 'alert',
   TASK = 'task',
+  NOTE = 'note',
   QUESTION = 'question',
 }
 
@@ -63,6 +64,18 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
     },
   },
   [AssistantsVariables.TASK]: {
+    defaultValue: null,
+    manyWords: true,
+    flags: {
+      [AssistantsFlags.DESCRIPTION]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.LIST]: {
+        defaultValue: true,
+      },
+    },
+  },
+  [AssistantsVariables.NOTE]: {
     defaultValue: null,
     manyWords: true,
     flags: {
