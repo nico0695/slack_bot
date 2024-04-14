@@ -33,13 +33,15 @@ export default class NotesServices {
   public async createAssistantNote(
     userId: number,
     title: string,
-    description: string
+    description: string,
+    tag: string
   ): Promise<GenericResponse<Notes>> {
     try {
       const response = await this.#notesDataSource.createNote({
         userId,
         title,
         description,
+        tag,
       })
 
       return {

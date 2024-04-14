@@ -323,7 +323,8 @@ export default class ConversationsServices {
           const note = await this.#notesServices.createAssistantNote(
             userId,
             assistantMessage.value as string,
-            (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? ''
+            (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
+            (assistantMessage?.flags?.[AssistantsFlags.TAG] as string) ?? ''
           )
 
           if (note.error) {
