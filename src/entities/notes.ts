@@ -7,12 +7,12 @@ import {
   JoinColumn,
   CreateDateColumn,
   DeleteDateColumn,
+  UpdateDateColumn,
 } from 'typeorm'
 import { Users } from './users'
-import { TaskStatus } from '../modules/tasks/shared/constants/tasks.constants'
 
 @Entity()
-export class Tasks extends BaseEntity {
+export class Notes extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number
 
@@ -21,12 +21,6 @@ export class Tasks extends BaseEntity {
 
   @Column()
   description: string
-
-  @Column({ default: TaskStatus.PENDING })
-  status: string
-
-  @Column({ nullable: true, default: null })
-  alertDate: Date
 
   @Column({ default: '' })
   tag: string
@@ -37,6 +31,9 @@ export class Tasks extends BaseEntity {
 
   @CreateDateColumn()
   createdAt: Date
+
+  @UpdateDateColumn()
+  updatedAt: Date
 
   @DeleteDateColumn()
   deletedAt: Date
