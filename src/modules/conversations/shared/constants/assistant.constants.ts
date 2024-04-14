@@ -26,6 +26,7 @@ export const assistantsVariablesKey: {
 export enum AssistantsFlags {
   DESCRIPTION = 'description',
   LIST = 'list',
+  LIST_TAG = 'list_tag',
 }
 
 export const assistantFlagsKey: {
@@ -36,10 +37,13 @@ export const assistantFlagsKey: {
 
   list: AssistantsFlags.LIST,
   l: AssistantsFlags.LIST,
+
+  listTag: AssistantsFlags.LIST_TAG,
+  lt: AssistantsFlags.LIST_TAG,
 }
 
 interface IFlagOptions {
-  defaultValue: boolean | null
+  defaultValue: boolean | null | string
 }
 
 export interface IVariableOptions {
@@ -84,6 +88,9 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
       },
       [AssistantsFlags.LIST]: {
         defaultValue: true,
+      },
+      [AssistantsFlags.LIST_TAG]: {
+        defaultValue: '',
       },
     },
   },

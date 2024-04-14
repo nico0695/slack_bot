@@ -76,9 +76,14 @@ export default class NotesServices {
    * @param userId number - User id
    * @returns
    */
-  public async getNotesByUserId(userId: number): Promise<GenericResponse<Notes[]>> {
+  public async getNotesByUserId(
+    userId: number,
+    options?: {
+      tag?: string
+    }
+  ): Promise<GenericResponse<Notes[]>> {
     try {
-      const response = await this.#notesDataSource.getNotesByUserId(userId)
+      const response = await this.#notesDataSource.getNotesByUserId(userId, options)
 
       return {
         data: response,
