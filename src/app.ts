@@ -30,6 +30,7 @@ import SummaryWebController from './modules/summary/controller/summary.controlle
 import { alertCronJob } from './modules/alerts/utils/cronJob'
 import AlertsWebController from './modules/alerts/controller/alersWeb.controller'
 import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
+import NotesWebController from './modules/notes/controller/notesWeb.controller'
 
 dotenv.config()
 
@@ -46,6 +47,7 @@ export default class App {
 
   #alertsWebController: AlertsWebController
   #tasksWebController: TasksWebController
+  #notesWebController: NotesWebController
 
   #imagesController: ImagesController
   #imagesWebController: ImagesWebController
@@ -62,6 +64,7 @@ export default class App {
 
     this.#alertsWebController = AlertsWebController.getInstance()
     this.#tasksWebController = TasksWebController.getInstance()
+    this.#notesWebController = NotesWebController.getInstance()
 
     this.#imagesController = ImagesController.getInstance()
     this.#imagesWebController = ImagesWebController.getInstance()
@@ -98,6 +101,7 @@ export default class App {
     this.#app.use('/conversations', [this.#conversationWebController.router])
     this.#app.use('/alerts', [this.#alertsWebController.router])
     this.#app.use('/tasks', [this.#tasksWebController.router])
+    this.#app.use('/notes', [this.#notesWebController.router])
     this.#app.use('/images', [this.#imagesWebController.router])
     this.#app.use('/text-to-speech', [this.#textToSpeechWebController.router])
     this.#app.use('/summary', [this.#summaryWebController.router])
