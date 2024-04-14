@@ -47,10 +47,15 @@ export default class NotesDataSource {
    * @param userId number - User id
    * @returns
    */
-  async getNotesByUserId(userId: number): Promise<Notes[]> {
+  async getNotesByUserId(
+    userId: number,
+    options?: {
+      tag?: string
+    }
+  ): Promise<Notes[]> {
     try {
       const notes = await Notes.find({
-        where: { user: { id: userId } },
+        where: { user: { id: userId }, ...(options ?? {}) },
       })
 
       return notes

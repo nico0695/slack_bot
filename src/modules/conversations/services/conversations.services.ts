@@ -295,6 +295,27 @@ export default class ConversationsServices {
             break
           }
 
+          if (assistantMessage.flags[AssistantsFlags.LIST_TAG]) {
+            const notes = await this.#notesServices.getNotesByUserId(userId, {
+              tag: assistantMessage.flags[AssistantsFlags.LIST_TAG] as string,
+            })
+
+            const messageToResponse =
+              notes?.data?.length > 0
+                ? notes?.data
+                    ?.map((note) => `• Id: _#${note.id}_ - *${note.title}*: ${note.description}`)
+                    .join('\n')
+                : 'No tienes notas'
+
+            returnValue.responseMessage = {
+              role: roleTypes.assistant,
+              content: messageToResponse,
+              provider: ConversationProviders.ASSISTANT,
+            }
+
+            break
+          }
+
           if (!assistantMessage.value) {
             throw new Error('Ups! No se pudo crear la nota, debes ingresar un título. 😅')
           }
