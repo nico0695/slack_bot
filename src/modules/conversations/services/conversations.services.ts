@@ -4,6 +4,7 @@ import { IoServer } from '../../../config/socketConfig'
 import UsersServices from '../../users/services/users.services'
 import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
+import NotesServices from '../../notes/services/notes.services'
 
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
@@ -41,6 +42,7 @@ export default class ConversationsServices {
   #usersServices: UsersServices
   #alertsServices: AlertsServices
   #tasksServices: TasksServices
+  #notesServices: NotesServices
 
   private constructor() {
     this.#openaiRepository = OpenaiRepository.getInstance()
@@ -49,6 +51,7 @@ export default class ConversationsServices {
     this.#usersServices = UsersServices.getInstance()
     this.#alertsServices = AlertsServices.getInstance()
     this.#tasksServices = TasksServices.getInstance()
+    this.#notesServices = NotesServices.getInstance()
   }
 
   static getInstance(): ConversationsServices {
@@ -266,6 +269,49 @@ export default class ConversationsServices {
           returnValue.responseMessage = {
             role: roleTypes.assistant,
             content: `Tarea creada correctamente con id: #${task.data.id}`,
+            provider: ConversationProviders.ASSISTANT,
+          }
+
+          break
+        }
+
+        case AssistantsVariables.NOTE: {
+          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+            const notes = await this.#notesServices.getNotesByUserId(userId)
+
+            const messageToResponse =
+              notes?.data?.length > 0
+                ? notes?.data
+                    ?.map((note) => `• Id: _#${note.id}_ - *${note.title}*: ${note.description}`)
+                    .join('\n')
+                : 'No tienes notas'
+
+            returnValue.responseMessage = {
+              role: roleTypes.assistant,
+              content: messageToResponse,
+              provider: ConversationProviders.ASSISTANT,
+            }
+
+            break
+          }
+
+          if (!assistantMessage.value) {
+            throw new Error('Ups! No se pudo crear la nota, debes ingresar un título. 😅')
+          }
+
+          const note = await this.#notesServices.createAssistantNote(
+            userId,
+            assistantMessage.value as string,
+            (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? ''
+          )
+
+          if (note.error) {
+            throw new Error(note.error)
+          }
+
+          returnValue.responseMessage = {
+            role: roleTypes.assistant,
+            content: `Nota creada correctamente con id: #${note.data.id}`,
             provider: ConversationProviders.ASSISTANT,
           }
 
