@@ -282,7 +282,7 @@ export default class ConversationsServices {
             const messageToResponse =
               notes?.data?.length > 0
                 ? notes?.data
-                    ?.map((note) => `• Id: _#${note.id}_ - *${note.title}*: ${note.description}`)
+                    ?.map((note) => `• Id: _#${note.id}_ - **${note.title}:** ${note.description}`)
                     .join('\n')
                 : 'No tienes notas'
 
@@ -295,21 +295,33 @@ export default class ConversationsServices {
             break
           }
 
-          if (assistantMessage.flags[AssistantsFlags.LIST_TAG]) {
+          if (assistantMessage.flags[AssistantsFlags.LIST_TAG] !== undefined) {
+            const tag = assistantMessage.flags[AssistantsFlags.LIST_TAG] as string
+
+            if (!tag) {
+              returnValue.responseMessage = {
+                role: roleTypes.assistant,
+                content: 'Ups! Debes ingresar un tag para listar las notas. 😅',
+                provider: ConversationProviders.ASSISTANT,
+              }
+
+              break
+            }
+
             const notes = await this.#notesServices.getNotesByUserId(userId, {
-              tag: assistantMessage.flags[AssistantsFlags.LIST_TAG] as string,
+              tag,
             })
 
             const messageToResponse =
               notes?.data?.length > 0
                 ? notes?.data
-                    ?.map((note) => `• Id: _#${note.id}_ - *${note.title}*: ${note.description}`)
+                    ?.map((note) => `• Id: _#${note.id}_ - **${note.title}:** ${note.description}`)
                     .join('\n')
                 : 'No tienes notas'
 
             returnValue.responseMessage = {
               role: roleTypes.assistant,
-              content: messageToResponse,
+              content: `#### Notas - tag: ${tag ?? ''} \n ` + messageToResponse,
               provider: ConversationProviders.ASSISTANT,
             }
 
