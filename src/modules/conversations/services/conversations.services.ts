@@ -127,7 +127,7 @@ export default class ConversationsServices {
 
       return messageResponse.content
     } catch (error) {
-      console.log('error= ', error.message)
+      console.log('- generateConversation service error= ', error.message)
       return null
     }
   }
@@ -374,6 +374,13 @@ export default class ConversationsServices {
         }
 
         default:
+          // Response with default message
+          returnValue.responseMessage = {
+            role: roleTypes.assistant,
+            content: 'Ups! No se encontró ninguna variable para procesar. 😅',
+            provider: ConversationProviders.ASSISTANT,
+          }
+
           break
       }
     }
@@ -560,11 +567,7 @@ export default class ConversationsServices {
         return null
       }
 
-      console.log('message= ', message)
-      let skipGeneration = false
-      if (message.startsWith('+')) {
-        skipGeneration = true
-      }
+      const skipGeneration = message.startsWith('+')
       const messageFormated = message.replace('+', '').trimStart()
 
       const newConversation: IUserConversation = {
@@ -612,8 +615,7 @@ export default class ConversationsServices {
 
       return messageResponse
     } catch (error) {
-      console.log('error= ', error.message)
-      return null
+      throw new Error('No se pudo generar la respuesta')
     }
   }
 
