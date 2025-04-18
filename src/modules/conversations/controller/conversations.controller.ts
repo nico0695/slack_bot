@@ -61,9 +61,14 @@ export default class ConversationsController extends GenericController {
         payload.channel
       )
 
-      say(newResponse)
+      if (newResponse) {
+        say(newResponse)
+      } else {
+        throw new Error('No se pudo generar la conversación')
+      }
     } catch (error) {
-      console.log('err= ', error)
+      console.log('- generateConversation controller err= ', error)
+      say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
     }
   }
 
@@ -121,76 +126,77 @@ export default class ConversationsController extends GenericController {
   @SlackAuth
   public async conversationFlow(data: any): Promise<void> {
     const { payload, say, body }: any = data
+    try {
+      // Personal conversation
+      if (payload.channel_type === 'im') {
+        const newMessage: string = payload.text
 
-    // Personal conversation
-    if (payload.channel_type === 'im') {
-      const newMessage: string = payload.text
+        const userData = this.userData
 
-      const userData = this.userData
+        if (!userData) {
+          say('Ups! No se pudo obtener tu información 🤷‍♂️')
+          return
+        }
 
-      if (!userData) {
-        say('Ups! No se pudo obtener tu información 🤷‍♂️')
+        const newResponse = await this.#conversationServices.generateAssistantConversation(
+          newMessage,
+          userData?.id ?? payload.user,
+          userData?.id.toString().padStart(8, '9') ?? payload.user,
+          ConversationProviders.SLACK
+        )
+
+        if (newResponse) {
+          say(newResponse.content)
+        }
         return
       }
 
-      const newResponse = await this.#conversationServices.generateAssistantConversation(
-        newMessage,
-        userData?.id ?? payload.user,
-        userData?.id.toString().padStart(8, '9') ?? payload.user,
-        ConversationProviders.SLACK
-      )
+      // Channel conversation
+      const message: string = payload.text
 
-      if (newResponse) {
-        say(newResponse.content)
-      }
-      return
-    }
+      switch (message.toLocaleLowerCase()) {
+        case FlowKeys.START: {
+          const response = await this.#conversationServices.startConversationFlow(
+            payload.channel,
+            ChannelType.SLACK
+          )
+          say(response ?? 'No se pudo iniciar la conversación 🤷‍♂️')
+          break
+        }
+        case FlowKeys.END: {
+          const response = await this.#conversationServices.endConversationFlow(payload.channel)
+          say(response ?? 'No se pudo finalizar la conversación 🤷‍♂️')
+          break
+        }
+        case FlowKeys.SHOW: {
+          const conversation = await this.#conversationServices.showConversationFlow(
+            payload.channel,
+            body.team_id
+          )
+          say(conversation?.join('\n') ?? 'No hay ninguna conversación guardada 🤷‍♂️')
+          break
+        }
 
-    // Channel conversation
-    const message: string = payload.text
-
-    switch (message.toLocaleLowerCase()) {
-      case FlowKeys.START: {
-        const response = await this.#conversationServices.startConversationFlow(
-          payload.channel,
-          ChannelType.SLACK
-        )
-        say(response ?? 'No se pudo iniciar la conversación 🤷‍♂️')
-        break
-      }
-      case FlowKeys.END: {
-        const response = await this.#conversationServices.endConversationFlow(payload.channel)
-        say(response ?? 'No se pudo finalizar la conversación 🤷‍♂️')
-        break
-      }
-      case FlowKeys.SHOW: {
-        const conversation = await this.#conversationServices.showConversationFlow(
-          payload.channel,
-          body.team_id
-        )
-        say(conversation?.join('\n') ?? 'No hay ninguna conversación guardada 🤷‍♂️')
-        break
-      }
-
-      default: {
-        const conversationStarted = await this.#conversationServices.conversationFlowStarted(
-          payload.channel
-        )
-
-        if (conversationStarted) {
-          console.log('### generateConversationFlow ###')
-
-          const newResponse = await this.#conversationServices.generateConversationFlow(
-            message,
-            payload.user,
+        default: {
+          const conversationStarted = await this.#conversationServices.conversationFlowStarted(
             payload.channel
           )
 
-          say(newResponse?.content ?? 'No existe una conversación en curso en este canal.')
-        }
+          if (conversationStarted) {
+            const newResponse = await this.#conversationServices.generateConversationFlow(
+              message,
+              payload.user,
+              payload.channel
+            )
 
-        break
+            say(newResponse?.content ?? 'No existe una conversación en curso en este canal.')
+          }
+
+          break
+        }
       }
+    } catch (error) {
+      say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
     }
   }
 }

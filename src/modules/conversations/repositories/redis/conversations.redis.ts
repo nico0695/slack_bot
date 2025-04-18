@@ -39,7 +39,7 @@ export class RedisRepository {
 
       const responseFormated: IConversation[] = JSON.parse(response)
 
-      return responseFormated
+      return responseFormated.filter((item) => item !== null)
     } catch (error) {
       console.log('error= ', error.message)
       return null
@@ -65,6 +65,8 @@ export class RedisRepository {
       const response = await this.#redisClient.get(rConversationFlow(chanelId))
 
       const responseFormated: IConversationFlow = JSON.parse(response)
+
+      responseFormated.conversation = responseFormated.conversation.filter((item) => item !== null)
 
       return responseFormated
     } catch (error) {

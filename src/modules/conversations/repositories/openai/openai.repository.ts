@@ -44,7 +44,9 @@ export default class OpenaiRepository {
 
       return completion.data.choices[0].message as IConversation
     } catch (error) {
-      console.log('error= ', error.message)
+      if (error.message.includes('429')) {
+        console.error('OpenAI API rate limit exceeded. Please try again later.')
+      }
       return null
     }
   }
