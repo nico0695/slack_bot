@@ -37,7 +37,9 @@ export class RedisRepository {
     try {
       const response = await this.#redisClient.get(key)
 
-      const responseFormated: IConversation[] = JSON.parse(response)
+      const responseFormated: IConversation[] = JSON.parse(response).filter(
+        (item: any) => item !== null
+      )
 
       return responseFormated.filter((item) => item !== null)
     } catch (error) {

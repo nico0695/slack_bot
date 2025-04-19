@@ -413,7 +413,8 @@ export default class ConversationsServices {
 
       const { conversation: conversationStored } = conversationFlow
 
-      const newConversationUser = [...conversationStored, newConversation]
+      // TODO: add filter for tokens
+      const newConversationUser = [...conversationStored.slice(-10), newConversation]
 
       const { responseMessage } = await this.#manageAssistantVariables(userId, message)
 
@@ -436,11 +437,8 @@ export default class ConversationsServices {
         return responseMessage
       }
     } catch (error) {
-      return {
-        role: roleTypes.assistant,
-        content: 'Ups! No pude procesar tu mensaje. 😅',
-        provider: ConversationProviders.ASSISTANT,
-      }
+      console.log('generateAssistantConversation services - error= ', error.message)
+      return null
     }
   }
 
@@ -616,6 +614,53 @@ export default class ConversationsServices {
       return messageResponse
     } catch (error) {
       throw new Error('No se pudo generar la respuesta')
+    }
+  }
+
+  generateConversationFlowAssistant = async (
+    message: string,
+    userId: number,
+    chanelId: string,
+    provider: ConversationProviders
+  ): Promise<IConversation | null> => {
+    try {
+      /** Get conversation */
+      const conversationFlow = await this.#redisRepository.getConversationFlow(chanelId)
+
+      if (conversationFlow === null) {
+        return null
+      }
+
+      const newConversation: IUserConversation = {
+        role: roleTypes.user,
+        content: message,
+        userId,
+        provider,
+      }
+
+      const { conversation: conversationStored } = conversationFlow
+
+      // TODO: add filter for tokens
+      const newConversationUser = [...conversationStored.slice(-10), newConversation]
+
+      const promptGenerated = await this.#generatePrompt(newConversationUser)
+
+      /** Generate conversation */
+      const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+
+      const newConversationGenerated: IConversationFlow = {
+        ...conversationFlow,
+        conversation: [...newConversationUser, messageResponse],
+        updatedAt: new Date(),
+      }
+
+      /** Save conversation */
+      await this.#redisRepository.saveConversationFlow(chanelId, newConversationGenerated)
+
+      return messageResponse
+    } catch (error) {
+      console.log('error= ', error.message)
+      return null
     }
   }
 

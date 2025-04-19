@@ -84,8 +84,6 @@ export default class ConversationsWebController {
     message: string
     iaEnabled?: boolean
   }): Promise<IConversation | null> => {
-    console.log('### generateConversation ###')
-
     try {
       const newMessage: string = data.message
 
@@ -137,7 +135,24 @@ export default class ConversationsWebController {
       ConversationProviders.WEB
     )
 
-    return newResponse
+    if (newResponse) {
+      return newResponse
+    }
+
+    if (iaEnabled) {
+      const newResponseIa = await this.#conversationServices.generateConversationFlowAssistant(
+        message,
+        userId,
+        userId.toString().padStart(8, '9'),
+        ConversationProviders.WEB
+      )
+
+      if (newResponseIa) {
+        return newResponseIa
+      }
+    }
+
+    throw new Error('No se pudo generar la conversación')
   }
 
   // ROUTES
