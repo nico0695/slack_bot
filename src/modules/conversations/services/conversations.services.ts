@@ -6,6 +6,8 @@ import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
 
+// AI
+import GeminiRepository from '../repositories/gemini/gemini.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
 
@@ -33,10 +35,21 @@ interface IManageAssistantMessage {
   responseMessage?: IConversation
 }
 
+export enum AIRepositoryType {
+  OPENAI = 'OPENAI',
+  GEMINI = 'GEMINI',
+}
+
+const AIRepositoryByType = {
+  [AIRepositoryType.OPENAI]: OpenaiRepository,
+  [AIRepositoryType.GEMINI]: GeminiRepository,
+}
+
 export default class ConversationsServices {
   static #instance: ConversationsServices
 
-  #openaiRepository: OpenaiRepository
+  #aiRepository: OpenaiRepository | GeminiRepository
+
   #redisRepository: RedisRepository
 
   #usersServices: UsersServices
@@ -44,8 +57,8 @@ export default class ConversationsServices {
   #tasksServices: TasksServices
   #notesServices: NotesServices
 
-  private constructor() {
-    this.#openaiRepository = OpenaiRepository.getInstance()
+  private constructor(aiToUse = AIRepositoryType.GEMINI) {
+    this.#aiRepository = AIRepositoryByType[aiToUse].getInstance()
     this.#redisRepository = RedisRepository.getInstance()
 
     this.#usersServices = UsersServices.getInstance()
@@ -115,7 +128,7 @@ export default class ConversationsServices {
       const promptGenerated = await this.#generatePrompt(newConversation)
 
       /** Generate conversation */
-      const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+      const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated = [...newConversation, messageResponse]
 
@@ -362,7 +375,8 @@ export default class ConversationsServices {
           ])
 
           /** Generate conversation */
-          const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+          const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
+          console.log('messageResponse= ', messageResponse)
 
           if (messageResponse) {
             returnValue.responseMessage = messageResponse
@@ -600,7 +614,7 @@ export default class ConversationsServices {
       )
 
       /** Generate conversation */
-      const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+      const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated: IConversationFlow = {
         ...conversationFlow,
@@ -646,7 +660,8 @@ export default class ConversationsServices {
       const promptGenerated = await this.#generatePrompt(newConversationUser)
 
       /** Generate conversation */
-      const messageResponse = await this.#openaiRepository.chatCompletion(promptGenerated)
+      // const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
+      const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated: IConversationFlow = {
         ...conversationFlow,
