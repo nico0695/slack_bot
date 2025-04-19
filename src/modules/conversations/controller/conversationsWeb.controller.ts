@@ -84,8 +84,6 @@ export default class ConversationsWebController {
     message: string
     iaEnabled?: boolean
   }): Promise<IConversation | null> => {
-    console.log('### generateConversation ###')
-
     try {
       const newMessage: string = data.message
 
@@ -120,24 +118,45 @@ export default class ConversationsWebController {
     message: string,
     iaEnabled: boolean
   ): Promise<IConversation> => {
-    const userData = await this.#usersServices.getUserById(userId)
+    try {
+      const userData = await this.#usersServices.getUserById(userId)
 
-    if (!userData.data) {
-      return {
-        role: roleTypes.assistant,
-        content: 'No se pudo obtener el usuario 🤷‍♂️',
-        provider: ConversationProviders.ASSISTANT,
+      if (!userData.data) {
+        return {
+          role: roleTypes.assistant,
+          content: 'No se pudo obtener el usuario 🤷‍♂️',
+          provider: ConversationProviders.ASSISTANT,
+        }
       }
+
+      const newResponse = await this.#conversationServices.generateAssistantConversation(
+        message,
+        userId,
+        userId.toString().padStart(8, '9'),
+        ConversationProviders.WEB
+      )
+
+      if (newResponse) {
+        return newResponse
+      }
+
+      if (iaEnabled) {
+        const newResponseIa = await this.#conversationServices.generateConversationFlowAssistant(
+          message,
+          userId,
+          userId.toString().padStart(8, '9'),
+          ConversationProviders.WEB
+        )
+
+        if (newResponseIa) {
+          return newResponseIa
+        }
+      }
+
+      throw new Error('No se pudo generar la conversación')
+    } catch (error) {
+      console.log('conversationAssistantFlow controller - error= ', error)
     }
-
-    const newResponse = await this.#conversationServices.generateAssistantConversation(
-      message,
-      userId,
-      userId.toString().padStart(8, '9'),
-      ConversationProviders.WEB
-    )
-
-    return newResponse
   }
 
   // ROUTES
