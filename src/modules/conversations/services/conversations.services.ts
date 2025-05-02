@@ -58,6 +58,7 @@ export default class ConversationsServices {
   #notesServices: NotesServices
 
   private constructor(aiToUse = AIRepositoryType.GEMINI) {
+    console.log('## CONVERSATION SERVICES AI = ', aiToUse, ' ##')
     this.#aiRepository = AIRepositoryByType[aiToUse].getInstance()
     this.#redisRepository = RedisRepository.getInstance()
 
