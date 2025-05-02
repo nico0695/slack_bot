@@ -54,6 +54,8 @@ export default class GeminiRepository {
     } catch (error) {
       if (error.message.includes('429')) {
         console.error('Gemini API rate limit exceeded. Please try again later.')
+      } else {
+        console.error('Error in Gemini API:', error)
       }
       return null
     }
