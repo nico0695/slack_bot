@@ -66,11 +66,17 @@ export default class ConversationsWebController {
     message: string
     conversation: IUserConversation[]
   }> => {
-    const conversationFlow = await this.#conversationServices.showConversationFlowWeb(data.channel)
+    try {
+      const conversationFlow = await this.#conversationServices.showConversationFlowWeb(
+        data.channel
+      )
 
-    return {
-      message: 'Conversación iniciada',
-      conversation: conversationFlow?.conversation ?? [],
+      return {
+        message: 'Conversación iniciada',
+        conversation: conversationFlow?.conversation ?? [],
+      }
+    } catch (error) {
+      console.log('joinAssistantChannel - error= ', error)
     }
   }
 
