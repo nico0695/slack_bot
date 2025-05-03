@@ -190,6 +190,11 @@ export default class App {
       socket.on('join_assistant_room', async (data) => {
         const { username, channel: channelId }: IJoinRoomData = data
 
+        if (!channelId) {
+          console.log('join_assistant_room: No channelId provided')
+          return
+        }
+
         const channel = channelId.toString().padStart(8, '9')
 
         void socket.join(channel) // Join the user to a socket room
@@ -221,6 +226,11 @@ export default class App {
 
       socket.on('leave_assistant_room', async (data) => {
         const { channel: channelId }: IJoinRoomData = data
+
+        if (!channelId) {
+          console.log('leave_assistant_room: No channelId provided')
+          return
+        }
 
         const channel = channelId.toString().padStart(8, '9')
 
