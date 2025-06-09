@@ -25,6 +25,7 @@ import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
 import { AssistantsFlags, AssistantsVariables } from '../shared/constants/assistant.constants'
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
+import { assistantPrompt } from '../shared/constants/prompt.constants'
 
 type TMembersNames = Record<string, string>
 
@@ -82,13 +83,10 @@ export default class ConversationsServices {
       return { role: message.role, content: message.content, provider: message.provider }
     })
 
-    const initialPrompt =
-      'Eres un asistente basado en IA con el que puedes chatear sobre cualquier cosa.'
-
     return [
       {
         role: roleTypes.system,
-        content: initialPrompt,
+        content: assistantPrompt,
         provider: ConversationProviders.ASSISTANT,
       },
       ...requestMessages,
