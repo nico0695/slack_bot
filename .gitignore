@@ -9,3 +9,5 @@
 /src/database/*
 
 /src/assets/*
+
+.build-docker.sh
