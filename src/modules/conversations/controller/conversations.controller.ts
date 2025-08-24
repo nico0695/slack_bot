@@ -7,7 +7,7 @@ import ConversationsServices from '../services/conversations.services'
 import { roleTypes } from '../shared/constants/openai'
 import { IConversation } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders, FlowKeys } from '../shared/constants/conversationFlow'
-import { SlackAuth } from '../../../shared/middleware/auth'
+import { SlackAuth, SlackAuthActions } from '../../../shared/middleware/auth'
 
 export default class ConversationsController extends GenericController {
   static #instance: ConversationsController
@@ -25,6 +25,7 @@ export default class ConversationsController extends GenericController {
     this.cleanConversation = this.cleanConversation.bind(this)
     this.showConversation = this.showConversation.bind(this)
     this.conversationFlow = this.conversationFlow.bind(this)
+    this.deleteActions = this.deleteActions.bind(this)
   }
 
   static getInstance(): ConversationsController {
@@ -146,7 +147,7 @@ export default class ConversationsController extends GenericController {
         )
 
         if (newResponse) {
-          say(newResponse.content)
+          say(newResponse?.contentBlock ?? newResponse.content)
         }
         return
       }
@@ -198,5 +199,30 @@ export default class ConversationsController extends GenericController {
     } catch (error) {
       say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
     }
+  }
+
+  @SlackAuthActions
+  public async deleteActions({ ack, body, say }: any): Promise<void> {
+    await ack()
+
+    const userData = this.userData
+
+    const action = body.actions[0]
+
+    if (action) {
+      const deleteResponse = await this.#conversationServices.deleteActions(
+        {
+          actionId: action.action_id,
+          value: action.value,
+        },
+        userData.id
+      )
+
+      await say(`${deleteResponse ?? 'No se pudo eliminar la nota 🤷‍♂️'}`)
+
+      return
+    }
+
+    await say('No action found in the payload.')
   }
 }

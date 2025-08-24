@@ -26,6 +26,7 @@ import { AssistantsFlags, AssistantsVariables } from '../shared/constants/assist
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
 import { assistantPrompt } from '../shared/constants/prompt.constants'
+import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 type TMembersNames = Record<string, string>
 
@@ -210,9 +211,12 @@ export default class ConversationsServices {
                     .join('\n')
                 : 'No tienes alertas'
 
+            const messageBlockToResponse = slackMsgUtils.msgAlertsList(alerts.data ?? [])
+
             returnValue.responseMessage = {
               role: roleTypes.assistant,
               content: messageToResponse,
+              contentBlock: messageBlockToResponse,
               provider: ConversationProviders.ASSISTANT,
             }
 
@@ -233,11 +237,14 @@ export default class ConversationsServices {
             throw new Error(alert.error)
           }
 
+          const contentBlock = slackMsgUtils.msgAlertCreated(alert.data)
+
           returnValue.responseMessage = {
             role: roleTypes.assistant,
             content: `Alerta creada correctamente para el ${formatDateToText(
               alert.data.date
             )} con id: #${alert.data.id}`,
+            contentBlock,
             provider: ConversationProviders.ASSISTANT,
           }
 
@@ -255,9 +262,12 @@ export default class ConversationsServices {
                     .join('\n')
                 : 'No tienes tareas'
 
+            const messageBlockToResponse = slackMsgUtils.msgTasksList(tasks?.data ?? [])
+
             returnValue.responseMessage = {
               role: roleTypes.assistant,
               content: messageToResponse,
+              contentBlock: messageBlockToResponse,
               provider: ConversationProviders.ASSISTANT,
             }
 
@@ -278,9 +288,12 @@ export default class ConversationsServices {
             throw new Error(task.error)
           }
 
+          const contentBlock = slackMsgUtils.msgTaskCreated(task.data)
+
           returnValue.responseMessage = {
             role: roleTypes.assistant,
             content: `Tarea creada correctamente con id: #${task.data.id}`,
+            contentBlock,
             provider: ConversationProviders.ASSISTANT,
           }
 
@@ -298,9 +311,12 @@ export default class ConversationsServices {
                     .join('\n')
                 : 'No tienes notas'
 
+            const messageBlockToResponse = slackMsgUtils.msgNotesList(notes?.data ?? [])
+
             returnValue.responseMessage = {
               role: roleTypes.assistant,
               content: messageToResponse,
+              contentBlock: messageBlockToResponse,
               provider: ConversationProviders.ASSISTANT,
             }
 
@@ -355,9 +371,12 @@ export default class ConversationsServices {
             throw new Error(note.error)
           }
 
+          const contentBlock = slackMsgUtils.msgNoteCreated(note.data)
+
           returnValue.responseMessage = {
             role: roleTypes.assistant,
             content: `Nota creada correctamente con id: #${note.data.id}`,
+            contentBlock,
             provider: ConversationProviders.ASSISTANT,
           }
 
@@ -450,8 +469,11 @@ export default class ConversationsServices {
         return responseMessage
       }
     } catch (error) {
-      console.log('generateAssistantConversation services - error= ', error.message)
-      return null
+      return {
+        role: roleTypes.assistant,
+        content: error.message ?? 'Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️',
+        provider: ConversationProviders.ASSISTANT,
+      }
     }
   }
 
@@ -767,6 +789,47 @@ export default class ConversationsServices {
     } catch (error) {
       console.log('error= ', error.message)
       return null
+    }
+  }
+
+  // Delete actions
+  deleteActions = async (
+    data: {
+      actionId: string
+      value: string
+    },
+    userId: number
+  ): Promise<string> => {
+    const { actionId, value } = data
+
+    try {
+      switch (actionId) {
+        case 'delete_note': {
+          const deleteRes = await this.#notesServices.deleteNote(parseInt(value), userId)
+          return deleteRes.error ?? deleteRes.data
+            ? `Nota #${value} eliminada correctamente.`
+            : `Error al eliminar la nota, no se encontro la nota con Id: ${value}`
+        }
+
+        case 'delete_task': {
+          const deleteRes = await this.#tasksServices.deleteTask(parseInt(value), userId)
+          return deleteRes.error ?? deleteRes.data
+            ? `Tarea #${value} eliminada correctamente.`
+            : `Error al eliminar la tarea, no se encontro la tarea con Id: ${value}`
+        }
+
+        case 'delete_alert': {
+          const deleteRes = await this.#alertsServices.deleteAlert(parseInt(value), userId)
+          return deleteRes.error ?? deleteRes.data
+            ? `Alerta #${value} eliminada correctamente.`
+            : `Error al eliminar la alerta, no se encontro la alerta con Id: ${value}`
+        }
+
+        default:
+          return 'Acción no reconocida.'
+      }
+    } catch (error) {
+      return 'Error al ejecutar la accion. 😅'
     }
   }
 }

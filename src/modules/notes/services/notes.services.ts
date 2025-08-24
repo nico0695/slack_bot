@@ -116,10 +116,10 @@ export default class NotesServices {
 
   public async deleteNote(noteId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
-      await this.#notesDataSource.deleteNote(noteId, userId)
+      const res = await this.#notesDataSource.deleteNote(noteId, userId)
 
       return {
-        data: true,
+        data: res > 0,
       }
     } catch (error) {
       return {

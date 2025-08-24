@@ -37,7 +37,19 @@ export function formatTextToDate(dateText: string): Date {
   return newDate
 }
 
-export const formatDateToText = (date: Date, local: 'es' | 'en' = 'es', options?: any): string => {
+export const formatDateToText = (
+  date: Date,
+  local: 'es' | 'en' = 'es',
+  options?: {
+    weekday?: 'long' | 'short' | 'narrow'
+    era?: 'long' | 'short' | 'narrow'
+    year?: 'numeric' | '2-digit'
+    month?: 'numeric' | '2-digit' | 'long' | 'short' | 'narrow'
+    day?: 'numeric' | '2-digit'
+    hour?: 'numeric' | '2-digit'
+    minute?: 'numeric' | '2-digit'
+  }
+): string => {
   return new Intl.DateTimeFormat(
     local,
     options ?? {

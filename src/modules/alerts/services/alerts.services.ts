@@ -143,10 +143,10 @@ export default class AlertsServices {
 
   public async deleteAlert(alertId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
-      await this.#alertsDataSource.deleteAlerts(alertId, userId)
+      const res = await this.#alertsDataSource.deleteAlerts(alertId, userId)
 
       return {
-        data: true,
+        data: res > 0,
       }
     } catch (error) {
       return {
