@@ -93,11 +93,12 @@ export default class AlertsDataSource {
     }
   }
 
-  async deleteAlerts(alertId: number, userId: number): Promise<void> {
+  async deleteAlerts(alertId: number, userId: number): Promise<number> {
     try {
-      await Alerts.delete({ id: alertId, user: { id: userId } })
+      const result = await Alerts.delete({ id: alertId, user: { id: userId } })
+      return result.affected ?? 0
     } catch (error) {
-      return error
+      throw new Error(error)
     }
   }
 }

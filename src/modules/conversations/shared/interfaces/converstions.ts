@@ -4,6 +4,7 @@ import { roleTypes } from '../constants/openai'
 export interface IConversation {
   role: roleTypes
   content: string
+  contentBlock?: { blocks: any[] } // For slack block messages
   provider: ConversationProviders
 }
 

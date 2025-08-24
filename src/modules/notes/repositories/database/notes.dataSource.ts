@@ -76,12 +76,13 @@ export default class NotesDataSource {
     }
   }
 
-  async deleteNote(noteId: number, userId: number): Promise<void> {
+  async deleteNote(noteId: number, userId: number): Promise<number> {
     try {
-      await Notes.delete({
+      const result = await Notes.delete({
         id: noteId,
         user: { id: userId },
       })
+      return result.affected ?? 0
     } catch (error) {
       throw new Error(error)
     }

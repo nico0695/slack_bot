@@ -103,6 +103,39 @@ export function SlackAuth(target: any, propertyKey: string, descriptor: Property
   }
 }
 
+export function SlackAuthActions(
+  target: any,
+  propertyKey: string,
+  descriptor: PropertyDescriptor
+): void {
+  const originalMethod = descriptor.value
+
+  descriptor.value = async function (...args: any[]) {
+    const [{ body, payload, ack, say }]: any = args
+
+    try {
+      const userServices = UsersServices.getInstance()
+
+      const meChannelId =
+        body.channel?.id ?? (payload.channel_type === 'im' ? payload.channel : undefined)
+
+      const { data: user } = await userServices.getOrCreateUserBySlackId(body.user?.id, meChannelId)
+
+      if (!user.enabled) {
+        await ack()
+        return say('Ups! No tienes permisos para usar el bot 🤷‍♂️')
+      }
+
+      this.userData = user
+
+      return originalMethod.apply(this, args)
+    } catch (error) {
+      await ack()
+      return say('Ups! No se pudo obtener tu información 🤷‍♂️')
+    }
+  }
+}
+
 export function Permission(profile: Profiles[] = []): any {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor): void {
     const originalMethod = descriptor.value

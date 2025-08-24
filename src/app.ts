@@ -31,6 +31,7 @@ import { alertCronJob } from './modules/alerts/utils/cronJob'
 import AlertsWebController from './modules/alerts/controller/alersWeb.controller'
 import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
 import NotesWebController from './modules/notes/controller/notesWeb.controller'
+import { slackHelperMessage } from './shared/constants/slack.constants'
 
 dotenv.config()
 
@@ -113,6 +114,9 @@ export default class App {
       console.log(`~ Slack Bot is running on port ${slackPort}!`)
     })
 
+    // Actions slack bot
+    this.#slackApp.action(/^delete_/, this.#conversationController.deleteActions)
+
     // Listener slack bot
     this.#slackApp.message(
       slackListenersKey.generateConversation,
@@ -132,9 +136,7 @@ export default class App {
     this.#slackApp.message('', this.#conversationController.conversationFlow)
 
     this.#slackApp.command('/help', async ({ ack, body, client }: any): Promise<void> => {
-      ack(
-        'List of commands \n - `.alert/.a` = Generate alert. ex. ".alert 1d14h12m Hello World" \n - `.task/.t` = Generate task. ex. ".task 1d14h12m Hello World" \n - `.note/.n` = Generate note. ex. ".note 1d14h12m Hello World"'
-      )
+      ack(slackHelperMessage)
     })
   }
 

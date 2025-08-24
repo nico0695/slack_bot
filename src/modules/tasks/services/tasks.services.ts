@@ -117,10 +117,10 @@ export default class TasksServices {
 
   public async deleteTask(taskId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
-      await this.#tasksDataSource.deleteTask(taskId, userId)
+      const res = await this.#tasksDataSource.deleteTask(taskId, userId)
 
       return {
-        data: true,
+        data: res > 0,
       }
     } catch (error) {
       return {

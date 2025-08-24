@@ -72,12 +72,13 @@ export default class TasksDataSource {
     }
   }
 
-  async deleteTask(taskId: number, userId: number): Promise<void> {
+  async deleteTask(taskId: number, userId: number): Promise<number> {
     try {
-      await Tasks.delete({
+      const result = await Tasks.delete({
         id: taskId,
         user: { id: userId },
       })
+      return result.affected ?? 0
     } catch (error) {
       throw new Error(error)
     }
