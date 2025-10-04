@@ -36,11 +36,15 @@ export default class GeminiRepository {
   }
 
   chatCompletion = async (
-    messages: ChatCompletionRequestMessage[]
+    messages: ChatCompletionRequestMessage[],
+    options?: { mode?: 'classification' | 'default' }
   ): Promise<IConversation | null> => {
     try {
+      const mode = options?.mode || 'default'
+      const isClassification = mode === 'classification'
+
       const apiRequestBot = await this.#geminiApi.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: isClassification ? 'gemini-2.5-flash-lite' : 'gemini-2.0-flash',
         contents: messages.map((message: any) => message.content).join(' '),
       })
 

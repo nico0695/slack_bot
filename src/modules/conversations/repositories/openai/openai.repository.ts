@@ -28,16 +28,22 @@ export default class OpenaiRepository {
   }
 
   chatCompletion = async (
-    messages: ChatCompletionRequestMessage[]
+    messages: ChatCompletionRequestMessage[],
+    options?: { mode?: 'classification' | 'default' }
   ): Promise<IConversation | null> => {
     try {
+      const mode = options?.mode || 'default'
+
+      const isClassification = mode === 'classification'
+
       const apiRequestBot = {
-        model: 'gpt-3.5-turbo',
+        model: isClassification ? 'gpt-4.1-nano' : 'gpt-3.5-turbo',
         messages: messages.map((message: any) => ({
           role: message.role,
           content: message.content,
         })),
-        temperature: 0.6,
+        temperature: isClassification ? 0 : 0.6,
+        max_tokens: isClassification ? 120 : undefined,
       }
 
       const completion = await this.#openai.createChatCompletion(apiRequestBot)
@@ -46,6 +52,8 @@ export default class OpenaiRepository {
     } catch (error) {
       if (error.message.includes('429')) {
         console.error('OpenAI API rate limit exceeded. Please try again later.')
+      } else {
+        console.error('Error in OpenAI API:', error.message)
       }
       return null
     }
