@@ -1,7 +1,7 @@
 import { Tasks } from '../../entities/tasks'
 import { Alerts } from '../../entities/alerts'
 import { Notes } from '../../entities/notes'
-import { formatDateToText } from './dates.utils'
+import { formatDateToText, formatTimeLeft } from './dates.utils'
 
 /** ALERTS */
 export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
@@ -43,10 +43,11 @@ export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
 
   blocks.push(
     {
-      type: 'section',
+      type: 'header',
       text: {
-        type: 'mrkdwn',
-        text: `Tienes *${alerts.length} Alertas*`,
+        type: 'plain_text',
+        text: `Tus Alertas (${alerts.length})`,
+        emoji: true,
       },
     },
     {
@@ -55,53 +56,36 @@ export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
   )
 
   alerts.forEach((alert) => {
-    // Alert title and description
-    blocks.push(
-      {
-        type: 'section',
-        fields: [
+    const timeLeft = formatTimeLeft(alert.date)
+    const truncatedMessage =
+      alert.message.length > 20 ? `${alert.message.slice(0, 20)}...` : alert.message
+
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `${truncatedMessage}\n > En: *${timeLeft}*`,
+      },
+      accessory: {
+        type: 'overflow',
+        options: [
           {
-            type: 'mrkdwn',
-            text: `*Día:* ${formatDateToText(alert.date, 'es', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}`,
+            text: {
+              type: 'plain_text',
+              text: 'Ver Detalles',
+            },
+            value: `view_alert_details:${alert.id}`,
           },
           {
-            type: 'mrkdwn',
-            text: `*A las:* ${formatDateToText(alert.date, 'es', {
-              hour: 'numeric',
-              minute: 'numeric',
-            })}`,
+            text: {
+              type: 'plain_text',
+              text: 'Eliminar',
+            },
+            value: `delete_alert:${alert.id}`,
           },
         ],
+        action_id: `alert_actions:${alert.id}`,
       },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*Message:* ${alert.message}`,
-        },
-      }
-    )
-
-    // Actions
-    blocks.push({
-      type: 'actions',
-      elements: [
-        {
-          type: 'button',
-          text: {
-            type: 'plain_text',
-            emoji: true,
-            text: 'Borrar Alerta',
-          },
-          style: 'danger',
-          value: `${alert.id}`,
-          action_id: 'delete_alert',
-        },
-      ],
     })
 
     blocks.push({
@@ -138,12 +122,14 @@ export const msgNoteCreated = (data: Notes): { blocks: any[] } => {
 export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
   const blocks = []
 
+  // Encabezado del mensaje
   blocks.push(
     {
-      type: 'section',
+      type: 'header',
       text: {
-        type: 'mrkdwn',
-        text: `Tienes *${notes.length} Notas*`,
+        type: 'plain_text',
+        text: `Tus Notas (${notes.length})`,
+        emoji: true,
       },
     },
     {
@@ -152,16 +138,17 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
   )
 
   notes.forEach((note) => {
-    // Note title and description
+    const truncatedDescription =
+      note.description.length > 40 ? note.description.slice(0, 40) + '...' : note.description
+
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${note.title}* \n${note.description}`,
+        text: `*${note.title}* \n${truncatedDescription}`,
       },
     })
 
-    // Actions
     blocks.push({
       type: 'actions',
       elements: [
@@ -169,8 +156,17 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
           type: 'button',
           text: {
             type: 'plain_text',
-            emoji: true,
-            text: 'Borrar Nota',
+            text: 'Ver Detalles',
+          },
+          style: 'primary',
+          value: `${note.id}`,
+          action_id: 'view_note_details',
+        },
+        {
+          type: 'button',
+          text: {
+            type: 'plain_text',
+            text: 'Eliminar',
           },
           style: 'danger',
           value: `${note.id}`,
@@ -196,14 +192,7 @@ export const msgTaskCreated = (data: Tasks): { blocks: any[] } => {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `Tarea creada correctamente - Id: ${data.id}`,
-        },
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*Título:* ${data.title} - Status: ${data.status} \n *Descripción:* ${data.description}`,
+          text: `Tarea creada correctamente - *#${data.id}* \n Titulo: *${data.title}*`,
         },
       },
     ],

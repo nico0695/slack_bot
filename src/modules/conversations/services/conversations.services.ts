@@ -394,7 +394,6 @@ export default class ConversationsServices {
 
           /** Generate conversation */
           const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
-          console.log('messageResponse= ', messageResponse)
 
           if (messageResponse) {
             returnValue.responseMessage = messageResponse
