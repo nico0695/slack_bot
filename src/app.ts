@@ -108,32 +108,62 @@ export default class App {
     this.#app.use('/summary', [this.#summaryWebController.router])
   }
 
+  // Add this method to your class
+  #restartSlackApp(): void {
+    try {
+      if (typeof this.#slackApp.stop === 'function') {
+        this.#slackApp.stop().catch(() => {
+          throw new Error('Error stopping Slack app')
+        })
+      }
+
+      this.#slackApp = connectionSlackApp
+      this.#slackListeners()
+    } catch (err) {
+      console.error('Failed to restart Slack app:', err)
+    }
+  }
+
   #slackListeners(): void {
+    // Helper to wrap handlers with defensive checks and restart on undefined event
+    const safeHandler = (handler: any) => {
+      return async (args: any) => {
+        if (!args?.event) {
+          this.#restartSlackApp()
+          return
+        }
+        return handler(args)
+      }
+    }
+
     // Start slack bot
     void this.#slackApp.start(process.env.PORT ?? slackPort).then(() => {
       console.log(`~ Slack Bot is running on port ${slackPort}!`)
     })
 
     // Actions slack bot
-    this.#slackApp.action(/^delete_/, this.#conversationController.deleteActions)
+    this.#slackApp.action(/^delete_/, safeHandler(this.#conversationController.deleteActions))
 
     // Listener slack bot
     this.#slackApp.message(
       slackListenersKey.generateConversation,
-      this.#conversationController.generateConversation
+      safeHandler(this.#conversationController.generateConversation)
     )
     this.#slackApp.message(
       slackListenersKey.cleanConversation,
-      this.#conversationController.cleanConversation
+      safeHandler(this.#conversationController.cleanConversation)
     )
     this.#slackApp.message(
       slackListenersKey.showConversation,
-      this.#conversationController.showConversation
+      safeHandler(this.#conversationController.showConversation)
     )
 
-    this.#slackApp.message(slackListenersKey.generateImages, this.#imagesController.generateImages)
+    this.#slackApp.message(
+      slackListenersKey.generateImages,
+      safeHandler(this.#imagesController.generateImages)
+    )
 
-    this.#slackApp.message('', this.#conversationController.conversationFlow)
+    this.#slackApp.message('', safeHandler(this.#conversationController.conversationFlow))
 
     this.#slackApp.command('/help', async ({ ack, body, client }: any): Promise<void> => {
       ack(slackHelperMessage)
@@ -267,6 +297,19 @@ export default class App {
 
   // Start server
   public async start(): Promise<void> {
+    process.on('uncaughtException', (err) => {
+      console.error(`[${new Date().toISOString()}] Uncaught Exception:`, err.stack || err)
+    })
+
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error(
+        `[${new Date().toISOString()}] Unhandled Rejection at:`,
+        promise,
+        'reason:',
+        reason
+      )
+    })
+
     const server = http.createServer(this.#app)
 
     // Socket io
