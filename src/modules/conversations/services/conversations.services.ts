@@ -25,7 +25,7 @@ import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
 import { AssistantsFlags, AssistantsVariables } from '../shared/constants/assistant.constants'
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
-import { assistantPrompt } from '../shared/constants/prompt.constants'
+import { assistantPrompt, assistantPromptFlagsLite } from '../shared/constants/prompt.constants'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 type TMembersNames = Record<string, string>
@@ -59,8 +59,7 @@ export default class ConversationsServices {
   #tasksServices: TasksServices
   #notesServices: NotesServices
 
-  private constructor(aiToUse = AIRepositoryType.GEMINI) {
-    console.log('## CONVERSATION SERVICES AI = ', aiToUse, ' ##')
+  private constructor(aiToUse = AIRepositoryType.OPENAI) {
     this.#aiRepository = AIRepositoryByType[aiToUse].getInstance()
     this.#redisRepository = RedisRepository.getInstance()
 
@@ -416,7 +415,193 @@ export default class ConversationsServices {
       }
     }
 
+    if (!returnValue.responseMessage) {
+      const intentRouted = await this.#intentFallbackRouter(userId, assistantMessage.cleanMessage)
+      if (intentRouted) {
+        returnValue.responseMessage = intentRouted
+      }
+    }
+
     return returnValue
+  }
+
+  /**
+   * Fallback router for intent classification.
+   * @param userId User ID for context.
+   * @param cleanMessage User message to classify.
+   * @returns Classified intent or null if uncertain.
+   */
+  #intentFallbackRouter = async (
+    userId: number,
+    cleanMessage: string
+  ): Promise<IConversation | null> => {
+    try {
+      if (!cleanMessage) return null
+
+      const classificationPrompt = [
+        {
+          role: roleTypes.system,
+          content: assistantPromptFlagsLite,
+          provider: ConversationProviders.ASSISTANT,
+        },
+        {
+          role: roleTypes.user,
+          content: cleanMessage,
+          provider: ConversationProviders.ASSISTANT,
+        },
+      ]
+
+      const classificationRes = await this.#aiRepository.chatCompletion(
+        classificationPrompt as any,
+        { mode: 'classification' }
+      )
+      let raw = classificationRes?.content ?? ''
+
+      raw = raw.trim()
+      raw = raw
+        .replace(/^```(json)?/i, '')
+        .replace(/```$/i, '')
+        .trim()
+
+      let parsed: any = null
+      const tryParses: string[] = []
+      tryParses.push(raw)
+
+      if (!/^{[\s\S]*}$/.test(raw)) {
+        const braceStart = raw.indexOf('{')
+        const braceEnd = raw.lastIndexOf('}')
+        if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
+          tryParses.push(raw.slice(braceStart, braceEnd + 1))
+        }
+      }
+
+      tryParses.forEach((candidate, idx) => {
+        tryParses[idx] = candidate.replace(/,\s*}/g, '}')
+      })
+
+      for (const candidate of tryParses) {
+        if (parsed) break
+        try {
+          parsed = JSON.parse(candidate)
+        } catch (e) {
+          continue
+        }
+      }
+
+      if (!parsed || typeof parsed !== 'object') return null
+
+      const intent = (parsed.intent || '').toLowerCase()
+      if (!intent) return null
+
+      switch (intent) {
+        case 'alert.create': {
+          if (!parsed.time || !parsed.title) return null
+          const alert = await this.#alertsServices.createAssistantAlert(
+            userId,
+            parsed.time,
+            parsed.title
+          )
+          if (alert.error) return null
+          const contentBlock = slackMsgUtils.msgAlertCreated(alert.data)
+          return {
+            role: roleTypes.assistant,
+            content: `Alerta creada (fallback) para el ${formatDateToText(
+              alert.data.date
+            )} con id: #${alert.data.id}`,
+            contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'alert.list': {
+          const alerts = await this.#alertsServices.getAlertsByUserId(userId)
+          if (alerts.error) return null
+          const contentBlock = slackMsgUtils.msgAlertsList(alerts.data ?? [])
+          return {
+            role: roleTypes.assistant,
+            content: parsed.successMessage || `Mostrando ${alerts.data?.length || 0} alertas`,
+            contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'task.create': {
+          if (!parsed.title) return null
+          const task = await this.#tasksServices.createAssistantTask(
+            userId,
+            parsed.title,
+            parsed.description || ''
+          )
+          if (task.error) return null
+          const contentBlock = slackMsgUtils.msgTaskCreated(task.data)
+          return {
+            role: roleTypes.assistant,
+            content: `Tarea creada (fallback) con id: #${task.data.id}`,
+            contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'task.list': {
+          const tasks = await this.#tasksServices.getTasksByUserId(userId)
+          ;(tasks.data || []).sort(
+            (a: any, b: any) => +new Date(a.createdAt) - +new Date(b.createdAt)
+          )
+          if (tasks.error) return null
+          const contentBlock = slackMsgUtils.msgTasksList(tasks.data ?? [])
+          return {
+            role: roleTypes.assistant,
+            content: parsed.successMessage || `Mostrando ${tasks.data?.length || 0} tareas`,
+            contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'note.create': {
+          if (!parsed.title) return null
+          const note = await this.#notesServices.createAssistantNote(
+            userId,
+            parsed.title,
+            parsed.description || '',
+            parsed.tag || ''
+          )
+          if (note.error) return null
+          const contentBlock = slackMsgUtils.msgNoteCreated(note.data)
+          return {
+            role: roleTypes.assistant,
+            content: `Nota creada (fallback) con id: #${note.data.id}`,
+            contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'note.list': {
+          const notes = await this.#notesServices.getNotesByUserId(userId)
+          if (notes.error) return null
+          const contentBlock = slackMsgUtils.msgNotesList(notes.data ?? [])
+          return {
+            role: roleTypes.assistant,
+            content: parsed.successMessage || `Mostrando ${notes.data?.length || 0} notas`,
+            contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'question': {
+          const promptGenerated = await this.#generatePrompt([
+            {
+              role: roleTypes.user,
+              content: cleanMessage,
+              provider: ConversationProviders.ASSISTANT,
+            },
+          ])
+          const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
+          return messageResponse
+        }
+        default:
+          return {
+            role: roleTypes.assistant,
+            content: 'Lo siento, no entendí tu mensaje. ¿Puedes reformularlo o ser más específico?',
+            provider: ConversationProviders.ASSISTANT,
+          }
+      }
+    } catch (e) {
+      return null
+    }
   }
 
   generateAssistantConversation = async (

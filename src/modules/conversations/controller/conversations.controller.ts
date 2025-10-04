@@ -68,7 +68,6 @@ export default class ConversationsController extends GenericController {
         throw new Error('No se pudo generar la conversación')
       }
     } catch (error) {
-      console.log('- generateConversation controller err= ', error)
       say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
     }
   }
@@ -79,19 +78,13 @@ export default class ConversationsController extends GenericController {
    */
   @SlackAuth
   public async cleanConversation(data: any): Promise<void> {
-    console.log('### cleanConversation ###')
     const { payload, say }: any = data
 
     try {
       const message: string = payload.text
 
       if (message !== 'clean_cb') {
-        const newResponse = await this.#conversationServices.cleanConversation(
-          payload.user,
-          payload.channel
-        )
-
-        console.log('newResponse= ', newResponse)
+        await this.#conversationServices.cleanConversation(payload.user, payload.channel)
         say('Se borro la conversación con éxito 🎉')
       }
     } catch (error) {
@@ -105,7 +98,6 @@ export default class ConversationsController extends GenericController {
    */
   @SlackAuth
   public async showConversation(data: any): Promise<void> {
-    console.log('### showConversation ###')
     const { payload, say, body }: any = data
 
     try {
@@ -126,6 +118,7 @@ export default class ConversationsController extends GenericController {
    */
   @SlackAuth
   public async conversationFlow(data: any): Promise<void> {
+    console.log('## Conversation Flow ##')
     const { payload, say, body }: any = data
     try {
       // Personal conversation
