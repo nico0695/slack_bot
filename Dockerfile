@@ -40,6 +40,8 @@ ENV ADMIN_MAIL="admin@bot.com"
 ENV SOCKET_URL = "http://localhost:3001"
 ENV REDIS_HOST "redis://host.docker.internal"
 
+ENV SEARCH_API_KEY=${SEARCH_API_KEY}
+ENV SEARCH_API_KEY_CX=${SEARCH_API_KEY_CX}
 
 COPY ./build /app/build
 COPY ./package.json /app/package.json
