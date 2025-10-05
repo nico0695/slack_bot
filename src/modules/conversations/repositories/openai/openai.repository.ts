@@ -42,8 +42,8 @@ export default class OpenaiRepository {
           role: message.role,
           content: message.content,
         })),
-        temperature: isClassification ? 0 : 0.6,
-        max_tokens: isClassification ? 120 : undefined,
+        temperature: isClassification ? 0 : 0.4,
+        max_tokens: isClassification ? 200 : undefined,
       }
 
       const completion = await this.#openai.createChatCompletion(apiRequestBot)
