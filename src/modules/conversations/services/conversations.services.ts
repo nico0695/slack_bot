@@ -25,7 +25,7 @@ import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
 import { AssistantsFlags, AssistantsVariables } from '../shared/constants/assistant.constants'
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
-import { assistantPrompt, assistantPromptFlagsLite } from '../shared/constants/prompt.constants'
+import { assistantPromptFlagsLite, assistantPromptLite } from '../shared/constants/prompt.constants'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 type TMembersNames = Record<string, string>
@@ -86,7 +86,7 @@ export default class ConversationsServices {
     return [
       {
         role: roleTypes.system,
-        content: assistantPrompt,
+        content: assistantPromptLite,
         provider: ConversationProviders.ASSISTANT,
       },
       ...requestMessages,
