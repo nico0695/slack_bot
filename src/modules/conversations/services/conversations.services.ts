@@ -25,8 +25,13 @@ import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
 import { AssistantsFlags, AssistantsVariables } from '../shared/constants/assistant.constants'
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
-import { assistantPromptFlagsLite, assistantPromptLite } from '../shared/constants/prompt.constants'
+import {
+  assistantPromptFlagsLite,
+  assistantPromptLite,
+  assistantSearchSummaryLite,
+} from '../shared/constants/prompt.constants'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
+import SearchRepository from '../repositories/search/search.repository'
 
 type TMembersNames = Record<string, string>
 
@@ -86,11 +91,58 @@ export default class ConversationsServices {
     return [
       {
         role: roleTypes.system,
-        content: assistantPromptLite,
+        content: this.#withDateContext(assistantPromptLite),
         provider: ConversationProviders.ASSISTANT,
       },
       ...requestMessages,
     ]
+  }
+
+  /**
+   * Appends current date context to a prompt (idempotent: avoids duplicate if already present).
+   * Format kept simple to reduce token usage.
+   */
+  #withDateContext = (prompt: string): string => {
+    const today = new Date().toLocaleDateString()
+    return prompt.replace('<fecha>', today)
+  }
+
+  /**
+   * Executes external search then summarizes via AI.
+   * Keeps logic isolated from the intent router for clarity & reuse.
+   */
+  #searchAndSummarize = async (
+    cleanMessage: string,
+    query: string
+  ): Promise<IConversation | null> => {
+    const trimmed = (query || '').trim()
+    if (!trimmed) return null
+
+    const searchRepo = SearchRepository.getInstance()
+    const results = await searchRepo.search(trimmed)
+
+    if (!results.length) {
+      return {
+        role: roleTypes.assistant,
+        content: 'No encontré resultados fiables ahora.',
+        provider: ConversationProviders.ASSISTANT,
+      }
+    }
+
+    const summaryUser = `Consulta original: ${cleanMessage}\nConsulta optimizada: ${trimmed}\nHOY_ES:${new Date().toLocaleDateString()}\n\nResultados:${results}\n\nGenera respuesta breve (1-2 frases) usando solo datos visibles. Si hay números útiles (temperatura exacta, marcador, fecha/hora, precio) inclúyelos sin adornos. Si falta info -> indica que no hay datos suficientes.`
+    const aiSummary = await this.#aiRepository.chatCompletion([
+      {
+        role: roleTypes.system,
+        content: this.#withDateContext(assistantSearchSummaryLite),
+      } as any,
+      { role: roleTypes.user, content: summaryUser } as any,
+    ])
+
+    return {
+      role: roleTypes.assistant,
+      content: aiSummary?.content || 'No se pudo generar un resumen.',
+      provider: ConversationProviders.ASSISTANT,
+    }
   }
 
   #getTeamMembers = async (teamId: string): Promise<TMembersNames> => {
@@ -441,7 +493,7 @@ export default class ConversationsServices {
       const classificationPrompt = [
         {
           role: roleTypes.system,
-          content: assistantPromptFlagsLite,
+          content: this.#withDateContext(assistantPromptFlagsLite),
           provider: ConversationProviders.ASSISTANT,
         },
         {
@@ -580,6 +632,10 @@ export default class ConversationsServices {
             contentBlock,
             provider: ConversationProviders.ASSISTANT,
           }
+        }
+        case 'search': {
+          if (!parsed.query) return null
+          return await this.#searchAndSummarize(cleanMessage, parsed.query)
         }
         case 'question': {
           const promptGenerated = await this.#generatePrompt([
