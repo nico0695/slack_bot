@@ -103,8 +103,17 @@ export default class ConversationsServices {
    * Format kept simple to reduce token usage.
    */
   #withDateContext = (prompt: string): string => {
-    const today = new Date().toLocaleDateString()
-    return prompt.replace('<fecha>', today)
+    if (!prompt.includes('<fecha>')) return prompt
+    const now = new Date()
+    // Obtener fecha en timezone AR en formato estable YYYY-MM-DD
+    const formatted = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now) // en-CA => YYYY-MM-DD
+
+    return prompt.replace(/<fecha>/g, formatted)
   }
 
   /**

@@ -1,10 +1,21 @@
 /**
  * Format text to date
- * @param dateText string - YYYY-MM-DD HH:mm:ss | 9w9d9h9m (optionals)
+ * @param dateText string - YYYY-MM-DD HH:mm[:ss] interpreted as Argentina local time OR relative 9w9d9h9m (optionals)
  * @returns Date
  */
 export function formatTextToDate(dateText: string): Date {
-  const date = new Date(dateText)
+  const raw = (dateText || '').trim()
+  const absolutePattern = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/
+
+  const date = new Date(raw)
+
+  if (date.toString() !== 'Invalid Date' && absolutePattern.test(raw)) {
+    // Interpret the naive date/time as Argentina local time (UTC-3, offset minutes = 180)
+    const ARG_OFFSET_MINUTES = 180 // Argentina (UTC-3) timezoneOffset
+    const serverOffsetMinutes = new Date().getTimezoneOffset() // minutes between UTC and server local
+    const diffMinutes = ARG_OFFSET_MINUTES - serverOffsetMinutes
+    return new Date(date.getTime() + diffMinutes * 60000)
+  }
 
   if (date.toString() !== 'Invalid Date') {
     return date
