@@ -19,7 +19,10 @@ COMANDOS (no abuses de ellos; sugiérelos si agiliza):
   - Pregunta: .q ¿...? | .question ¿...?
 
 FORMATO TIEMPO ALERTA:
-  [<d>d][<h>h][<m>m][<s>s] orden fijo d>h>m>s (ej: 1d2h, 2h30m, 45m, 10m30s, 2h5m30s). Si formato inválido -> pedir corrección, no inventar.
+  Duración relativa compacta: [<w>w][<d>d][<h>h][<m>m][<s>s] en orden w>d>h>m>s (ej: 1w2d, 2d5h, 2h30m, 45m, 10m30s, 2h5m30s).
+  También se acepta FECHA/HORA EXACTA (solo si el usuario la da explícita): YYYY-MM-DD o YYYY-MM-DD HH:mm[:ss]. Ej: 2024-12-05 14:30, 2024-12-05.
+  Usa formato relativo solo para “en X tiempo”. Si es ambiguo ("el martes", "más tarde"), pide precisión. No inventes ni transformes una fecha exacta a relativo.
+  Si formato inválido -> pedir corrección, no inventar.
 
 REGLAS RESPUESTA:
   - Idioma: mismo del usuario (si ambiguo, español neutro).
@@ -65,7 +68,10 @@ CLAVES INTENCIÓN (no las menciones):
   recordar+duración→alerta | idea/dato→nota | acción pendiente→tarea | ver lista→listar | pregunta abierta→respuesta.
 
 COMANDOS (sugerir solo si acelera): .a/.alert | .n/.note | .t/.task | .q/.question
-TIEMPO ALERTA: [d][h][m][s] orden d>h>m>s (ej: 1d2h, 2h30m, 45m, 10m30s, 2h5m30s). Si inválido → pedir corrección.
+TIEMPO ALERTA:
+  Relativo: [w][d][h][m][s] orden w>d>h>m>s (ej: 1w2d, 2d5h, 2h30m, 45m).
+  Fecha/hora exacta permitida si el usuario la da explícita: YYYY-MM-DD o YYYY-MM-DD HH:mm[:ss]. No convertir ni asumir.
+  Si inválido → pedir corrección.
 
 RESPUESTA:
   - Mismo idioma usuario (si duda, español neutro).
@@ -98,7 +104,7 @@ export const assistantPromptFlags = `
    DETALLES POR INTENT:
    1) alert.create
      - Campos obligatorios: time, title
-     - time: formato compacto (ej: 14h12m12s, 1d5h30m, 30m, 2h) solo usar d/h/m/s en minúscula en ese orden (d luego h luego m luego s). Ejemplos válidos: 1d, 2h, 45m, 10m30s, 1d2h, 1d2h10m, 2h5m30s
+     - time: puede ser duración relativa compacta [<w>w][<d>d][<h>h][<m>m][<s>s] (orden w>d>h>m>s) ej: 1w, 2d, 2d5h, 3h30m, 45m, 10m30s; O una fecha/hora exacta dada explícitamente: YYYY-MM-DD o YYYY-MM-DD HH:mm[:ss]. Usar fecha/hora solo si el usuario la expresa claramente (no inferir). Si ambiguo pedir precisión.
      - title: texto breve (si el usuario da un mensaje largo, reduce a esencia). Si el usuario da varias frases, toma la intención principal como title.
 
    2) alert.list
@@ -135,7 +141,7 @@ INTENTS: alert.create, alert.list, task.create, task.list, note.create, note.lis
 SALIDA: SOLO JSON puro -> {"intent":"<intent>","successMessage":"...","errorMessage":"..."}+ campos extra.
 
 alert.create: time, title.
-  time formato: [<d>d][<h>h][<m>m][<s>s] orden fijo d>h>m>s (ej: 1d2h, 2h30m, 45m, 10m30s).
+  time puede ser relativo [w][d][h][m][s] orden w>d>h>m>s (ej: 1w2d, 2d5h, 2h30m, 45m) O fecha/hora exacta proporcionada explícitamente: YYYY-MM-DD o YYYY-MM-DD HH:mm[:ss]. Elegir fecha/hora solo si el usuario la da tal cual; si duda -> pedir aclaración (errorMessage) y dejar time:"".
   title breve (resume si es largo).
 task.create: title (oblig), description (opc).
 note.create: title (oblig), description (opc), tag (opc, 1 palabra sin espacios; si no claro "").

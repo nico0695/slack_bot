@@ -48,18 +48,22 @@ export const formatDateToText = (
     day?: 'numeric' | '2-digit'
     hour?: 'numeric' | '2-digit'
     minute?: 'numeric' | '2-digit'
+    timeZone?: string // Argentina timezone by default
   }
 ): string => {
-  return new Intl.DateTimeFormat(
-    local,
-    options ?? {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-    }
-  ).format(date)
+  const baseOptions: Intl.DateTimeFormatOptions = options ?? {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+  }
+
+  if (!baseOptions.timeZone) {
+    baseOptions.timeZone = 'America/Argentina/Buenos_Aires'
+  }
+
+  return new Intl.DateTimeFormat(local, baseOptions).format(date)
 }
 
 /**
