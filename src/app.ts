@@ -108,30 +108,10 @@ export default class App {
     this.#app.use('/summary', [this.#summaryWebController.router])
   }
 
-  // Add this method to your class
-  #restartSlackApp(): void {
-    try {
-      if (typeof this.#slackApp.stop === 'function') {
-        this.#slackApp.stop().catch(() => {
-          throw new Error('Error stopping Slack app')
-        })
-      }
-
-      this.#slackApp = connectionSlackApp
-      this.#slackListeners()
-    } catch (err) {
-      console.error('Failed to restart Slack app:', err)
-    }
-  }
-
   #slackListeners(): void {
     // Helper to wrap handlers with defensive checks and restart on undefined event
     const safeHandler = (handler: any) => {
       return async (args: any) => {
-        if (!args?.event) {
-          this.#restartSlackApp()
-          return
-        }
         return handler(args)
       }
     }
@@ -142,7 +122,10 @@ export default class App {
     })
 
     // Actions slack bot
-    this.#slackApp.action(/^delete_/, safeHandler(this.#conversationController.deleteActions))
+    this.#slackApp.action(
+      /^(?:alert|note|task)_actions.*$|^(?:delete|view)_(?:alert|note|task)(?:_details)?$/,
+      safeHandler(this.#conversationController.handleActions)
+    )
 
     // Listener slack bot
     this.#slackApp.message(

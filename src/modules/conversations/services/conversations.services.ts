@@ -5,6 +5,9 @@ import UsersServices from '../../users/services/users.services'
 import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
+import { Alerts } from '../../../entities/alerts'
+import { Tasks } from '../../../entities/tasks'
+import { Notes } from '../../../entities/notes'
 
 // AI
 import GeminiRepository from '../repositories/gemini/gemini.repository'
@@ -1041,44 +1044,160 @@ export default class ConversationsServices {
     }
   }
 
-  // Delete actions
-  deleteActions = async (
+  // Slack actions
+  handleAction = async (
     data: {
-      actionId: string
-      value: string
+      entity: string
+      operation: string
+      targetId: number
     },
     userId: number
   ): Promise<string> => {
-    const { actionId, value } = data
+    const entity = typeof data.entity === 'string' ? data.entity.toLowerCase() : ''
+    const operation = typeof data.operation === 'string' ? data.operation.toLowerCase() : ''
+    const targetId = data.targetId
+
+    if (!entity || !operation || !Number.isFinite(targetId)) {
+      return 'Acción no reconocida.'
+    }
 
     try {
-      switch (actionId) {
-        case 'delete_note': {
-          const deleteRes = await this.#notesServices.deleteNote(parseInt(value), userId)
-          return deleteRes.error ?? deleteRes.data
-            ? `Nota #${value} eliminada correctamente.`
-            : `Error al eliminar la nota, no se encontro la nota con Id: ${value}`
-        }
-
-        case 'delete_task': {
-          const deleteRes = await this.#tasksServices.deleteTask(parseInt(value), userId)
-          return deleteRes.error ?? deleteRes.data
-            ? `Tarea #${value} eliminada correctamente.`
-            : `Error al eliminar la tarea, no se encontro la tarea con Id: ${value}`
-        }
-
-        case 'delete_alert': {
-          const deleteRes = await this.#alertsServices.deleteAlert(parseInt(value), userId)
-          return deleteRes.error ?? deleteRes.data
-            ? `Alerta #${value} eliminada correctamente.`
-            : `Error al eliminar la alerta, no se encontro la alerta con Id: ${value}`
-        }
-
+      switch (entity) {
+        case 'alert':
+          return await this.#handleAlertAction(operation, targetId, userId)
+        case 'note':
+          return await this.#handleNoteAction(operation, targetId, userId)
+        case 'task':
+          return await this.#handleTaskAction(operation, targetId, userId)
         default:
           return 'Acción no reconocida.'
       }
     } catch (error) {
       return 'Error al ejecutar la accion. 😅'
     }
+  }
+
+  #handleAlertAction = async (operation: string, targetId: number, userId: number): Promise<string> => {
+    switch (operation) {
+      case 'delete': {
+        const deleteRes = await this.#alertsServices.deleteAlert(targetId, userId)
+
+        if (deleteRes.error || !deleteRes.data) {
+          return `Error al eliminar la alerta, no se encontro la alerta con Id: ${targetId}`
+        }
+
+        return `Alerta #${targetId} eliminada correctamente.`
+      }
+
+      case 'detail': {
+        const alertsRes = await this.#alertsServices.getAlertsByUserId(userId)
+        if (alertsRes.error) {
+          return 'No se pudieron obtener las alertas. 😅'
+        }
+        const alert = alertsRes.data?.find((item) => item.id === targetId)
+
+        if (!alert) {
+          return `No se encontró la alerta con Id: ${targetId}`
+        }
+
+        return this.#formatAlertDetail(alert)
+      }
+
+      default:
+        return 'Acción no reconocida.'
+    }
+  }
+
+  #handleNoteAction = async (operation: string, targetId: number, userId: number): Promise<string> => {
+    switch (operation) {
+      case 'delete': {
+        const deleteRes = await this.#notesServices.deleteNote(targetId, userId)
+
+        if (deleteRes.error || !deleteRes.data) {
+          return `Error al eliminar la nota, no se encontro la nota con Id: ${targetId}`
+        }
+
+        return `Nota #${targetId} eliminada correctamente.`
+      }
+
+      case 'detail': {
+        const notesRes = await this.#notesServices.getNotesByUserId(userId)
+        if (notesRes.error) {
+          return 'No se pudieron obtener las notas. 😅'
+        }
+        const note = notesRes.data?.find((item) => item.id === targetId)
+
+        if (!note) {
+          return `No se encontró la nota con Id: ${targetId}`
+        }
+
+        return this.#formatNoteDetail(note)
+      }
+
+      default:
+        return 'Acción no reconocida.'
+    }
+  }
+
+  #handleTaskAction = async (operation: string, targetId: number, userId: number): Promise<string> => {
+    switch (operation) {
+      case 'delete': {
+        const deleteRes = await this.#tasksServices.deleteTask(targetId, userId)
+
+        if (deleteRes.error || !deleteRes.data) {
+          return `Error al eliminar la tarea, no se encontro la tarea con Id: ${targetId}`
+        }
+
+        return `Tarea #${targetId} eliminada correctamente.`
+      }
+
+      case 'detail': {
+        const tasksRes = await this.#tasksServices.getTasksByUserId(userId)
+        if (tasksRes.error) {
+          return 'No se pudieron obtener las tareas. 😅'
+        }
+        const task = tasksRes.data?.find((item) => item.id === targetId)
+
+        if (!task) {
+          return `No se encontró la tarea con Id: ${targetId}`
+        }
+
+        return this.#formatTaskDetail(task)
+      }
+
+      default:
+        return 'Acción no reconocida.'
+    }
+  }
+
+  #formatAlertDetail = (alert: Alerts): string => {
+    const programmedAt = formatDateToText(alert.date, 'es', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+
+    return `Alerta #${alert.id}\n• Mensaje: ${alert.message}\n• Programada para: ${programmedAt}`
+  }
+
+  #formatNoteDetail = (note: Notes): string => {
+    const tagLabel = note.tag ? `\n• Etiqueta: ${note.tag}` : ''
+    return `Nota #${note.id}\n• Título: ${note.title}\n• Descripción: ${note.description}${tagLabel}`
+  }
+
+  #formatTaskDetail = (task: Tasks): string => {
+    const dueDate = task.alertDate
+      ? formatDateToText(task.alertDate, 'es', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : 'Sin fecha recordatorio'
+
+    return `Tarea #${task.id}\n• Título: ${task.title}\n• Estado: ${task.status}\n• Descripción: ${task.description}\n• Recordatorio: ${dueDate}`
   }
 }
