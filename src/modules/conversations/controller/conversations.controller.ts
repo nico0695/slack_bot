@@ -261,7 +261,7 @@ export default class ConversationsController extends GenericController {
     }
 
     const normalizedValue = rawValue.toLowerCase()
-    const valueTripleMatch = normalizedValue.match(/^([a-z]+):([a-z_-]+):(\d+)$/)
+    const valueTripleMatch = normalizedValue.match(/^([a-z]+):([a-z0-9_-]+):(\d+)$/)
 
     if (valueTripleMatch) {
       const [, entity, operation, targetId] = valueTripleMatch
@@ -272,7 +272,7 @@ export default class ConversationsController extends GenericController {
       }
     }
 
-    const valueDoubleMatch = normalizedValue.match(/^([a-z_-]+):(\d+)$/)
+    const valueDoubleMatch = normalizedValue.match(/^([a-z0-9_-]+):(\d+)$/)
     if (valueDoubleMatch) {
       const [, combined, targetId] = valueDoubleMatch
       const [operationRaw, entityRaw] = combined.split('_')
@@ -303,7 +303,7 @@ export default class ConversationsController extends GenericController {
     }
 
     const normalizedActionId = actionId.toLowerCase()
-    const extendedMatch = normalizedActionId.match(/^([a-z]+)_actions(?::([a-z_-]+))?:(\d+)$/)
+    const extendedMatch = normalizedActionId.match(/^([a-z]+)_actions(?::([a-z0-9_-]+))?:(\d+)$/)
 
     if (extendedMatch) {
       const [, entity, operationRaw, targetId] = extendedMatch
