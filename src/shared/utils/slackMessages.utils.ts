@@ -3,6 +3,40 @@ import { Alerts } from '../../entities/alerts'
 import { Notes } from '../../entities/notes'
 import { formatDateToText, formatTimeLeft } from './dates.utils'
 
+const truncateText = (value: string, maxLength: number): string => {
+  if (!value) return ''
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
+}
+
+const formatShortDate = (date: Date): string =>
+  formatDateToText(date, 'es', {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+const overflowAccessory = (entity: 'alert' | 'note' | 'task', id: number): any => ({
+  type: 'overflow',
+  options: [
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Ver Detalles',
+      },
+      value: `${entity}:detail:${id}`,
+    },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Eliminar',
+      },
+      value: `${entity}:delete:${id}`,
+    },
+  ],
+  action_id: `${entity}_actions:${id}`,
+})
+
 /** ALERTS */
 export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
   return {
@@ -57,35 +91,16 @@ export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
 
   alerts.forEach((alert) => {
     const timeLeft = formatTimeLeft(alert.date)
-    const truncatedMessage =
-      alert.message.length > 20 ? `${alert.message.slice(0, 20)}...` : alert.message
+    const truncatedMessage = truncateText(alert.message, 60)
+    const scheduledAt = formatShortDate(alert.date)
 
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${truncatedMessage}\n > En: *${timeLeft}*`,
+        text: `*#${alert.id}* ${truncatedMessage}\n> ${scheduledAt} • ${timeLeft}`,
       },
-      accessory: {
-        type: 'overflow',
-        options: [
-          {
-            text: {
-              type: 'plain_text',
-              text: 'Ver Detalles',
-            },
-            value: `alert:detail:${alert.id}`,
-          },
-          {
-            text: {
-              type: 'plain_text',
-              text: 'Eliminar',
-            },
-            value: `alert:delete:${alert.id}`,
-          },
-        ],
-        action_id: `alert_actions:${alert.id}`,
-      },
+      accessory: overflowAccessory('alert', alert.id),
     })
 
     blocks.push({
@@ -138,41 +153,19 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
   )
 
   notes.forEach((note) => {
-    const truncatedDescription =
-      note.description.length > 40 ? note.description.slice(0, 40) + '...' : note.description
+    const truncatedTitle = truncateText(note.title, 40)
+    const truncatedDescription = truncateText(note.description, 70)
+    const tagLabel = note.tag ? ` · #${truncateText(note.tag, 15)}` : ''
 
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${note.title}* \n${truncatedDescription}`,
+        text: `*#${note.id}* ${truncatedTitle}${tagLabel}\n> ${
+          truncatedDescription || '_Sin descripción_'
+        }`,
       },
-    })
-
-    blocks.push({
-      type: 'actions',
-      elements: [
-        {
-          type: 'button',
-          text: {
-            type: 'plain_text',
-            text: 'Ver Detalles',
-          },
-          style: 'primary',
-          value: `note:detail:${note.id}`,
-          action_id: `note_actions:detail:${note.id}`,
-        },
-        {
-          type: 'button',
-          text: {
-            type: 'plain_text',
-            text: 'Eliminar',
-          },
-          style: 'danger',
-          value: `note:delete:${note.id}`,
-          action_id: `note_actions:delete:${note.id}`,
-        },
-      ],
+      accessory: overflowAccessory('note', note.id),
     })
 
     blocks.push({
@@ -216,31 +209,17 @@ export const msgTasksList = (tasks: Tasks[]): { blocks: any[] } => {
   )
 
   tasks.forEach((task) => {
-    // Task title and description
+    const truncatedTitle = truncateText(task.title, 40)
+    const truncatedDescription = truncateText(task.description, 70)
+    const reminder = task.alertDate ? formatShortDate(task.alertDate) : 'Sin recordatorio'
+
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${task.title}* - Status: ${task.status} \n${task.description}`,
+        text: `*#${task.id}* ${truncatedTitle} • ${task.status}\n> ${truncatedDescription}\n> Recordatorio: ${reminder}`,
       },
-    })
-
-    // Actions
-    blocks.push({
-      type: 'actions',
-      elements: [
-        {
-          type: 'button',
-          text: {
-            type: 'plain_text',
-            emoji: true,
-            text: 'Borrar Tarea',
-          },
-          style: 'danger',
-          value: `task:delete:${task.id}`,
-          action_id: `task_actions:delete:${task.id}`,
-        },
-      ],
+      accessory: overflowAccessory('task', task.id),
     })
 
     blocks.push({
