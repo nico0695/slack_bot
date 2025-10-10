@@ -64,10 +64,16 @@ const getAlertStatusTokens = (alert: Alerts, metadata?: AlertMetadata): AlertSta
   const now = new Date()
   const alertDate = new Date(alert.date)
   const resolved = Boolean(alert.sent)
-  const overdue = !resolved && alertDate.getTime() < now.getTime()
+  const overdue = !resolved && alertDate.getTime() < now.getTime() + 2 * 60 * 1000
   const snoozed = !resolved && !overdue && Boolean(metadata?.snoozedAt)
 
-  const icon = resolved ? ':white_check_mark:' : overdue ? ':warning:' : snoozed ? ':bellhop_bell:' : ':rotating_light:'
+  const icon = resolved
+    ? ':white_check_mark:'
+    : overdue
+    ? ':warning:'
+    : snoozed
+    ? ':bellhop_bell:'
+    : ':rotating_light:'
   const scheduledAt = formatShortDate(alertDate)
 
   if (resolved) {
@@ -233,9 +239,7 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
   const digestStatus =
     data.digestFrequency && data.digestFrequency !== 'off'
       ? `Digest ${data.digestFrequency === 'daily' ? 'diario' : 'semanal'}${
-          data.lastDigestAt
-            ? ` • Último: ${formatShortDate(new Date(data.lastDigestAt))}`
-            : ''
+          data.lastDigestAt ? ` • Último: ${formatShortDate(new Date(data.lastDigestAt))}` : ''
         }`
       : 'Digest desactivado'
 
@@ -440,9 +444,7 @@ export const msgAlertDetail = (alert: Alerts, metadata?: AlertMetadata): { block
     metaNotes.push(`Snooze: ${formatShortDate(new Date(metadata.snoozedAt))}`)
   }
   if (metadata?.repeatPolicy && metadata.repeatPolicy !== 'custom') {
-    metaNotes.push(
-      `Recurrencia: ${metadata.repeatPolicy === 'daily' ? 'Diaria' : 'Semanal'}`
-    )
+    metaNotes.push(`Recurrencia: ${metadata.repeatPolicy === 'daily' ? 'Diaria' : 'Semanal'}`)
   }
 
   return {
