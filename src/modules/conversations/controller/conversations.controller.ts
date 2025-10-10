@@ -25,7 +25,7 @@ export default class ConversationsController extends GenericController {
     this.cleanConversation = this.cleanConversation.bind(this)
     this.showConversation = this.showConversation.bind(this)
     this.conversationFlow = this.conversationFlow.bind(this)
-    this.deleteActions = this.deleteActions.bind(this)
+    this.handleActions = this.handleActions.bind(this)
   }
 
   static getInstance(): ConversationsController {
@@ -121,16 +121,25 @@ export default class ConversationsController extends GenericController {
     console.log('## Conversation Flow ##')
     const { payload, say, body }: any = data
     try {
+      const incomingMessage = String(payload.text ?? '')
+      const normalizedMessage = incomingMessage.trim().toLowerCase()
+
       // Personal conversation
       if (payload.channel_type === 'im') {
-        const newMessage: string = payload.text
-
         const userData = this.userData
 
         if (!userData) {
           say('Ups! No se pudo obtener tu información 🤷‍♂️')
           return
         }
+
+        if (normalizedMessage === 'h' || normalizedMessage === 'help') {
+          const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id)
+          say(quickHelp ?? 'No pude mostrar tu resumen ahora mismo.')
+          return
+        }
+
+        const newMessage: string = incomingMessage
 
         const newResponse = await this.#conversationServices.generateAssistantConversation(
           newMessage,
@@ -146,7 +155,19 @@ export default class ConversationsController extends GenericController {
       }
 
       // Channel conversation
-      const message: string = payload.text
+      if (normalizedMessage === 'h' || normalizedMessage === 'help') {
+        const userData = this.userData
+        if (!userData) {
+          say('Ups! No se pudo obtener tu información 🤷‍♂️')
+          return
+        }
+
+        const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id)
+        say(quickHelp ?? 'No pude mostrar tu resumen ahora mismo.')
+        return
+      }
+
+      const message: string = incomingMessage
 
       switch (message.toLocaleLowerCase()) {
         case FlowKeys.START: {
@@ -195,27 +216,117 @@ export default class ConversationsController extends GenericController {
   }
 
   @SlackAuthActions
-  public async deleteActions({ ack, body, say }: any): Promise<void> {
+  public async handleActions({ ack, body, say }: any): Promise<void> {
     await ack()
 
     const userData = this.userData
+    const actionPayload = body?.actions?.[0]
 
-    const action = body.actions[0]
-
-    if (action) {
-      const deleteResponse = await this.#conversationServices.deleteActions(
-        {
-          actionId: action.action_id,
-          value: action.value,
-        },
-        userData.id
-      )
-
-      await say(`${deleteResponse ?? 'No se pudo eliminar la nota 🤷‍♂️'}`)
-
+    if (!actionPayload) {
+      await say('Ups! No se encontró la acción en la solicitud 🤷‍♂️')
       return
     }
 
-    await say('No action found in the payload.')
+    const parsedAction = this.parseSlackAction(actionPayload)
+
+    if (!parsedAction) {
+      await say('Ups! Acción no reconocida 🤷‍♂️')
+      return
+    }
+
+    const response = await this.#conversationServices.handleAction(parsedAction, userData.id)
+
+    await say(response ?? 'No se pudo procesar la acción 🤷‍♂️')
+  }
+
+  private parseSlackAction(
+    action: any
+  ): { entity: string; operation: string; targetId: number } | null {
+    const actionId = String(action?.action_id ?? '').trim()
+    const rawValue = String(action?.selected_option?.value ?? action?.value ?? '').trim()
+
+    if (!actionId) {
+      return null
+    }
+
+    const normalizeOperation = (operation: string): string => {
+      const op = operation.toLowerCase()
+      if (op === 'view' || op === 'details' || op === 'detalle') {
+        return 'detail'
+      }
+      if (op === 'list' || op === 'listar' || op === 'lista') {
+        return 'list'
+      }
+      return op
+    }
+
+    const normalizedValue = rawValue.toLowerCase()
+    const valueTripleMatch = normalizedValue.match(/^([a-z]+):([a-z_-]+):(\d+)$/)
+
+    if (valueTripleMatch) {
+      const [, entity, operation, targetId] = valueTripleMatch
+      return {
+        entity,
+        operation: normalizeOperation(operation),
+        targetId: Number(targetId),
+      }
+    }
+
+    const valueDoubleMatch = normalizedValue.match(/^([a-z_-]+):(\d+)$/)
+    if (valueDoubleMatch) {
+      const [, combined, targetId] = valueDoubleMatch
+      const [operationRaw, entityRaw] = combined.split('_')
+
+      if (operationRaw && entityRaw) {
+        return {
+          entity: entityRaw,
+          operation: normalizeOperation(operationRaw),
+          targetId: Number(targetId),
+        }
+      }
+    }
+
+    if (/^\d+$/.test(normalizedValue)) {
+      const legacyMatch = actionId
+        .toLowerCase()
+        .match(/^(delete|view)_(alert|note|task)(?:_details)?$/)
+
+      if (legacyMatch) {
+        const [, operationRaw, entity] = legacyMatch
+
+        return {
+          entity,
+          operation: normalizeOperation(operationRaw),
+          targetId: Number(normalizedValue),
+        }
+      }
+    }
+
+    const normalizedActionId = actionId.toLowerCase()
+    const extendedMatch = normalizedActionId.match(/^([a-z]+)_actions(?::([a-z_-]+))?:(\d+)$/)
+
+    if (extendedMatch) {
+      const [, entity, operationRaw, targetId] = extendedMatch
+
+      return {
+        entity,
+        operation: normalizeOperation(operationRaw ?? 'detail'),
+        targetId: Number(targetId),
+      }
+    }
+
+    const fallbackMatch = normalizedActionId.match(/^([a-z]+)_actions:(\d+)$/)
+
+    if (fallbackMatch && /^\d+$/.test(normalizedValue)) {
+      const [, entity, targetId] = fallbackMatch
+
+      return {
+        entity,
+        operation: 'detail',
+        targetId: Number(targetId),
+      }
+    }
+
+    return null
   }
 }
