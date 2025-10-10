@@ -5,9 +5,9 @@ import {
   rAssistantDigestSnapshot,
   rAlertMetadata,
   conversationFlowPrefix,
-} from '../redis.constatns'
+} from '../redis.constants'
 
-describe('redis.constatns', () => {
+describe('redis.constants', () => {
   it('builds conversation key with channel when provided', () => {
     expect(rConversationKey('user', 'chan')).toBe('cb_chan_user')
   })
