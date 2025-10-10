@@ -1052,7 +1052,7 @@ export default class ConversationsServices {
       targetId: number
     },
     userId: number
-  ): Promise<string> => {
+  ): Promise<string | { blocks: any[] }> => {
     const entity = typeof data.entity === 'string' ? data.entity.toLowerCase() : ''
     const operation = typeof data.operation === 'string' ? data.operation.toLowerCase() : ''
     const targetId = data.targetId
@@ -1077,7 +1077,11 @@ export default class ConversationsServices {
     }
   }
 
-  #handleAlertAction = async (operation: string, targetId: number, userId: number): Promise<string> => {
+  #handleAlertAction = async (
+    operation: string,
+    targetId: number,
+    userId: number
+  ): Promise<string | { blocks: any[] }> => {
     switch (operation) {
       case 'delete': {
         const deleteRes = await this.#alertsServices.deleteAlert(targetId, userId)
@@ -1103,12 +1107,28 @@ export default class ConversationsServices {
         return this.#formatAlertDetail(alert)
       }
 
+      case 'list': {
+        const alertsRes = await this.#alertsServices.getAlertsByUserId(userId)
+        if (alertsRes.error) {
+          return 'No se pudieron obtener las alertas. 😅'
+        }
+        const alerts = alertsRes.data ?? []
+        if (!alerts.length) {
+          return 'No tienes alertas guardadas.'
+        }
+        return slackMsgUtils.msgAlertsList(alerts)
+      }
+
       default:
         return 'Acción no reconocida.'
     }
   }
 
-  #handleNoteAction = async (operation: string, targetId: number, userId: number): Promise<string> => {
+  #handleNoteAction = async (
+    operation: string,
+    targetId: number,
+    userId: number
+  ): Promise<string | { blocks: any[] }> => {
     switch (operation) {
       case 'delete': {
         const deleteRes = await this.#notesServices.deleteNote(targetId, userId)
@@ -1134,12 +1154,28 @@ export default class ConversationsServices {
         return this.#formatNoteDetail(note)
       }
 
+      case 'list': {
+        const notesRes = await this.#notesServices.getNotesByUserId(userId)
+        if (notesRes.error) {
+          return 'No se pudieron obtener las notas. 😅'
+        }
+        const notes = notesRes.data ?? []
+        if (!notes.length) {
+          return 'No tienes notas guardadas.'
+        }
+        return slackMsgUtils.msgNotesList(notes)
+      }
+
       default:
         return 'Acción no reconocida.'
     }
   }
 
-  #handleTaskAction = async (operation: string, targetId: number, userId: number): Promise<string> => {
+  #handleTaskAction = async (
+    operation: string,
+    targetId: number,
+    userId: number
+  ): Promise<string | { blocks: any[] }> => {
     switch (operation) {
       case 'delete': {
         const deleteRes = await this.#tasksServices.deleteTask(targetId, userId)
@@ -1163,6 +1199,18 @@ export default class ConversationsServices {
         }
 
         return this.#formatTaskDetail(task)
+      }
+
+      case 'list': {
+        const tasksRes = await this.#tasksServices.getTasksByUserId(userId)
+        if (tasksRes.error) {
+          return 'No se pudieron obtener las tareas. 😅'
+        }
+        const tasks = tasksRes.data ?? []
+        if (!tasks.length) {
+          return 'No tienes tareas guardadas.'
+        }
+        return slackMsgUtils.msgTasksList(tasks)
       }
 
       default:
@@ -1199,5 +1247,30 @@ export default class ConversationsServices {
       : 'Sin fecha recordatorio'
 
     return `Tarea #${task.id}\n• Título: ${task.title}\n• Estado: ${task.status}\n• Descripción: ${task.description}\n• Recordatorio: ${dueDate}`
+  }
+
+  getAssistantQuickHelp = async (
+    userId: number
+  ): Promise<{ blocks: any[] } | string | null> => {
+    try {
+      const [alertsRes, notesRes, tasksRes] = await Promise.all([
+        this.#alertsServices.getAlertsByUserId(userId),
+        this.#notesServices.getNotesByUserId(userId),
+        this.#tasksServices.getTasksByUserId(userId),
+      ])
+
+      const alertsCount = alertsRes.data?.length ?? 0
+      const notesCount = notesRes.data?.length ?? 0
+      const tasksCount = tasksRes.data?.length ?? 0
+
+      return slackMsgUtils.msgAssistantQuickHelp({
+        alerts: alertsCount,
+        notes: notesCount,
+        tasks: tasksCount,
+      })
+    } catch (error) {
+      console.log('getAssistantQuickHelp - error=', error)
+      return 'No pude obtener tu resumen en este momento. 😅'
+    }
   }
 }

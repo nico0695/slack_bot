@@ -121,16 +121,25 @@ export default class ConversationsController extends GenericController {
     console.log('## Conversation Flow ##')
     const { payload, say, body }: any = data
     try {
+      const incomingMessage = String(payload.text ?? '')
+      const normalizedMessage = incomingMessage.trim().toLowerCase()
+
       // Personal conversation
       if (payload.channel_type === 'im') {
-        const newMessage: string = payload.text
-
         const userData = this.userData
 
         if (!userData) {
           say('Ups! No se pudo obtener tu información 🤷‍♂️')
           return
         }
+
+        if (normalizedMessage === 'h' || normalizedMessage === 'help') {
+          const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id)
+          say(quickHelp ?? 'No pude mostrar tu resumen ahora mismo.')
+          return
+        }
+
+        const newMessage: string = incomingMessage
 
         const newResponse = await this.#conversationServices.generateAssistantConversation(
           newMessage,
@@ -146,7 +155,19 @@ export default class ConversationsController extends GenericController {
       }
 
       // Channel conversation
-      const message: string = payload.text
+      if (normalizedMessage === 'h' || normalizedMessage === 'help') {
+        const userData = this.userData
+        if (!userData) {
+          say('Ups! No se pudo obtener tu información 🤷‍♂️')
+          return
+        }
+
+        const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id)
+        say(quickHelp ?? 'No pude mostrar tu resumen ahora mismo.')
+        return
+      }
+
+      const message: string = incomingMessage
 
       switch (message.toLocaleLowerCase()) {
         case FlowKeys.START: {
@@ -232,6 +253,9 @@ export default class ConversationsController extends GenericController {
       const op = operation.toLowerCase()
       if (op === 'view' || op === 'details' || op === 'detalle') {
         return 'detail'
+      }
+      if (op === 'list' || op === 'listar' || op === 'lista') {
+        return 'list'
       }
       return op
     }

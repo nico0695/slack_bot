@@ -37,6 +37,74 @@ const overflowAccessory = (entity: 'alert' | 'note' | 'task', id: number): any =
   action_id: `${entity}_actions:${id}`,
 })
 
+const quickActionOverflow = (entity: 'alert' | 'note' | 'task'): any => ({
+  type: 'overflow',
+  options: [
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Ver listado',
+      },
+      value: `${entity}:list:0`,
+    },
+  ],
+  action_id: `${entity}_actions:list:0`,
+})
+
+export const msgAssistantQuickHelp = (data: {
+  alerts: number
+  notes: number
+  tasks: number
+}): { blocks: any[] } => {
+  return {
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: ':information_source: *Panel rápido*',
+        },
+      },
+      {
+        type: 'divider',
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Notas* (${data.notes})\n> Guarda ideas o seguimientos rápidos.`,
+        },
+        accessory: quickActionOverflow('note'),
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Tareas* (${data.tasks})\n> Organiza pendientes y recordatorios.`,
+        },
+        accessory: quickActionOverflow('task'),
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Alertas* (${data.alerts})\n> Programa recordatorios puntuales.`,
+        },
+        accessory: quickActionOverflow('alert'),
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: 'Tip: crea alertas rápidas usando formatos como `1h30m` o fechas tipo `5 oct 15hs`.',
+          },
+        ],
+      },
+    ],
+  }
+}
+
 /** ALERTS */
 export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
   const timeLeft = formatTimeLeft(data.date)
