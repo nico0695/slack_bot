@@ -39,34 +39,21 @@ const overflowAccessory = (entity: 'alert' | 'note' | 'task', id: number): any =
 
 /** ALERTS */
 export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
+  const timeLeft = formatTimeLeft(data.date)
+  const scheduledAt = formatShortDate(data.date)
+  const message = truncateText(data.message ?? '', 120)
+
   return {
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `Alerta creada correctamente - Id: ${data.id}`,
+          text: `:rotating_light: *Alerta creada*\n*#${data.id}* ${
+            message || '_Sin descripción_'
+          }\n> ${scheduledAt} • ${timeLeft}`,
         },
-      },
-      {
-        type: 'section',
-        fields: [
-          {
-            type: 'mrkdwn',
-            text: `*Para el:*\n ${formatDateToText(data.date, 'es', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}`,
-          },
-          {
-            type: 'mrkdwn',
-            text: `*A las:*\n${formatDateToText(data.date, 'es', {
-              hour: 'numeric',
-              minute: 'numeric',
-            })}`,
-          },
-        ],
+        accessory: overflowAccessory('alert', data.id),
       },
     ],
   }
@@ -114,21 +101,21 @@ export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
 /** NOTES */
 
 export const msgNoteCreated = (data: Notes): { blocks: any[] } => {
+  const truncatedTitle = truncateText(data.title ?? '', 60)
+  const truncatedDescription = truncateText(data.description ?? '', 120)
+  const tagLabel = data.tag ? ` · #${truncateText(data.tag, 20)}` : ''
+
   return {
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `Nota creada correctamente - Id: ${data.id}`,
+          text: `:memo: *Nota creada*\n*#${data.id}* ${truncatedTitle}${tagLabel}\n> ${
+            truncatedDescription || '_Sin descripción_'
+          }`,
         },
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*Título:* ${data.title} \n *Descripción:* ${data.description}`,
-        },
+        accessory: overflowAccessory('note', data.id),
       },
     ],
   }
@@ -179,14 +166,19 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
 // Tasks
 
 export const msgTaskCreated = (data: Tasks): { blocks: any[] } => {
+  const truncatedTitle = truncateText(data.title ?? '', 60)
+  const truncatedDescription = truncateText(data.description ?? '', 120)
+  const reminder = data.alertDate ? formatShortDate(data.alertDate) : 'Sin recordatorio'
+
   return {
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `Tarea creada correctamente - *#${data.id}* \n Titulo: *${data.title}*`,
+          text: `:white_check_mark: *Tarea creada*\n*#${data.id}* ${truncatedTitle} • ${data.status}\n> ${truncatedDescription || '_Sin descripción_'}\n> Recordatorio: ${reminder}`,
         },
+        accessory: overflowAccessory('task', data.id),
       },
     ],
   }
