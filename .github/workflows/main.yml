@@ -1,45 +1,25 @@
-name: CI/CD Pipeline
+name: Continuous Integration-Continuous Deployment
 
 on:
   push:
     branches:
       - main
-
 jobs:
   build:
     runs-on: ubuntu-latest
     name: Continuous Integration
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 18.x
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
         with:
-          node-version: '18'
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: npm ci
-
-      # Optionally add lint/test steps here
-
+          node-version: 18
+      - run: npm ci
   deploy:
     runs-on: ubuntu-latest
     name: Continuous Deployment
     needs: [build]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Deploy - Pull latest code
+      - name: Deploy using ssh
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -49,47 +29,8 @@ jobs:
           script: |
             cd /app/slack_bot/
             git pull
-
-      - name: Deploy - Build project
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 5001
-          script: |
-            cd /app/slack_bot/
             npm run build
-
-      - name: Deploy - Build Docker image
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 5001
-          script: |
-            cd /app/slack_bot/
             ./build-docker.sh
-
-      - name: Deploy - Stop & Remove Old Container
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 5001
-          script: |
-            docker stop slack_bot || true
-            docker rm slack_bot || true
-
-      - name: Deploy - Run Docker Container
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 5001
-          script: |
-            cd /app/slack_bot/
+            docker stop slack_bot
+            docker rm slack_bot
             ./run-docker.sh
