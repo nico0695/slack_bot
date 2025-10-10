@@ -60,6 +60,32 @@ export default class AlertsDataSource {
     }
   }
 
+  async getAlertById(alertId: number, userId: number): Promise<Alerts | null> {
+    try {
+      const alert = await Alerts.findOne({
+        where: { id: alertId, user: { id: userId } },
+      })
+
+      return alert
+    } catch (error) {
+      return error
+    }
+  }
+
+  async updateAlert(
+    alertId: number,
+    userId: number,
+    payload: Partial<Pick<Alerts, 'date' | 'sent' | 'message'>>
+  ): Promise<Alerts | null> {
+    try {
+      await Alerts.update({ id: alertId, user: { id: userId } }, payload)
+
+      return await this.getAlertById(alertId, userId)
+    } catch (error) {
+      return error
+    }
+  }
+
   async getAlertsByDate(date: Date): Promise<IAlertToNotify[]> {
     try {
       const alerts = await Alerts.find({

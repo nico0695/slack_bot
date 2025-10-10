@@ -2,6 +2,19 @@ import { Tasks } from '../../entities/tasks'
 import { Alerts } from '../../entities/alerts'
 import { Notes } from '../../entities/notes'
 import { formatDateToText, formatTimeLeft } from './dates.utils'
+import { AlertMetadata } from '../../modules/conversations/shared/interfaces/alertMetadata'
+
+interface AlertStatusTokens {
+  icon: string
+  statusLine: string
+  helper: string
+}
+
+interface TaskStatusTokens {
+  icon: string
+  statusLine: string
+  helper: string
+}
 
 const truncateText = (value: string, maxLength: number): string => {
   if (!value) return ''
@@ -16,7 +29,112 @@ const formatShortDate = (date: Date): string =>
     minute: '2-digit',
   })
 
-const overflowAccessory = (entity: 'alert' | 'note' | 'task', id: number): any => ({
+const formatDurationDiff = (targetDate: Date, base: Date = new Date()): string => {
+  const diffInMilliseconds = Math.abs(targetDate.getTime() - base.getTime())
+  const seconds = Math.floor(diffInMilliseconds / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (days > 0) {
+    const remainingHours = hours % 24
+    return `${days} día${days > 1 ? 's' : ''}${
+      remainingHours > 0 ? ` y ${remainingHours} hora${remainingHours > 1 ? 's' : ''}` : ''
+    }`
+  }
+
+  if (hours > 0) {
+    const remainingMinutes = minutes % 60
+    return `${hours} hora${hours > 1 ? 's' : ''}${
+      remainingMinutes > 0 ? ` y ${remainingMinutes} minuto${remainingMinutes > 1 ? 's' : ''}` : ''
+    }`
+  }
+
+  if (minutes > 0) {
+    const remainingSeconds = seconds % 60
+    return `${minutes} minuto${minutes > 1 ? 's' : ''}${
+      remainingSeconds > 0 ? ` y ${remainingSeconds} segundo${remainingSeconds > 1 ? 's' : ''}` : ''
+    }`
+  }
+
+  return `${seconds} segundo${seconds > 1 ? 's' : ''}`
+}
+
+const getAlertStatusTokens = (alert: Alerts, metadata?: AlertMetadata): AlertStatusTokens => {
+  const now = new Date()
+  const alertDate = new Date(alert.date)
+  const resolved = Boolean(alert.sent)
+  const overdue = !resolved && alertDate.getTime() < now.getTime() + 2 * 60 * 1000
+  const snoozed = !resolved && !overdue && Boolean(metadata?.snoozedAt)
+
+  const icon = resolved
+    ? ':white_check_mark:'
+    : overdue
+    ? ':warning:'
+    : snoozed
+    ? ':bellhop_bell:'
+    : ':rotating_light:'
+  const scheduledAt = formatShortDate(alertDate)
+
+  if (resolved) {
+    return {
+      icon,
+      statusLine: `Resuelta • ${scheduledAt}`,
+      helper: 'No se volverá a notificar.',
+    }
+  }
+
+  if (overdue) {
+    return {
+      icon,
+      statusLine: `Atrasada • ${scheduledAt}`,
+      helper: `Venció hace ${formatDurationDiff(alertDate, now)}.`,
+    }
+  }
+
+  if (snoozed) {
+    const snoozedUntil = metadata?.snoozedUntil ? new Date(metadata.snoozedUntil) : alertDate
+    return {
+      icon,
+      statusLine: `Reprogramada • ${scheduledAt}`,
+      helper: `Se recordará en ${formatDurationDiff(snoozedUntil, now)}.`,
+    }
+  }
+
+  return {
+    icon,
+    statusLine: `Próxima • ${scheduledAt}`,
+    helper: `Falta ${formatTimeLeft(alertDate)}.`,
+  }
+}
+
+const getTaskStatusTokens = (task: Tasks): TaskStatusTokens => {
+  const status = (task.status ?? '').toLowerCase()
+  const dueDate = task.alertDate ? new Date(task.alertDate) : null
+  let icon = ':large_blue_circle:'
+  let label = 'Pendiente'
+
+  if (status === 'completed') {
+    icon = ':white_check_mark:'
+    label = 'Completada'
+  } else if (status === 'in_progress') {
+    icon = ':hammer_and_wrench:'
+    label = 'En progreso'
+  } else if (status === 'canceled') {
+    icon = ':x:'
+    label = 'Cancelada'
+  }
+
+  const reminderLabel = dueDate ? `Recordatorio: ${formatShortDate(dueDate)}` : 'Sin recordatorio'
+
+  return {
+    icon,
+    statusLine: label,
+    helper: reminderLabel,
+  }
+}
+
+const overflowAccessory = (entity: 'note' | 'task', id: number): any => ({
   type: 'overflow',
   options: [
     {
@@ -37,7 +155,52 @@ const overflowAccessory = (entity: 'alert' | 'note' | 'task', id: number): any =
   action_id: `${entity}_actions:${id}`,
 })
 
-const quickActionOverflow = (entity: 'alert' | 'note' | 'task'): any => ({
+const alertOverflowAccessory = (id: number): any => ({
+  type: 'overflow',
+  options: [
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Ver Detalles',
+      },
+      value: `alert:detail:${id}`,
+    },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Snooze 5 min',
+      },
+      value: `alert:snooze_5m:${id}`,
+    },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Snooze 1 hora',
+      },
+      value: `alert:snooze_1h:${id}`,
+    },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Marcar resuelta',
+      },
+      value: `alert:resolve:${id}`,
+    },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Eliminar',
+      },
+      value: `alert:delete:${id}`,
+    },
+  ],
+  action_id: `alert_actions:${id}`,
+})
+
+const quickActionOverflow = (
+  entity: 'alert' | 'note' | 'task',
+  extraOptions: Array<{ label: string; value: string }> = []
+): any => ({
   type: 'overflow',
   options: [
     {
@@ -47,15 +210,43 @@ const quickActionOverflow = (entity: 'alert' | 'note' | 'task'): any => ({
       },
       value: `${entity}:list:0`,
     },
+    ...extraOptions.slice(0, 4).map((option) => ({
+      text: {
+        type: 'plain_text',
+        text: option.label,
+      },
+      value: option.value,
+    })),
   ],
   action_id: `${entity}_actions:list:0`,
 })
 
-export const msgAssistantQuickHelp = (data: {
+interface IQuickHelpPayload {
   alerts: number
+  alertsPending: number
+  alertsOverdue: number
+  alertsResolved: number
+  alertsSnoozed: number
   notes: number
   tasks: number
-}): { blocks: any[] } => {
+  tasksPending: number
+  digestFrequency?: 'off' | 'daily' | 'weekly'
+  lastDigestAt?: string
+  defaultSnoozeMinutes?: number
+}
+
+export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] } => {
+  const digestStatus =
+    data.digestFrequency && data.digestFrequency !== 'off'
+      ? `Digest ${data.digestFrequency === 'daily' ? 'diario' : 'semanal'}${
+          data.lastDigestAt ? ` • Último: ${formatShortDate(new Date(data.lastDigestAt))}` : ''
+        }`
+      : 'Digest desactivado'
+
+  const snoozeTip = data.defaultSnoozeMinutes
+    ? `Tip: Snooze rápido usando \`${data.defaultSnoozeMinutes}m\` o di "snooze #{id}".`
+    : 'Tip: prueba comandos como `alert snooze #12 10m`.'
+
   return {
     blocks: [
       {
@@ -72,7 +263,7 @@ export const msgAssistantQuickHelp = (data: {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*Notas* (${data.notes})\n> Guarda ideas o seguimientos rápidos.`,
+          text: `*Notas* (${data.notes})\n> Guarda ideas o seguimientos rápidos.\n> Usa comandos como \`note nueva\` o \`note list\`.`,
         },
         accessory: quickActionOverflow('note'),
       },
@@ -80,7 +271,7 @@ export const msgAssistantQuickHelp = (data: {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*Tareas* (${data.tasks})\n> Organiza pendientes y recordatorios.`,
+          text: `*Tareas* (${data.tasks})\n> Pendientes: *${data.tasksPending}*\n> Usa \`task done #{id}\` para completarlas rápido.`,
         },
         accessory: quickActionOverflow('task'),
       },
@@ -88,16 +279,59 @@ export const msgAssistantQuickHelp = (data: {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*Alertas* (${data.alerts})\n> Programa recordatorios puntuales.`,
+          text: `*Alertas* (${data.alerts})\n> Pendientes: *${data.alertsPending}* · Snooze: *${data.alertsSnoozed}* · Atrasadas: *${data.alertsOverdue}*\n> Di \`snooze #{id} 5m\` o \`alert repeat #{id} daily\`.`,
         },
-        accessory: quickActionOverflow('alert'),
+        accessory: quickActionOverflow('alert', [
+          { label: 'Pendientes', value: 'alert:list_pending:0' },
+          { label: 'Atrasadas', value: 'alert:list_overdue:0' },
+          { label: 'Snoozeadas', value: 'alert:list_snoozed:0' },
+        ]),
       },
       {
         type: 'context',
         elements: [
           {
             type: 'mrkdwn',
-            text: 'Tip: crea alertas rápidas usando formatos como `1h30m` o fechas tipo `5 oct 15hs`.',
+            text: digestStatus,
+          },
+          {
+            type: 'mrkdwn',
+            text: snoozeTip,
+          },
+        ],
+      },
+      {
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            action_id: 'assistant_actions:digest_daily:0',
+            text: { type: 'plain_text', text: 'Digest diario' },
+            value: 'assistant:digest_daily:0',
+          },
+          {
+            type: 'button',
+            action_id: 'assistant_actions:digest_weekly:0',
+            text: { type: 'plain_text', text: 'Digest semanal' },
+            value: 'assistant:digest_weekly:0',
+          },
+          {
+            type: 'button',
+            action_id: 'assistant_actions:digest_off:0',
+            text: { type: 'plain_text', text: 'Stop digest' },
+            value: 'assistant:digest_off:0',
+          },
+          {
+            type: 'button',
+            action_id: 'assistant_actions:set_snooze_5m:0',
+            text: { type: 'plain_text', text: 'Snooze 5m' },
+            value: 'assistant:set_snooze_5m:0',
+          },
+          {
+            type: 'button',
+            action_id: 'assistant_actions:set_snooze_30m:0',
+            text: { type: 'plain_text', text: 'Snooze 30m' },
+            value: 'assistant:set_snooze_30m:0',
           },
         ],
       },
@@ -106,10 +340,9 @@ export const msgAssistantQuickHelp = (data: {
 }
 
 /** ALERTS */
-export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
-  const timeLeft = formatTimeLeft(data.date)
-  const scheduledAt = formatShortDate(data.date)
+export const msgAlertCreated = (data: Alerts, metadata?: AlertMetadata): { blocks: any[] } => {
   const message = truncateText(data.message ?? '', 120)
+  const tokens = getAlertStatusTokens(data, metadata)
 
   return {
     blocks: [
@@ -117,17 +350,20 @@ export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `:rotating_light: *Alerta creada*\n*#${data.id}* ${
+          text: `${tokens.icon} *Alerta creada*\n*#${data.id}* ${
             message || '_Sin descripción_'
-          }\n> ${scheduledAt} • ${timeLeft}`,
+          }\n> ${tokens.statusLine}\n> ${tokens.helper}`,
         },
-        accessory: overflowAccessory('alert', data.id),
+        accessory: alertOverflowAccessory(data.id),
       },
     ],
   }
 }
 
-export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
+export const msgAlertsList = (
+  alerts: Alerts[],
+  metadata: Record<number, AlertMetadata> = {}
+): { blocks: any[] } => {
   const blocks = []
 
   blocks.push(
@@ -145,17 +381,18 @@ export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
   )
 
   alerts.forEach((alert) => {
-    const timeLeft = formatTimeLeft(alert.date)
     const truncatedMessage = truncateText(alert.message, 60)
-    const scheduledAt = formatShortDate(alert.date)
+    const tokens = getAlertStatusTokens(alert, metadata[alert.id])
 
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*#${alert.id}* ${truncatedMessage}\n> ${scheduledAt} • ${timeLeft}`,
+        text: `${tokens.icon} *#${alert.id}* ${truncatedMessage || '_Sin descripción_'}\n> ${
+          tokens.statusLine
+        }\n> ${tokens.helper}`,
       },
-      accessory: overflowAccessory('alert', alert.id),
+      accessory: alertOverflowAccessory(alert.id),
     })
 
     blocks.push({
@@ -164,6 +401,80 @@ export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
   })
 
   return { blocks }
+}
+
+export const msgAlertDetail = (alert: Alerts, metadata?: AlertMetadata): { blocks: any[] } => {
+  const tokens = getAlertStatusTokens(alert, metadata)
+  const actions = [
+    {
+      type: 'button',
+      action_id: `alert_actions:snooze_default:${alert.id}`,
+      text: { type: 'plain_text', text: 'Snooze preferido' },
+      value: `alert:snooze_default:${alert.id}`,
+    },
+    {
+      type: 'button',
+      action_id: `alert_actions:snooze_5m:${alert.id}`,
+      text: { type: 'plain_text', text: 'Snooze 5m' },
+      value: `alert:snooze_5m:${alert.id}`,
+    },
+    {
+      type: 'button',
+      action_id: `alert_actions:repeat_daily:${alert.id}`,
+      text: { type: 'plain_text', text: 'Repetir diario' },
+      value: `alert:repeat_daily:${alert.id}`,
+    },
+    {
+      type: 'button',
+      action_id: `alert_actions:repeat_weekly:${alert.id}`,
+      text: { type: 'plain_text', text: 'Repetir semanal' },
+      value: `alert:repeat_weekly:${alert.id}`,
+    },
+    {
+      type: 'button',
+      action_id: `alert_actions:resolve:${alert.id}`,
+      text: { type: 'plain_text', text: 'Marcar resuelta' },
+      style: 'primary',
+      value: `alert:resolve:${alert.id}`,
+    },
+  ]
+  const metaNotes: string[] = []
+
+  if (metadata?.snoozedAt) {
+    metaNotes.push(`Snooze: ${formatShortDate(new Date(metadata.snoozedAt))}`)
+  }
+  if (metadata?.repeatPolicy && metadata.repeatPolicy !== 'custom') {
+    metaNotes.push(`Recurrencia: ${metadata.repeatPolicy === 'daily' ? 'Diaria' : 'Semanal'}`)
+  }
+
+  return {
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${tokens.icon} *Alerta #${alert.id}*\n>${
+            alert.message || '_Sin descripción_'
+          }\n> ${tokens.statusLine}\n> ${tokens.helper}`,
+        },
+      },
+      {
+        type: 'actions',
+        elements: actions,
+      },
+      ...(metaNotes.length
+        ? [
+            {
+              type: 'context',
+              elements: metaNotes.map((note) => ({
+                type: 'mrkdwn',
+                text: note,
+              })),
+            },
+          ]
+        : []),
+    ],
+  }
 }
 
 /** NOTES */
@@ -236,7 +547,7 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
 export const msgTaskCreated = (data: Tasks): { blocks: any[] } => {
   const truncatedTitle = truncateText(data.title ?? '', 60)
   const truncatedDescription = truncateText(data.description ?? '', 120)
-  const reminder = data.alertDate ? formatShortDate(data.alertDate) : 'Sin recordatorio'
+  const tokens = getTaskStatusTokens(data)
 
   return {
     blocks: [
@@ -244,7 +555,9 @@ export const msgTaskCreated = (data: Tasks): { blocks: any[] } => {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `:white_check_mark: *Tarea creada*\n*#${data.id}* ${truncatedTitle} • ${data.status}\n> ${truncatedDescription || '_Sin descripción_'}\n> Recordatorio: ${reminder}`,
+          text: `${tokens.icon} *Tarea creada*\n*#${data.id}* ${truncatedTitle} • ${
+            tokens.statusLine
+          }\n> ${truncatedDescription || '_Sin descripción_'}\n> ${tokens.helper}`,
         },
         accessory: overflowAccessory('task', data.id),
       },
@@ -271,13 +584,15 @@ export const msgTasksList = (tasks: Tasks[]): { blocks: any[] } => {
   tasks.forEach((task) => {
     const truncatedTitle = truncateText(task.title, 40)
     const truncatedDescription = truncateText(task.description, 70)
-    const reminder = task.alertDate ? formatShortDate(task.alertDate) : 'Sin recordatorio'
+    const tokens = getTaskStatusTokens(task)
 
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*#${task.id}* ${truncatedTitle} • ${task.status}\n> ${truncatedDescription}\n> Recordatorio: ${reminder}`,
+        text: `${tokens.icon} *#${task.id}* ${truncatedTitle}\n> ${tokens.statusLine}\n> ${
+          truncatedDescription || '_Sin descripción_'
+        }\n> ${tokens.helper}`,
       },
       accessory: overflowAccessory('task', task.id),
     })
@@ -285,6 +600,149 @@ export const msgTasksList = (tasks: Tasks[]): { blocks: any[] } => {
     blocks.push({
       type: 'divider',
     })
+  })
+
+  return { blocks }
+}
+
+export const msgAssistantDigest = (payload: {
+  title: string
+  rangeLabel: string
+  stats: {
+    alertsPending: number
+    alertsOverdue: number
+    alertsResolved: number
+    tasksPending: number
+    tasksCompleted: number
+    notes: number
+  }
+  highlights: {
+    alerts: Alerts[]
+    tasks: Tasks[]
+    notes: Notes[]
+  }
+  metadata?: Record<number, AlertMetadata>
+}): { blocks: any[] } => {
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: payload.title,
+        emoji: true,
+      },
+    },
+    {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: payload.rangeLabel,
+        },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Alertas*: Pendientes ${payload.stats.alertsPending} · Atrasadas ${payload.stats.alertsOverdue} · Resueltas ${payload.stats.alertsResolved}\n*Tareas*: Pendientes ${payload.stats.tasksPending} · Completadas ${payload.stats.tasksCompleted}\n*Notas*: ${payload.stats.notes}`,
+      },
+    },
+    {
+      type: 'divider',
+    },
+  ]
+
+  const metadata = payload.metadata ?? {}
+
+  if (payload.highlights.alerts.length) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '*Alertas destacadas*',
+      },
+    })
+
+    payload.highlights.alerts.slice(0, 3).forEach((alert) => {
+      const tokens = getAlertStatusTokens(alert, metadata[alert.id])
+      const truncatedMessage = truncateText(alert.message ?? '', 80)
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${tokens.icon} *#${alert.id}* ${truncatedMessage || '_Sin descripción_'}\n> ${
+            tokens.statusLine
+          }\n> ${tokens.helper}`,
+        },
+        accessory: alertOverflowAccessory(alert.id),
+      })
+    })
+
+    blocks.push({ type: 'divider' })
+  }
+
+  if (payload.highlights.tasks.length) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '*Tareas recientes*',
+      },
+    })
+
+    payload.highlights.tasks.slice(0, 3).forEach((task) => {
+      const tokens = getTaskStatusTokens(task)
+      const truncatedTitle = truncateText(task.title ?? '', 60)
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${tokens.icon} *#${task.id}* ${truncatedTitle}\n> ${tokens.statusLine}\n> ${tokens.helper}`,
+        },
+        accessory: overflowAccessory('task', task.id),
+      })
+    })
+
+    blocks.push({ type: 'divider' })
+  }
+
+  if (payload.highlights.notes.length) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '*Notas recientes*',
+      },
+    })
+
+    payload.highlights.notes.slice(0, 3).forEach((note) => {
+      const truncatedTitle = truncateText(note.title ?? '', 60)
+      const truncatedDescription = truncateText(note.description ?? '', 80)
+      const tagLabel = note.tag ? ` · #${truncateText(note.tag, 20)}` : ''
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `:memo: *#${note.id}* ${truncatedTitle}${tagLabel}\n> ${
+            truncatedDescription || '_Sin descripción_'
+          }`,
+        },
+        accessory: overflowAccessory('note', note.id),
+      })
+    })
+
+    blocks.push({ type: 'divider' })
+  }
+
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: 'Configura tu digest desde el panel rápido (`h`).',
+      },
+    ],
   })
 
   return { blocks }

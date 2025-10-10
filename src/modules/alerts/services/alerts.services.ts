@@ -4,6 +4,7 @@ import { IAlertToNotify, IAlert } from '../shared/interfaces/alerts.interfaces'
 
 import AlertsDataSource from '../repositories/database/alerts.dataSource'
 import { UsersRedis } from '../../users/repositories/redis/users.redis'
+import { RedisRepository } from '../../conversations/repositories/redis/conversations.redis'
 
 import { formatTextToDate } from '../../../shared/utils/dates.utils'
 
@@ -12,10 +13,12 @@ export default class AlertsServices {
 
   #alertsDataSource: AlertsDataSource
   #usersRedis: UsersRedis
+  #redisRepository: RedisRepository
 
   private constructor() {
     this.#alertsDataSource = AlertsDataSource.getInstance()
     this.#usersRedis = UsersRedis.getInstance()
+    this.#redisRepository = RedisRepository.getInstance()
   }
 
   static getInstance(): AlertsServices {
@@ -99,6 +102,114 @@ export default class AlertsServices {
     }
   }
 
+  public async getAlertById(alertId: number, userId: number): Promise<GenericResponse<Alerts>> {
+    try {
+      const response = await this.#alertsDataSource.getAlertById(alertId, userId)
+
+      if (!response) {
+        return {
+          error: 'No se encontró la alerta solicitada',
+        }
+      }
+
+      return { data: response }
+    } catch (error) {
+      return {
+        error: 'Error al obtener la alerta solicitada',
+      }
+    }
+  }
+
+  public async rescheduleAlert(
+    alertId: number,
+    userId: number,
+    minutesToAdd: number
+  ): Promise<GenericResponse<Alerts>> {
+    try {
+      const alertResponse = await this.#alertsDataSource.getAlertById(alertId, userId)
+
+      if (!alertResponse) {
+        return {
+          error: 'No se encontró la alerta solicitada',
+        }
+      }
+
+      const now = new Date()
+      const alertDate = new Date(alertResponse.date)
+      const baseDate = alertDate > now ? alertDate : now
+      const newDate = new Date(baseDate.getTime() + minutesToAdd * 60 * 1000)
+
+      const updated = await this.#alertsDataSource.updateAlert(alertId, userId, {
+        date: newDate,
+        sent: false,
+      })
+
+      return {
+        data: updated,
+      }
+    } catch (error) {
+      return {
+        error: 'Error al reagendar la alerta',
+      }
+    }
+  }
+
+  public async markAlertResolved(
+    alertId: number,
+    userId: number
+  ): Promise<GenericResponse<Alerts>> {
+    try {
+      const updated = await this.#alertsDataSource.updateAlert(alertId, userId, {
+        sent: true,
+      })
+
+      if (!updated) {
+        return {
+          error: 'No se encontró la alerta solicitada',
+        }
+      }
+
+      return { data: updated }
+    } catch (error) {
+      return {
+        error: 'Error al marcar la alerta como resuelta',
+      }
+    }
+  }
+
+  public async createFollowUpAlert(
+    alertId: number,
+    userId: number,
+    minutesToAdd: number
+  ): Promise<GenericResponse<Alerts>> {
+    try {
+      const alert = await this.#alertsDataSource.getAlertById(alertId, userId)
+
+      if (!alert) {
+        return {
+          error: 'No se encontró la alerta base para duplicar',
+        }
+      }
+
+      const currentDate = new Date(alert.date)
+      const newDate = new Date(currentDate.getTime() + minutesToAdd * 60 * 1000)
+
+      const created = await this.#alertsDataSource.createAlert({
+        userId,
+        message: alert.message,
+        date: newDate,
+      })
+
+      return {
+        data: created,
+      }
+    } catch (error) {
+      return {
+        error: 'Error al crear la alerta recurrente',
+      }
+    }
+  }
+
   public async getAlertsToNotify(): Promise<GenericResponse<IAlertToNotify[]>> {
     try {
       const date = new Date()
@@ -144,6 +255,11 @@ export default class AlertsServices {
   public async deleteAlert(alertId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
       const res = await this.#alertsDataSource.deleteAlerts(alertId, userId)
+
+      // Clean up alert metadata from Redis when alert is deleted
+      if (res > 0) {
+        await this.#redisRepository.deleteAlertMetadata(alertId)
+      }
 
       return {
         data: res > 0,

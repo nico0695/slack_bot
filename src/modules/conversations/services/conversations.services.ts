@@ -35,6 +35,8 @@ import {
 } from '../shared/constants/prompt.constants'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 import SearchRepository from '../repositories/search/search.repository'
+import { AssistantPreferences } from '../shared/interfaces/assistantPreferences'
+import { AlertMetadata } from '../shared/interfaces/alertMetadata'
 
 type TMembersNames = Record<string, string>
 
@@ -66,6 +68,7 @@ export default class ConversationsServices {
   #alertsServices: AlertsServices
   #tasksServices: TasksServices
   #notesServices: NotesServices
+  #defaultAssistantPreferences: AssistantPreferences
 
   private constructor(aiToUse = AIRepositoryType.OPENAI) {
     this.#aiRepository = AIRepositoryByType[aiToUse].getInstance()
@@ -75,6 +78,14 @@ export default class ConversationsServices {
     this.#alertsServices = AlertsServices.getInstance()
     this.#tasksServices = TasksServices.getInstance()
     this.#notesServices = NotesServices.getInstance()
+
+    this.#defaultAssistantPreferences = {
+      alertDefaultSnoozeMinutes: 10,
+      preferredAlertScope: 'pending',
+      preferredTaskScope: 'pending',
+      preferredNoteScope: 'all',
+      digestFrequency: 'off',
+    }
   }
 
   static getInstance(): ConversationsServices {
@@ -173,6 +184,284 @@ export default class ConversationsServices {
     return membersNames
   }
 
+  #mergePreferences = (
+    base: AssistantPreferences,
+    partial: Partial<AssistantPreferences>
+  ): AssistantPreferences => {
+    const merged: AssistantPreferences = { ...base }
+
+    const source = partial ?? {}
+
+    if (source.alertDefaultSnoozeMinutes !== undefined) {
+      merged.alertDefaultSnoozeMinutes = source.alertDefaultSnoozeMinutes
+    }
+
+    if (source.preferredAlertScope !== undefined) {
+      merged.preferredAlertScope = source.preferredAlertScope
+    }
+
+    if (source.preferredTaskScope !== undefined) {
+      merged.preferredTaskScope = source.preferredTaskScope
+    }
+
+    if (source.preferredNoteScope !== undefined) {
+      merged.preferredNoteScope = source.preferredNoteScope
+    }
+
+    if (source.digestFrequency !== undefined) {
+      merged.digestFrequency = source.digestFrequency
+    }
+
+    if (source.digestChannelId !== undefined) {
+      merged.digestChannelId = source.digestChannelId
+    }
+
+    if (source.lastDigestSentAt !== undefined) {
+      merged.lastDigestSentAt = source.lastDigestSentAt
+    }
+
+    return merged
+  }
+
+  #getAssistantPreferences = async (userId: number): Promise<AssistantPreferences> => {
+    const stored = await this.#redisRepository.getAssistantPreferences(userId)
+    return this.#mergePreferences(this.#defaultAssistantPreferences, stored ?? {})
+  }
+
+  #saveAssistantPreferences = async (
+    userId: number,
+    preferences: AssistantPreferences
+  ): Promise<AssistantPreferences> => {
+    const payload = this.#mergePreferences(this.#defaultAssistantPreferences, preferences)
+    await this.#redisRepository.saveAssistantPreferences(userId, payload)
+    return payload
+  }
+
+  #updateAssistantPreferences = async (
+    userId: number,
+    partial: Partial<AssistantPreferences>
+  ): Promise<AssistantPreferences> => {
+    const current = await this.#getAssistantPreferences(userId)
+    const merged = this.#mergePreferences(current, partial)
+    await this.#redisRepository.saveAssistantPreferences(userId, merged)
+    return merged
+  }
+
+  #getAlertMetadata = async (alertId: number): Promise<AlertMetadata | null> => {
+    return await this.#redisRepository.getAlertMetadata(alertId)
+  }
+
+  #setAlertMetadata = async (
+    alertId: number,
+    metadata: Partial<AlertMetadata>
+  ): Promise<AlertMetadata | null> => {
+    await this.#redisRepository.saveAlertMetadata(alertId, metadata)
+    return await this.#redisRepository.getAlertMetadata(alertId)
+  }
+
+  #clearAlertMetadata = async (alertId: number): Promise<void> => {
+    await this.#redisRepository.deleteAlertMetadata(alertId)
+  }
+
+  #buildAlertMetadataMap = async (
+    alerts: Alerts[]
+  ): Promise<Record<number, AlertMetadata>> => {
+    const results = await Promise.all(
+      alerts.map(async (alert) => {
+        const metadata = await this.#redisRepository.getAlertMetadata(alert.id)
+        return { id: alert.id, metadata }
+      })
+    )
+
+    const metadataMap: Record<number, AlertMetadata> = {}
+    results.forEach(({ id, metadata }) => {
+      if (!metadata) return
+      metadataMap[id] = metadata
+    })
+
+    return metadataMap
+  }
+
+  #buildAssistantResponse = (
+    content: string,
+    block?: { blocks: any[] }
+  ): IConversation => {
+    return {
+      role: roleTypes.assistant,
+      content,
+      ...(block ? { contentBlock: block } : {}),
+      provider: ConversationProviders.ASSISTANT,
+    }
+  }
+
+  #handleAssistantCommand = async (
+    userId: number,
+    message: string
+  ): Promise<IConversation | null> => {
+    const trimmed = message.trim()
+    if (!trimmed) {
+      return null
+    }
+
+    const lower = trimmed.toLowerCase()
+
+    const snoozeMatch = lower.match(/^snooze\s+#?(\d+)(?:\s+(\d+)([mh]))?/)
+    if (snoozeMatch) {
+      const alertId = Number(snoozeMatch[1])
+      if (!Number.isFinite(alertId)) {
+        return this.#buildAssistantResponse('Necesito un número de alerta válido para snooze.')
+      }
+
+      let minutes: number | null = null
+      const amountRaw = snoozeMatch[2]
+      const unit = snoozeMatch[3]
+
+      if (amountRaw && unit) {
+        const amount = Number(amountRaw)
+        if (!Number.isFinite(amount) || amount <= 0) {
+          return this.#buildAssistantResponse('Usa minutos u horas válidas para snooze.')
+        }
+        minutes = unit === 'h' ? amount * 60 : amount
+      }
+
+      if (!minutes) {
+        const preferences = await this.#getAssistantPreferences(userId)
+        minutes = preferences.alertDefaultSnoozeMinutes ?? 10
+      }
+
+      const result = await this.#handleAlertSnooze(alertId, userId, minutes, {
+        updatePreference: Boolean(amountRaw),
+      })
+
+      if (typeof result === 'string') {
+        return this.#buildAssistantResponse(result)
+      }
+
+      const summary = `Alerta #${alertId} reprogramada a ${minutes} minuto${
+        minutes > 1 ? 's' : ''
+      }.`
+      return this.#buildAssistantResponse(summary, result)
+    }
+
+    const repeatMatch = lower.match(/^(?:alert\s+)?repeat\s+#?(\d+)\s+(daily|weekly)/)
+    if (repeatMatch) {
+      const alertId = Number(repeatMatch[1])
+      const policy = repeatMatch[2] as 'daily' | 'weekly'
+      const minutesToAdd = policy === 'daily' ? 24 * 60 : 7 * 24 * 60
+
+      const result = await this.#handleAlertRepeat(alertId, userId, minutesToAdd, policy)
+
+      if (typeof result === 'string') {
+        return this.#buildAssistantResponse(result)
+      }
+
+      const summary = `Listo, la alerta #${alertId} ahora se repetirá ${
+        policy === 'daily' ? 'todos los días' : 'cada semana'
+      }.`
+      return this.#buildAssistantResponse(summary, result)
+    }
+
+    const alertsListMatch = lower.match(/^alerts?\s+(pending|pendientes|all|todas|snoozed|snoozeadas|resolved|resueltas|overdue|atrasadas)/)
+    if (alertsListMatch) {
+      const scopeRaw = alertsListMatch[1]
+      let scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved' = 'pending'
+
+      if (scopeRaw === 'all' || scopeRaw === 'todas') {
+        scope = 'all'
+        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'all' })
+      } else if (scopeRaw === 'snoozed' || scopeRaw === 'snoozeadas') {
+        scope = 'snoozed'
+        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'snoozed' })
+      } else if (scopeRaw === 'resolved' || scopeRaw === 'resueltas') {
+        scope = 'resolved'
+      } else if (scopeRaw === 'overdue' || scopeRaw === 'atrasadas') {
+        scope = 'overdue'
+      } else {
+        scope = 'pending'
+        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'pending' })
+      }
+
+      const result = await this.#listAlertsByScope(userId, scope)
+
+      if (typeof result === 'string') {
+        return this.#buildAssistantResponse(result)
+      }
+
+      const summary =
+        scope === 'all'
+          ? 'Estas son todas tus alertas.'
+          : scope === 'pending'
+          ? 'Alertas pendientes al detalle.'
+          : scope === 'snoozed'
+          ? 'Alertas con snooze activo.'
+          : scope === 'resolved'
+          ? 'Alertas marcadas como resueltas.'
+          : 'Alertas atrasadas que necesitan atención.'
+
+      return this.#buildAssistantResponse(summary, result)
+    }
+
+    const digestMatch = lower.match(/^digest\s+(daily|weekly|off)\b/)
+    if (digestMatch) {
+      const freqRaw = digestMatch[1]
+      if (freqRaw === 'off') {
+        await this.#updateAssistantPreferences(userId, { digestFrequency: 'off' })
+        return this.#buildAssistantResponse('Desactivé tus resúmenes automáticos.')
+      }
+
+      const digest = await this.generateAssistantDigest(
+        userId,
+        freqRaw as 'daily' | 'weekly'
+      )
+
+      if (typeof digest === 'string') {
+        return this.#buildAssistantResponse(digest)
+      }
+
+      const summary = `Te envié el resumen ${
+        freqRaw === 'daily' ? 'diario' : 'semanal'
+      } con lo más importante.`
+      return this.#buildAssistantResponse(summary, digest)
+    }
+
+    const preferMatch = lower.match(
+      /^(?:set|configurar|pref(?:erencia)?)\s+(?:snooze|snooze\s+default)\s+(\d+)([mh])/
+    )
+    if (preferMatch) {
+      const amount = Number(preferMatch[1])
+      const unit = preferMatch[2]
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return this.#buildAssistantResponse('Usa un número válido para configurar el snooze.')
+      }
+
+      const minutes = unit === 'h' ? amount * 60 : amount
+      await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: minutes })
+      return this.#buildAssistantResponse(
+        `Snooze preferido actualizado a ${minutes} minuto${minutes > 1 ? 's' : ''}.`
+      )
+    }
+
+    const remindMatch = trimmed.match(/^remind me\s+(?:in\s+)?(.+?)\s+to\s+(.+)/i)
+    if (remindMatch) {
+      const timeText = remindMatch[1]
+      const noteText = remindMatch[2]
+
+      const alertRes = await this.#alertsServices.createAssistantAlert(userId, timeText, noteText)
+
+      if (alertRes.error || !alertRes.data) {
+        return this.#buildAssistantResponse(
+          'No pude crear esa alerta, intenta con otro formato de tiempo.'
+        )
+      }
+
+      const block = slackMsgUtils.msgAlertCreated(alertRes.data)
+      const summary = `Listo, te recordaré ${noteText} (${formatDateToText(alertRes.data.date)}).`
+      return this.#buildAssistantResponse(summary, block)
+    }
+
+    return null
+  }
+
   generateConversation = async (
     conversation: IConversation,
     userId: string,
@@ -264,9 +553,13 @@ export default class ConversationsServices {
           if (assistantMessage.flags[AssistantsFlags.LIST]) {
             const alerts = await this.#alertsServices.getAlertsByUserId(userId)
 
+            const alertsList = alerts.data ?? []
+            const metadataMap =
+              alertsList.length > 0 ? await this.#buildAlertMetadataMap(alertsList) : {}
+
             const messageToResponse =
-              alerts?.data?.length > 0
-                ? alerts?.data
+              alertsList.length > 0
+                ? alertsList
                     ?.map(
                       (alert) =>
                         `• Id: _#${alert.id}_ - *${alert.message}*: ${formatDateToText(alert.date)}`
@@ -274,7 +567,7 @@ export default class ConversationsServices {
                     .join('\n')
                 : 'No tienes alertas'
 
-            const messageBlockToResponse = slackMsgUtils.msgAlertsList(alerts.data ?? [])
+            const messageBlockToResponse = slackMsgUtils.msgAlertsList(alertsList, metadataMap)
 
             returnValue.responseMessage = {
               role: roleTypes.assistant,
@@ -579,7 +872,10 @@ export default class ConversationsServices {
         case 'alert.list': {
           const alerts = await this.#alertsServices.getAlertsByUserId(userId)
           if (alerts.error) return null
-          const contentBlock = slackMsgUtils.msgAlertsList(alerts.data ?? [])
+          const alertsList = alerts.data ?? []
+          const metadataMap =
+            alertsList.length > 0 ? await this.#buildAlertMetadataMap(alertsList) : {}
+          const contentBlock = slackMsgUtils.msgAlertsList(alertsList, metadataMap)
           return {
             role: roleTypes.assistant,
             content: parsed.successMessage || `Mostrando ${alerts.data?.length || 0} alertas`,
@@ -700,7 +996,12 @@ export default class ConversationsServices {
       // TODO: add filter for tokens
       const newConversationUser = [...conversationStored.slice(-10), newConversation]
 
-      const { responseMessage } = await this.#manageAssistantVariables(userId, message)
+      let responseMessage = await this.#handleAssistantCommand(userId, message)
+
+      if (!responseMessage) {
+        const managed = await this.#manageAssistantVariables(userId, message)
+        responseMessage = managed.responseMessage ?? null
+      }
 
       // if bot response message, add to conversation
       if (responseMessage) {
@@ -1069,11 +1370,178 @@ export default class ConversationsServices {
           return await this.#handleNoteAction(operation, targetId, userId)
         case 'task':
           return await this.#handleTaskAction(operation, targetId, userId)
+        case 'assistant':
+          return await this.#handleAssistantAction(operation, userId)
         default:
           return 'Acción no reconocida.'
       }
     } catch (error) {
       return 'Error al ejecutar la accion. 😅'
+    }
+  }
+
+  #handleAlertSnooze = async (
+    alertId: number,
+    userId: number,
+    minutes: number,
+    options: { updatePreference?: boolean } = {}
+  ): Promise<string | { blocks: any[] }> => {
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return 'El snooze debe ser mayor a 1 minuto.'
+    }
+
+    const res = await this.#alertsServices.rescheduleAlert(alertId, userId, minutes)
+
+    if (res.error || !res.data) {
+      return res.error ?? 'No se pudo reprogramar la alerta. 😅'
+    }
+
+    const snoozedUntil = new Date(res.data.date)
+    const metadata = await this.#setAlertMetadata(alertId, {
+      snoozedAt: new Date().toISOString(),
+      snoozedUntil: snoozedUntil.toISOString(),
+    })
+
+    if (options.updatePreference) {
+      await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: minutes })
+    }
+
+    return slackMsgUtils.msgAlertDetail(res.data, metadata ?? undefined)
+  }
+
+  #handleAlertRepeat = async (
+    alertId: number,
+    userId: number,
+    minutesToAdd: number,
+    policy: 'daily' | 'weekly'
+  ): Promise<string | { blocks: any[] }> => {
+    const followUp = await this.#alertsServices.createFollowUpAlert(alertId, userId, minutesToAdd)
+
+    if (followUp.error || !followUp.data) {
+      return followUp.error ?? 'No se pudo crear la recurrencia. 😅'
+    }
+
+    await this.#setAlertMetadata(alertId, { repeatPolicy: policy })
+    const newAlertMetadata = await this.#setAlertMetadata(followUp.data.id, {
+      repeatPolicy: policy,
+    })
+
+    const messageBlock = slackMsgUtils.msgAlertCreated(
+      followUp.data,
+      newAlertMetadata ?? undefined
+    )
+
+    messageBlock.blocks.push({
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: `La alerta #${alertId} se repetirá de forma ${
+            policy === 'daily' ? 'diaria' : 'semanal'
+          }.`,
+        },
+      ],
+    })
+
+    return messageBlock
+  }
+
+  #listAlertsByScope = async (
+    userId: number,
+    scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved'
+  ): Promise<string | { blocks: any[] }> => {
+    const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {})
+    if (alertsRes.error) {
+      return 'No se pudieron obtener las alertas. 😅'
+    }
+
+    const alerts = alertsRes.data ?? []
+    if (!alerts.length) {
+      return 'No tienes alertas guardadas.'
+    }
+
+    const metadataMap = await this.#buildAlertMetadataMap(alerts)
+    const now = new Date()
+
+    let filtered = alerts
+    let emptyMessage = 'No hay alertas para mostrar.'
+
+    switch (scope) {
+      case 'pending':
+        filtered = alerts.filter((alert) => !alert.sent)
+        emptyMessage = 'No tienes alertas pendientes.'
+        break
+      case 'snoozed':
+        filtered = alerts.filter((alert) => {
+          const metadata = metadataMap[alert.id]
+          return !alert.sent && Boolean(metadata?.snoozedAt)
+        })
+        emptyMessage = 'No tienes alertas snoozeadas.'
+        break
+      case 'overdue':
+        filtered = alerts.filter((alert) => !alert.sent && new Date(alert.date) < now)
+        emptyMessage = 'No tienes alertas atrasadas.'
+        break
+      case 'resolved':
+        filtered = alerts.filter((alert) => alert.sent)
+        emptyMessage = 'No tienes alertas resueltas.'
+        break
+      case 'all':
+      default:
+        filtered = alerts
+        emptyMessage = 'No tienes alertas guardadas.'
+        break
+    }
+
+    if (!filtered.length) {
+      return emptyMessage
+    }
+
+    return slackMsgUtils.msgAlertsList(filtered, metadataMap)
+  }
+
+  #handleAlertResolve = async (
+    alertId: number,
+    userId: number
+  ): Promise<string | { blocks: any[] }> => {
+    const res = await this.#alertsServices.markAlertResolved(alertId, userId)
+
+    if (res.error || !res.data) {
+      return res.error ?? 'No se pudo marcar la alerta como resuelta. 😅'
+    }
+
+    await this.#clearAlertMetadata(alertId)
+
+    return slackMsgUtils.msgAlertDetail(res.data)
+  }
+
+  #handleAssistantAction = async (
+    operation: string,
+    userId: number
+  ): Promise<string | { blocks: any[] }> => {
+    switch (operation) {
+      case 'digest_daily':
+        return await this.generateAssistantDigest(userId, 'daily')
+      case 'digest_weekly':
+        return await this.generateAssistantDigest(userId, 'weekly')
+      case 'digest_off': {
+        await this.#updateAssistantPreferences(userId, { digestFrequency: 'off' })
+        return 'Se desactivaron los resúmenes automáticos.'
+      }
+      case 'set_snooze_5m': {
+        await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: 5 })
+        return 'Snooze preferido configurado en 5 minutos.'
+      }
+      case 'set_snooze_10m': {
+        await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: 10 })
+        return 'Snooze preferido configurado en 10 minutos.'
+      }
+      case 'set_snooze_30m': {
+        await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: 30 })
+        return 'Snooze preferido configurado en 30 minutos.'
+      }
+      default:
+        return 'Acción no reconocida.'
     }
   }
 
@@ -1094,7 +1562,7 @@ export default class ConversationsServices {
       }
 
       case 'detail': {
-        const alertsRes = await this.#alertsServices.getAlertsByUserId(userId)
+        const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {})
         if (alertsRes.error) {
           return 'No se pudieron obtener las alertas. 😅'
         }
@@ -1104,19 +1572,55 @@ export default class ConversationsServices {
           return `No se encontró la alerta con Id: ${targetId}`
         }
 
-        return this.#formatAlertDetail(alert)
+        const metadata = await this.#getAlertMetadata(alert.id)
+        return slackMsgUtils.msgAlertDetail(alert, metadata ?? undefined)
       }
 
+      case 'snooze_5m':
+        return await this.#handleAlertSnooze(targetId, userId, 5)
+
+      case 'snooze_1h':
+        return await this.#handleAlertSnooze(targetId, userId, 60)
+
+      case 'snooze_default': {
+        const preferences = await this.#getAssistantPreferences(userId)
+        const minutes = preferences.alertDefaultSnoozeMinutes ?? 10
+        return await this.#handleAlertSnooze(targetId, userId, minutes, { updatePreference: true })
+      }
+
+      case 'repeat_daily':
+        return await this.#handleAlertRepeat(targetId, userId, 24 * 60, 'daily')
+
+      case 'repeat_weekly':
+        return await this.#handleAlertRepeat(targetId, userId, 7 * 24 * 60, 'weekly')
+
+      case 'resolve':
+        return await this.#handleAlertResolve(targetId, userId)
+
+      case 'list_overdue':
+        return await this.#listAlertsByScope(userId, 'overdue')
+
+      case 'list_snoozed': {
+        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'snoozed' })
+        return await this.#listAlertsByScope(userId, 'snoozed')
+      }
+
+      case 'list_all': {
+        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'all' })
+        return await this.#listAlertsByScope(userId, 'all')
+      }
+
+      case 'list_pending': {
+        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'pending' })
+        return await this.#listAlertsByScope(userId, 'pending')
+      }
+
+      case 'list_resolved':
+        return await this.#listAlertsByScope(userId, 'resolved')
+
       case 'list': {
-        const alertsRes = await this.#alertsServices.getAlertsByUserId(userId)
-        if (alertsRes.error) {
-          return 'No se pudieron obtener las alertas. 😅'
-        }
-        const alerts = alertsRes.data ?? []
-        if (!alerts.length) {
-          return 'No tienes alertas guardadas.'
-        }
-        return slackMsgUtils.msgAlertsList(alerts)
+        const preferences = await this.#getAssistantPreferences(userId)
+        return await this.#listAlertsByScope(userId, preferences.preferredAlertScope ?? 'pending')
       }
 
       default:
@@ -1218,18 +1722,6 @@ export default class ConversationsServices {
     }
   }
 
-  #formatAlertDetail = (alert: Alerts): string => {
-    const programmedAt = formatDateToText(alert.date, 'es', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-
-    return `Alerta #${alert.id}\n• Mensaje: ${alert.message}\n• Programada para: ${programmedAt}`
-  }
-
   #formatNoteDetail = (note: Notes): string => {
     const tagLabel = note.tag ? `\n• Etiqueta: ${note.tag}` : ''
     return `Nota #${note.id}\n• Título: ${note.title}\n• Descripción: ${note.description}${tagLabel}`
@@ -1253,24 +1745,167 @@ export default class ConversationsServices {
     userId: number
   ): Promise<{ blocks: any[] } | string | null> => {
     try {
-      const [alertsRes, notesRes, tasksRes] = await Promise.all([
-        this.#alertsServices.getAlertsByUserId(userId),
+      const [alertsRes, notesRes, tasksRes, preferences] = await Promise.all([
+        this.#alertsServices.getAlertsByUserId(userId, {}),
         this.#notesServices.getNotesByUserId(userId),
         this.#tasksServices.getTasksByUserId(userId),
+        this.#getAssistantPreferences(userId),
       ])
 
-      const alertsCount = alertsRes.data?.length ?? 0
-      const notesCount = notesRes.data?.length ?? 0
-      const tasksCount = tasksRes.data?.length ?? 0
+      const alerts = alertsRes.data ?? []
+      const notes = notesRes.data ?? []
+      const tasks = tasksRes.data ?? []
+
+      const metadataMap =
+        alerts.length > 0 ? await this.#buildAlertMetadataMap(alerts) : {}
+
+      const now = new Date()
+      const alertsPending = alerts.filter((alert) => !alert.sent)
+      const alertsOverdue = alertsPending.filter((alert) => new Date(alert.date) < now).length
+      const alertsResolved = alerts.filter((alert) => alert.sent).length
+      const alertsSnoozed = alertsPending.filter((alert) =>
+        Boolean(metadataMap[alert.id]?.snoozedAt)
+      ).length
+
+      const tasksPending = tasks.filter((task) => {
+        const status = (task.status ?? '').toLowerCase()
+        return status !== 'completed' && status !== 'canceled'
+      }).length
 
       return slackMsgUtils.msgAssistantQuickHelp({
-        alerts: alertsCount,
-        notes: notesCount,
-        tasks: tasksCount,
+        alerts: alerts.length,
+        alertsPending: alertsPending.length,
+        alertsOverdue,
+        alertsResolved,
+        alertsSnoozed,
+        notes: notes.length,
+        tasks: tasks.length,
+        tasksPending,
+        digestFrequency: preferences.digestFrequency ?? 'off',
+        lastDigestAt: preferences.lastDigestSentAt,
+        defaultSnoozeMinutes: preferences.alertDefaultSnoozeMinutes,
       })
     } catch (error) {
       console.log('getAssistantQuickHelp - error=', error)
       return 'No pude obtener tu resumen en este momento. 😅'
+    }
+  }
+
+  generateAssistantDigest = async (
+    userId: number,
+    frequency: 'daily' | 'weekly'
+  ): Promise<{ blocks: any[] } | string> => {
+    try {
+      const now = new Date()
+      const rangeHours = frequency === 'daily' ? 24 : 24 * 7
+      const rangeMs = rangeHours * 60 * 60 * 1000
+      const rangeStart = new Date(now.getTime() - rangeMs)
+
+      const [alertsRes, notesRes, tasksRes] = await Promise.all([
+        this.#alertsServices.getAlertsByUserId(userId, {}),
+        this.#notesServices.getNotesByUserId(userId),
+        this.#tasksServices.getTasksByUserId(userId),
+      ])
+
+      if (alertsRes.error || notesRes.error || tasksRes.error) {
+        return 'No pude generar tu digest ahora mismo. 😅'
+      }
+
+      const alerts = alertsRes.data ?? []
+      const notes = notesRes.data ?? []
+      const tasks = tasksRes.data ?? []
+
+      const metadataMap =
+        alerts.length > 0 ? await this.#buildAlertMetadataMap(alerts) : {}
+
+      const alertsPending = alerts.filter((alert) => !alert.sent)
+      const alertsOverdue = alertsPending.filter(
+        (alert) => new Date(alert.date).getTime() < now.getTime()
+      ).length
+      const alertsResolved = alerts.filter((alert) => alert.sent).length
+
+      const highlightAlerts = alerts
+        .filter((alert) => {
+          if (alert.sent) return false
+          const alertTime = new Date(alert.date).getTime()
+          const diff = alertTime - now.getTime()
+          return diff <= rangeMs && diff >= -rangeMs
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+      const highlightTasks = tasks
+        .filter((task) => {
+          const status = (task.status ?? '').toLowerCase()
+          if (status === 'completed' || status === 'canceled') return false
+          if (!task.alertDate) return true
+          const diff = new Date(task.alertDate).getTime() - now.getTime()
+          return diff <= rangeMs && diff >= -rangeMs
+        })
+        .sort((a, b) => {
+          const timeA = a.alertDate ? new Date(a.alertDate).getTime() : Number.MAX_SAFE_INTEGER
+          const timeB = b.alertDate ? new Date(b.alertDate).getTime() : Number.MAX_SAFE_INTEGER
+          return timeA - timeB
+        })
+
+      const highlightNotes = notes
+        .filter((note) => {
+          if (!note.createdAt) return false
+          return new Date(note.createdAt).getTime() >= rangeStart.getTime()
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+      const tasksPending = tasks.filter((task) => {
+        const status = (task.status ?? '').toLowerCase()
+        return status !== 'completed' && status !== 'canceled'
+      }).length
+      const tasksCompleted = tasks.filter(
+        (task) => (task.status ?? '').toLowerCase() === 'completed'
+      ).length
+
+      const rangeLabel = `Últimas ${frequency === 'daily' ? '24 horas' : 'semana'} · Desde ${formatDateToText(
+        rangeStart,
+        'es',
+        {
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        }
+      )}`
+
+      const digest = slackMsgUtils.msgAssistantDigest({
+        title: `Resumen ${frequency === 'daily' ? 'diario' : 'semanal'}`,
+        rangeLabel,
+        stats: {
+          alertsPending: alertsPending.length,
+          alertsOverdue,
+          alertsResolved,
+          tasksPending,
+          tasksCompleted,
+          notes: notes.length,
+        },
+        highlights: {
+          alerts: highlightAlerts,
+          tasks: highlightTasks,
+          notes: highlightNotes,
+        },
+        metadata: metadataMap,
+      })
+
+      await this.#redisRepository.saveAssistantDigestSnapshot(userId, {
+        generatedAt: now.toISOString(),
+        blocks: digest.blocks,
+      })
+
+      await this.#updateAssistantPreferences(userId, {
+        digestFrequency: frequency,
+        lastDigestSentAt: now.toISOString(),
+      })
+
+      return digest
+    } catch (error) {
+      console.log('generateAssistantDigest - error=', error)
+      return 'No pude generar tu digest ahora mismo. 😅'
     }
   }
 }
