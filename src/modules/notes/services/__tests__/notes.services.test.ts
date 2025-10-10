@@ -64,6 +64,19 @@ describe('NotesServices', () => {
     expect(result).toEqual({ data: { id: 2 } })
   })
 
+  it('returns error when direct creation fails', async () => {
+    createNoteMock.mockRejectedValue(new Error('fail'))
+
+    const result = await services.createNote({
+      userId: 1,
+      title: 'Note',
+      description: '',
+      tag: 'tag',
+    })
+
+    expect(result.error).toBe('Error al crear la tarea')
+  })
+
   describe('getNotesByUserId', () => {
     it('returns notes when repository succeeds', async () => {
       const notes = [{ id: 1 }]

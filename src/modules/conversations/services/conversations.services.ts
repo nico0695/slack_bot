@@ -15,7 +15,7 @@ import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
 
 import { RedisRepository } from '../repositories/redis/conversations.redis'
-import { conversationFlowPrefix, rConversationKey } from '../repositories/redis/redis.constatns'
+import { conversationFlowPrefix, rConversationKey } from '../repositories/redis/redis.constants'
 
 import {
   IConversation,
@@ -263,9 +263,7 @@ export default class ConversationsServices {
     await this.#redisRepository.deleteAlertMetadata(alertId)
   }
 
-  #buildAlertMetadataMap = async (
-    alerts: Alerts[]
-  ): Promise<Record<number, AlertMetadata>> => {
+  #buildAlertMetadataMap = async (alerts: Alerts[]): Promise<Record<number, AlertMetadata>> => {
     const results = await Promise.all(
       alerts.map(async (alert) => {
         const metadata = await this.#redisRepository.getAlertMetadata(alert.id)
@@ -282,10 +280,7 @@ export default class ConversationsServices {
     return metadataMap
   }
 
-  #buildAssistantResponse = (
-    content: string,
-    block?: { blocks: any[] }
-  ): IConversation => {
+  #buildAssistantResponse = (content: string, block?: { blocks: any[] }): IConversation => {
     return {
       role: roleTypes.assistant,
       content,
@@ -361,7 +356,9 @@ export default class ConversationsServices {
       return this.#buildAssistantResponse(summary, result)
     }
 
-    const alertsListMatch = lower.match(/^alerts?\s+(pending|pendientes|all|todas|snoozed|snoozeadas|resolved|resueltas|overdue|atrasadas)/)
+    const alertsListMatch = lower.match(
+      /^alerts?\s+(pending|pendientes|all|todas|snoozed|snoozeadas|resolved|resueltas|overdue|atrasadas)/
+    )
     if (alertsListMatch) {
       const scopeRaw = alertsListMatch[1]
       let scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved' = 'pending'
@@ -409,10 +406,7 @@ export default class ConversationsServices {
         return this.#buildAssistantResponse('Desactivé tus resúmenes automáticos.')
       }
 
-      const digest = await this.generateAssistantDigest(
-        userId,
-        freqRaw as 'daily' | 'weekly'
-      )
+      const digest = await this.generateAssistantDigest(userId, freqRaw as 'daily' | 'weekly')
 
       if (typeof digest === 'string') {
         return this.#buildAssistantResponse(digest)
@@ -1426,10 +1420,7 @@ export default class ConversationsServices {
       repeatPolicy: policy,
     })
 
-    const messageBlock = slackMsgUtils.msgAlertCreated(
-      followUp.data,
-      newAlertMetadata ?? undefined
-    )
+    const messageBlock = slackMsgUtils.msgAlertCreated(followUp.data, newAlertMetadata ?? undefined)
 
     messageBlock.blocks.push({
       type: 'context',
@@ -1741,9 +1732,7 @@ export default class ConversationsServices {
     return `Tarea #${task.id}\n• Título: ${task.title}\n• Estado: ${task.status}\n• Descripción: ${task.description}\n• Recordatorio: ${dueDate}`
   }
 
-  getAssistantQuickHelp = async (
-    userId: number
-  ): Promise<{ blocks: any[] } | string | null> => {
+  getAssistantQuickHelp = async (userId: number): Promise<{ blocks: any[] } | string | null> => {
     try {
       const [alertsRes, notesRes, tasksRes, preferences] = await Promise.all([
         this.#alertsServices.getAlertsByUserId(userId, {}),
@@ -1756,8 +1745,7 @@ export default class ConversationsServices {
       const notes = notesRes.data ?? []
       const tasks = tasksRes.data ?? []
 
-      const metadataMap =
-        alerts.length > 0 ? await this.#buildAlertMetadataMap(alerts) : {}
+      const metadataMap = alerts.length > 0 ? await this.#buildAlertMetadataMap(alerts) : {}
 
       const now = new Date()
       const alertsPending = alerts.filter((alert) => !alert.sent)
@@ -1815,8 +1803,7 @@ export default class ConversationsServices {
       const notes = notesRes.data ?? []
       const tasks = tasksRes.data ?? []
 
-      const metadataMap =
-        alerts.length > 0 ? await this.#buildAlertMetadataMap(alerts) : {}
+      const metadataMap = alerts.length > 0 ? await this.#buildAlertMetadataMap(alerts) : {}
 
       const alertsPending = alerts.filter((alert) => !alert.sent)
       const alertsOverdue = alertsPending.filter(
@@ -1862,16 +1849,14 @@ export default class ConversationsServices {
         (task) => (task.status ?? '').toLowerCase() === 'completed'
       ).length
 
-      const rangeLabel = `Últimas ${frequency === 'daily' ? '24 horas' : 'semana'} · Desde ${formatDateToText(
-        rangeStart,
-        'es',
-        {
-          month: 'short',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-        }
-      )}`
+      const rangeLabel = `Últimas ${
+        frequency === 'daily' ? '24 horas' : 'semana'
+      } · Desde ${formatDateToText(rangeStart, 'es', {
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`
 
       const digest = slackMsgUtils.msgAssistantDigest({
         title: `Resumen ${frequency === 'daily' ? 'diario' : 'semanal'}`,

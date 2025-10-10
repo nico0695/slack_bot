@@ -85,6 +85,19 @@ describe('TasksServices', () => {
     expect(result).toEqual({ data: { id: 2 } })
   })
 
+  it('returns error when createTask fails', async () => {
+    createTaskMock.mockRejectedValue(new Error('fail'))
+
+    const result = await services.createTask({
+      userId: 4,
+      title: 'Task',
+      description: 'desc',
+      status: TaskStatus.PENDING,
+    })
+
+    expect(result.error).toBe('Error al crear la tarea')
+  })
+
   describe('getTasksByUserId', () => {
     it('returns tasks when repository succeeds', async () => {
       const tasks = [{ id: 1 }]
