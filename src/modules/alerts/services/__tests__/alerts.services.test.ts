@@ -89,6 +89,35 @@ describe('AlertsServices', () => {
     })
   })
 
+  describe('createAlert', () => {
+    it('delegates creation to datasource', async () => {
+      createAlertMock.mockResolvedValue({ id: 20 })
+
+      const payload = {
+        userId: 1,
+        date: new Date('2024-03-01T10:00:00.000Z'),
+        message: 'Ping',
+      }
+
+      const result = await services.createAlert(payload)
+
+      expect(createAlertMock).toHaveBeenCalledWith(payload)
+      expect(result).toEqual({ data: { id: 20 } })
+    })
+
+    it('returns error when datasource rejects', async () => {
+      createAlertMock.mockRejectedValue(new Error('boom'))
+
+      const result = await services.createAlert({
+        userId: 1,
+        date: new Date(),
+        message: 'Ping',
+      })
+
+      expect(result.error).toBe('Error al crear la alerta')
+    })
+  })
+
   it('fetches alerts by user with default filters', async () => {
     getAlertsByUserIdMock.mockResolvedValue([{ id: 1 }])
 

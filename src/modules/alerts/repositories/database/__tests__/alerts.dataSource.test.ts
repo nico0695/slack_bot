@@ -54,6 +54,15 @@ describe('AlertsDataSource', () => {
     expect(result).toBe(alerts)
   })
 
+  it('returns error when fetching alerts fails', async () => {
+    const error = new Error('fail')
+    jest.spyOn(Alerts, 'find').mockRejectedValue(error)
+
+    const result = await dataSource.getAlertsByUserId(3)
+
+    expect(result).toBe(error)
+  })
+
   it('gets single alert by id and user', async () => {
     const alert = { id: 1 } as any
     const findOneSpy = jest.spyOn(Alerts, 'findOne').mockResolvedValue(alert)
@@ -98,6 +107,15 @@ describe('AlertsDataSource', () => {
     expect(callArgs.relations).toEqual(['user'])
     expect(callArgs.where.sent).toBe(false)
     expect(result).toBe(alerts)
+  })
+
+  it('returns error when query for alerts to notify fails', async () => {
+    const error = new Error('fail')
+    jest.spyOn(Alerts, 'find').mockRejectedValue(error)
+
+    const result = await dataSource.getAlertsByDate(new Date())
+
+    expect(result).toBe(error)
   })
 
   it('marks alerts as notified by ids', async () => {
