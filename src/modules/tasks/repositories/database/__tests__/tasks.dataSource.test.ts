@@ -56,6 +56,15 @@ describe('TasksDataSource', () => {
     expect(result).toBe(tasks)
   })
 
+  it('returns error when fetching tasks fails', async () => {
+    const error = new Error('fail')
+    jest.spyOn(Tasks, 'find').mockRejectedValue(error)
+
+    const result = await dataSource.getTasksByUserId(7)
+
+    expect(result).toBe(error)
+  })
+
   it('updates task with sanitized payload', async () => {
     const updateSpy = jest.spyOn(Tasks, 'update').mockResolvedValue({} as any)
 
@@ -72,6 +81,16 @@ describe('TasksDataSource', () => {
       description: 'desc',
       status: TaskStatus.COMPLETED,
     })
+  })
+
+  it('throws formatted error when update fails', async () => {
+    jest.spyOn(Tasks, 'update').mockRejectedValue(new Error('db'))
+
+    await expect(
+      dataSource.updateTask(5, {
+        title: 'Updated',
+      })
+    ).rejects.toThrow('Error al actualizar la tarea')
   })
 
   describe('deleteTask', () => {

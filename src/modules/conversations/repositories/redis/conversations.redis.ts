@@ -4,7 +4,7 @@ import {
   rAssistantPreferences,
   rAlertMetadata,
   rConversationFlow,
-} from './redis.constatns'
+} from './redis.constants'
 import { RedisConfig } from '../../../../config/redisConfig'
 import { AssistantPreferences } from '../../shared/interfaces/assistantPreferences'
 import { AlertMetadata } from '../../shared/interfaces/alertMetadata'

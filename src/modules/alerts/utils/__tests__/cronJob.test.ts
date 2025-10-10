@@ -109,4 +109,48 @@ describe('alertCronJob', () => {
     )
     expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([1])
   })
+
+  it('skips slack delivery when channel missing but updates notification state', async () => {
+    const alert: any = {
+      id: 2,
+      message: 'No channel',
+      user: {
+        id: 9,
+        slackChannelId: undefined as string | undefined,
+        pwSubscription: { endpoint: 'https://example.com' },
+      },
+    }
+    getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
+    updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+
+    await alertCronJob()
+    await new Promise((resolve) => setImmediate(resolve))
+
+    expect(postMessageMock).not.toHaveBeenCalled()
+    expect(sendNotificationMock).not.toHaveBeenCalled()
+    expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([2])
+  })
+
+  it('sends slack message without web push when subscription absent', async () => {
+    const alert: any = {
+      id: 3,
+      message: 'Slack only',
+      user: {
+        id: 11,
+        slackChannelId: 'channel-2',
+        pwSubscription: undefined as unknown,
+      },
+    }
+    getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
+    getAlertMetadataMock.mockResolvedValue(undefined)
+    msgAlertDetailMock.mockReturnValue({ blocks: [] })
+    updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+
+    await alertCronJob()
+    await new Promise((resolve) => setImmediate(resolve))
+
+    expect(postMessageMock).toHaveBeenCalled()
+    expect(sendNotificationMock).not.toHaveBeenCalled()
+    expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([3])
+  })
 })

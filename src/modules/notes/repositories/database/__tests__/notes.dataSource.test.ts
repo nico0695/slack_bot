@@ -55,6 +55,15 @@ describe('NotesDataSource', () => {
     expect(result).toBe(notes)
   })
 
+  it('returns error when fetching notes fails', async () => {
+    const error = new Error('fail')
+    jest.spyOn(Notes, 'find').mockRejectedValue(error)
+
+    const result = await dataSource.getNotesByUserId(5)
+
+    expect(result).toBe(error)
+  })
+
   it('updates note ignoring user and id fields', async () => {
     const updateSpy = jest.spyOn(Notes, 'update').mockResolvedValue({} as any)
 
@@ -69,6 +78,16 @@ describe('NotesDataSource', () => {
       title: 'Updated',
       description: 'desc',
     })
+  })
+
+  it('throws formatted error when update fails', async () => {
+    jest.spyOn(Notes, 'update').mockRejectedValue(new Error('db'))
+
+    await expect(
+      dataSource.updateNote(3, {
+        title: 'Updated',
+      })
+    ).rejects.toThrow('Error al actualizar la tarea')
   })
 
   describe('deleteNote', () => {

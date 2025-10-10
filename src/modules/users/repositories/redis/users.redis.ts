@@ -1,6 +1,6 @@
 import { PushSubscription } from 'web-push'
 
-import { usersPushSubscriptionsKey } from './redis.constatns'
+import { usersPushSubscriptionsKey } from './redis.constants'
 import { RedisConfig } from '../../../../config/redisConfig'
 
 export class UsersRedis {
