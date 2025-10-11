@@ -42,6 +42,19 @@ describe('NotesServices', () => {
       expect(result).toEqual({ data: note })
     })
 
+    it('omits tag when value is empty', async () => {
+      const note = { id: 2 }
+      createNoteMock.mockResolvedValue(note)
+
+      await services.createAssistantNote(3, 'Title', 'Body', '   ')
+
+      expect(createNoteMock).toHaveBeenCalledWith({
+        userId: 3,
+        title: 'Title',
+        description: 'Body',
+      })
+    })
+
     it('returns error when datasource throws', async () => {
       createNoteMock.mockRejectedValue(new Error('fail'))
 

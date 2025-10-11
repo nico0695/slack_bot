@@ -34,15 +34,21 @@ export default class NotesServices {
     userId: number,
     title: string,
     description: string,
-    tag: string
+    tag?: string
   ): Promise<GenericResponse<Notes>> {
     try {
-      const response = await this.#notesDataSource.createNote({
+      const sanitizedTag = tag?.trim()
+      const payload: INote = {
         userId,
         title,
         description,
-        tag,
-      })
+      }
+
+      if (sanitizedTag && sanitizedTag.length > 0) {
+        payload.tag = sanitizedTag
+      }
+
+      const response = await this.#notesDataSource.createNote(payload)
 
       return {
         data: response,
