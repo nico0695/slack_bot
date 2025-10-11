@@ -2,7 +2,6 @@ import webpush from 'web-push'
 
 import { connectionSlackApp } from '../../../config/slackConfig'
 import AlertsServices from '../services/alerts.services'
-import { RedisRepository } from '../../conversations/repositories/redis/conversations.redis'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 /**
@@ -11,7 +10,6 @@ import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 export const alertCronJob = async (): Promise<void> => {
   try {
     const alertsServices = AlertsServices.getInstance()
-    const redisRepository = RedisRepository.getInstance()
     const slackApp = connectionSlackApp
 
     const alerts = await alertsServices.getAlertsToNotify()
@@ -27,9 +25,8 @@ export const alertCronJob = async (): Promise<void> => {
 
     alerts?.data.forEach(async (alert) => {
       if (alert.user.slackChannelId) {
-        // Get alert metadata for rich message
-        const metadata = await redisRepository.getAlertMetadata(alert.id)
-        const messageBlock = slackMsgUtils.msgAlertDetail(alert as any, metadata ?? undefined)
+        // Send rich message to slack
+        const messageBlock = slackMsgUtils.msgAlertDetail(alert as any)
 
         // Send rich message to slack
         await slackApp.client.chat.postMessage({

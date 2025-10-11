@@ -1,13 +1,10 @@
 import { IConversation, IConversationFlow } from '../../shared/interfaces/converstions'
-import {
-  rAssistantDigestSnapshot,
-  rAssistantPreferences,
-  rAlertMetadata,
-  rConversationFlow,
-} from './redis.constants'
+import { rConversationFlow, rAlertSnoozeConfig } from './redis.constants'
 import { RedisConfig } from '../../../../config/redisConfig'
-import { AssistantPreferences } from '../../shared/interfaces/assistantPreferences'
-import { AlertMetadata } from '../../shared/interfaces/alertMetadata'
+
+export interface AlertSnoozeConfig {
+  defaultSnoozeMinutes: number
+}
 
 export class RedisRepository {
   static #instance: RedisRepository
@@ -15,9 +12,7 @@ export class RedisRepository {
   #redisClient
 
   // TTL constants (in seconds)
-  private readonly TTL_ALERT_METADATA = 90 * 24 * 60 * 60 // 90 days
-  private readonly TTL_ASSISTANT_PREFERENCES = 365 * 24 * 60 * 60 // 1 year
-  private readonly TTL_DIGEST_SNAPSHOT = 30 * 24 * 60 * 60 // 30 days
+  private readonly TTL_SNOOZE_CONFIG = 365 * 24 * 60 * 60 // 1 year
 
   private constructor() {
     this.#redisClient = RedisConfig.getClient()
@@ -111,104 +106,32 @@ export class RedisRepository {
     }
   }
 
-  saveAssistantPreferences = async (
+  saveAlertSnoozeConfig = async (
     userId: number,
-    preferences: AssistantPreferences
+    config: AlertSnoozeConfig
   ): Promise<boolean> => {
     try {
-      const key = rAssistantPreferences(userId)
-      await this.#redisClient.set(key, JSON.stringify(preferences), {
-        EX: this.TTL_ASSISTANT_PREFERENCES,
+      const key = rAlertSnoozeConfig(userId)
+      await this.#redisClient.set(key, JSON.stringify(config), {
+        EX: this.TTL_SNOOZE_CONFIG,
       })
       return true
     } catch (error) {
-      console.log('saveAssistantPreferences - error=', error.message)
+      console.log('saveAlertSnoozeConfig - error=', error.message)
       return false
     }
   }
 
-  getAssistantPreferences = async (userId: number): Promise<AssistantPreferences | null> => {
+  getAlertSnoozeConfig = async (userId: number): Promise<AlertSnoozeConfig | null> => {
     try {
-      const response = await this.#redisClient.get(rAssistantPreferences(userId))
+      const response = await this.#redisClient.get(rAlertSnoozeConfig(userId))
       if (!response) {
         return null
       }
-      return JSON.parse(response) as AssistantPreferences
+      return JSON.parse(response) as AlertSnoozeConfig
     } catch (error) {
-      console.log('getAssistantPreferences - error=', error.message)
+      console.log('getAlertSnoozeConfig - error=', error.message)
       return null
-    }
-  }
-
-  saveAssistantDigestSnapshot = async (
-    userId: number,
-    digest: { generatedAt: string; blocks: any[] }
-  ): Promise<boolean> => {
-    try {
-      const key = rAssistantDigestSnapshot(userId)
-      const payload = JSON.stringify(digest)
-      await this.#redisClient.set(key, payload, {
-        EX: this.TTL_DIGEST_SNAPSHOT,
-      })
-      return true
-    } catch (error) {
-      console.log('saveAssistantDigestSnapshot - error=', error.message)
-      return false
-    }
-  }
-
-  getAssistantDigestSnapshot = async (
-    userId: number
-  ): Promise<{ generatedAt: string; blocks: any[] } | null> => {
-    try {
-      const response = await this.#redisClient.get(rAssistantDigestSnapshot(userId))
-      if (!response) {
-        return null
-      }
-      return JSON.parse(response)
-    } catch (error) {
-      console.log('getAssistantDigestSnapshot - error=', error.message)
-      return null
-    }
-  }
-
-  saveAlertMetadata = async (alertId: number, metadata: AlertMetadata): Promise<boolean> => {
-    try {
-      const key = rAlertMetadata(alertId)
-      const currentRaw = await this.#redisClient.get(key)
-      const currentMetadata = currentRaw ? JSON.parse(currentRaw) : {}
-      const merged = { ...currentMetadata, ...metadata }
-      await this.#redisClient.set(key, JSON.stringify(merged), {
-        EX: this.TTL_ALERT_METADATA,
-      })
-      return true
-    } catch (error) {
-      console.log('saveAlertMetadata - error=', error.message)
-      return false
-    }
-  }
-
-  getAlertMetadata = async (alertId: number): Promise<AlertMetadata | null> => {
-    try {
-      const key = rAlertMetadata(alertId)
-      const response = await this.#redisClient.get(key)
-      if (!response) {
-        return null
-      }
-      return JSON.parse(response) as AlertMetadata
-    } catch (error) {
-      console.log('getAlertMetadata - error=', error.message)
-      return null
-    }
-  }
-
-  deleteAlertMetadata = async (alertId: number): Promise<boolean> => {
-    try {
-      await this.#redisClient.del(rAlertMetadata(alertId))
-      return true
-    } catch (error) {
-      console.log('deleteAlertMetadata - error=', error.message)
-      return false
     }
   }
 }

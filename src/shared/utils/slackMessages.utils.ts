@@ -2,7 +2,6 @@ import { Tasks } from '../../entities/tasks'
 import { Alerts } from '../../entities/alerts'
 import { Notes } from '../../entities/notes'
 import { formatDateToText, formatTimeLeft } from './dates.utils'
-import { AlertMetadata } from '../../modules/conversations/shared/interfaces/alertMetadata'
 
 interface AlertStatusTokens {
   icon: string
@@ -60,20 +59,13 @@ const formatDurationDiff = (targetDate: Date, base: Date = new Date()): string =
   return `${seconds} segundo${seconds > 1 ? 's' : ''}`
 }
 
-const getAlertStatusTokens = (alert: Alerts, metadata?: AlertMetadata): AlertStatusTokens => {
+const getAlertStatusTokens = (alert: Alerts): AlertStatusTokens => {
   const now = new Date()
   const alertDate = new Date(alert.date)
   const resolved = Boolean(alert.sent)
   const overdue = !resolved && alertDate.getTime() < now.getTime() + 2 * 60 * 1000
-  const snoozed = !resolved && !overdue && Boolean(metadata?.snoozedAt)
 
-  const icon = resolved
-    ? ':white_check_mark:'
-    : overdue
-    ? ':warning:'
-    : snoozed
-    ? ':bellhop_bell:'
-    : ':rotating_light:'
+  const icon = resolved ? ':white_check_mark:' : overdue ? ':warning:' : ':rotating_light:'
   const scheduledAt = formatShortDate(alertDate)
 
   if (resolved) {
@@ -89,15 +81,6 @@ const getAlertStatusTokens = (alert: Alerts, metadata?: AlertMetadata): AlertSta
       icon,
       statusLine: `Atrasada • ${scheduledAt}`,
       helper: `Venció hace ${formatDurationDiff(alertDate, now)}.`,
-    }
-  }
-
-  if (snoozed) {
-    const snoozedUntil = metadata?.snoozedUntil ? new Date(metadata.snoozedUntil) : alertDate
-    return {
-      icon,
-      statusLine: `Reprogramada • ${scheduledAt}`,
-      helper: `Se recordará en ${formatDurationDiff(snoozedUntil, now)}.`,
     }
   }
 
@@ -230,19 +213,10 @@ interface IQuickHelpPayload {
   notes: number
   tasks: number
   tasksPending: number
-  digestFrequency?: 'off' | 'daily' | 'weekly'
-  lastDigestAt?: string
   defaultSnoozeMinutes?: number
 }
 
 export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] } => {
-  const digestStatus =
-    data.digestFrequency && data.digestFrequency !== 'off'
-      ? `Digest ${data.digestFrequency === 'daily' ? 'diario' : 'semanal'}${
-          data.lastDigestAt ? ` • Último: ${formatShortDate(new Date(data.lastDigestAt))}` : ''
-        }`
-      : 'Digest desactivado'
-
   const snoozeTip = data.defaultSnoozeMinutes
     ? `Tip: Snooze rápido usando \`${data.defaultSnoozeMinutes}m\` o di "snooze #{id}".`
     : 'Tip: prueba comandos como `alert snooze #12 10m`.'
@@ -292,10 +266,6 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
         elements: [
           {
             type: 'mrkdwn',
-            text: digestStatus,
-          },
-          {
-            type: 'mrkdwn',
             text: snoozeTip,
           },
         ],
@@ -305,27 +275,15 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
         elements: [
           {
             type: 'button',
-            action_id: 'assistant_actions:digest_daily:0',
-            text: { type: 'plain_text', text: 'Digest diario' },
-            value: 'assistant:digest_daily:0',
-          },
-          {
-            type: 'button',
-            action_id: 'assistant_actions:digest_weekly:0',
-            text: { type: 'plain_text', text: 'Digest semanal' },
-            value: 'assistant:digest_weekly:0',
-          },
-          {
-            type: 'button',
-            action_id: 'assistant_actions:digest_off:0',
-            text: { type: 'plain_text', text: 'Stop digest' },
-            value: 'assistant:digest_off:0',
-          },
-          {
-            type: 'button',
             action_id: 'assistant_actions:set_snooze_5m:0',
             text: { type: 'plain_text', text: 'Snooze 5m' },
             value: 'assistant:set_snooze_5m:0',
+          },
+          {
+            type: 'button',
+            action_id: 'assistant_actions:set_snooze_10m:0',
+            text: { type: 'plain_text', text: 'Snooze 10m' },
+            value: 'assistant:set_snooze_10m:0',
           },
           {
             type: 'button',
@@ -340,9 +298,9 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
 }
 
 /** ALERTS */
-export const msgAlertCreated = (data: Alerts, metadata?: AlertMetadata): { blocks: any[] } => {
+export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
   const message = truncateText(data.message ?? '', 120)
-  const tokens = getAlertStatusTokens(data, metadata)
+  const tokens = getAlertStatusTokens(data)
 
   return {
     blocks: [
@@ -360,10 +318,7 @@ export const msgAlertCreated = (data: Alerts, metadata?: AlertMetadata): { block
   }
 }
 
-export const msgAlertsList = (
-  alerts: Alerts[],
-  metadata: Record<number, AlertMetadata> = {}
-): { blocks: any[] } => {
+export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
   const blocks = []
 
   blocks.push(
@@ -382,7 +337,7 @@ export const msgAlertsList = (
 
   alerts.forEach((alert) => {
     const truncatedMessage = truncateText(alert.message, 60)
-    const tokens = getAlertStatusTokens(alert, metadata[alert.id])
+    const tokens = getAlertStatusTokens(alert)
 
     blocks.push({
       type: 'section',
@@ -403,8 +358,8 @@ export const msgAlertsList = (
   return { blocks }
 }
 
-export const msgAlertDetail = (alert: Alerts, metadata?: AlertMetadata): { blocks: any[] } => {
-  const tokens = getAlertStatusTokens(alert, metadata)
+export const msgAlertDetail = (alert: Alerts): { blocks: any[] } => {
+  const tokens = getAlertStatusTokens(alert)
   const actions = [
     {
       type: 'button',
@@ -438,14 +393,6 @@ export const msgAlertDetail = (alert: Alerts, metadata?: AlertMetadata): { block
       value: `alert:resolve:${alert.id}`,
     },
   ]
-  const metaNotes: string[] = []
-
-  if (metadata?.snoozedAt) {
-    metaNotes.push(`Snooze: ${formatShortDate(new Date(metadata.snoozedAt))}`)
-  }
-  if (metadata?.repeatPolicy && metadata.repeatPolicy !== 'custom') {
-    metaNotes.push(`Recurrencia: ${metadata.repeatPolicy === 'daily' ? 'Diaria' : 'Semanal'}`)
-  }
 
   return {
     blocks: [
@@ -462,17 +409,6 @@ export const msgAlertDetail = (alert: Alerts, metadata?: AlertMetadata): { block
         type: 'actions',
         elements: actions,
       },
-      ...(metaNotes.length
-        ? [
-            {
-              type: 'context',
-              elements: metaNotes.map((note) => ({
-                type: 'mrkdwn',
-                text: note,
-              })),
-            },
-          ]
-        : []),
     ],
   }
 }
@@ -621,7 +557,6 @@ export const msgAssistantDigest = (payload: {
     tasks: Tasks[]
     notes: Notes[]
   }
-  metadata?: Record<number, AlertMetadata>
 }): { blocks: any[] } => {
   const blocks: any[] = [
     {
@@ -653,8 +588,6 @@ export const msgAssistantDigest = (payload: {
     },
   ]
 
-  const metadata = payload.metadata ?? {}
-
   if (payload.highlights.alerts.length) {
     blocks.push({
       type: 'section',
@@ -665,7 +598,7 @@ export const msgAssistantDigest = (payload: {
     })
 
     payload.highlights.alerts.slice(0, 3).forEach((alert) => {
-      const tokens = getAlertStatusTokens(alert, metadata[alert.id])
+      const tokens = getAlertStatusTokens(alert)
       const truncatedMessage = truncateText(alert.message ?? '', 80)
       blocks.push({
         type: 'section',

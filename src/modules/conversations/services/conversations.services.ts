@@ -5,7 +5,6 @@ import UsersServices from '../../users/services/users.services'
 import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
-import { Alerts } from '../../../entities/alerts'
 import { Tasks } from '../../../entities/tasks'
 import { Notes } from '../../../entities/notes'
 
@@ -35,8 +34,6 @@ import {
 } from '../shared/constants/prompt.constants'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 import SearchRepository from '../repositories/search/search.repository'
-import { AssistantPreferences } from '../shared/interfaces/assistantPreferences'
-import { AlertMetadata } from '../shared/interfaces/alertMetadata'
 
 type TMembersNames = Record<string, string>
 
@@ -68,7 +65,7 @@ export default class ConversationsServices {
   #alertsServices: AlertsServices
   #tasksServices: TasksServices
   #notesServices: NotesServices
-  #defaultAssistantPreferences: AssistantPreferences
+  #defaultSnoozeMinutes = 10
 
   private constructor(aiToUse = AIRepositoryType.OPENAI) {
     this.#aiRepository = AIRepositoryByType[aiToUse].getInstance()
@@ -78,14 +75,6 @@ export default class ConversationsServices {
     this.#alertsServices = AlertsServices.getInstance()
     this.#tasksServices = TasksServices.getInstance()
     this.#notesServices = NotesServices.getInstance()
-
-    this.#defaultAssistantPreferences = {
-      alertDefaultSnoozeMinutes: 10,
-      preferredAlertScope: 'pending',
-      preferredTaskScope: 'pending',
-      preferredNoteScope: 'all',
-      digestFrequency: 'off',
-    }
   }
 
   static getInstance(): ConversationsServices {
@@ -184,100 +173,13 @@ export default class ConversationsServices {
     return membersNames
   }
 
-  #mergePreferences = (
-    base: AssistantPreferences,
-    partial: Partial<AssistantPreferences>
-  ): AssistantPreferences => {
-    const merged: AssistantPreferences = { ...base }
-
-    const source = partial ?? {}
-
-    if (source.alertDefaultSnoozeMinutes !== undefined) {
-      merged.alertDefaultSnoozeMinutes = source.alertDefaultSnoozeMinutes
-    }
-
-    if (source.preferredAlertScope !== undefined) {
-      merged.preferredAlertScope = source.preferredAlertScope
-    }
-
-    if (source.preferredTaskScope !== undefined) {
-      merged.preferredTaskScope = source.preferredTaskScope
-    }
-
-    if (source.preferredNoteScope !== undefined) {
-      merged.preferredNoteScope = source.preferredNoteScope
-    }
-
-    if (source.digestFrequency !== undefined) {
-      merged.digestFrequency = source.digestFrequency
-    }
-
-    if (source.digestChannelId !== undefined) {
-      merged.digestChannelId = source.digestChannelId
-    }
-
-    if (source.lastDigestSentAt !== undefined) {
-      merged.lastDigestSentAt = source.lastDigestSentAt
-    }
-
-    return merged
+  #getSnoozeMinutes = async (userId: number): Promise<number> => {
+    const config = await this.#redisRepository.getAlertSnoozeConfig(userId)
+    return config?.defaultSnoozeMinutes ?? this.#defaultSnoozeMinutes
   }
 
-  #getAssistantPreferences = async (userId: number): Promise<AssistantPreferences> => {
-    const stored = await this.#redisRepository.getAssistantPreferences(userId)
-    return this.#mergePreferences(this.#defaultAssistantPreferences, stored ?? {})
-  }
-
-  #saveAssistantPreferences = async (
-    userId: number,
-    preferences: AssistantPreferences
-  ): Promise<AssistantPreferences> => {
-    const payload = this.#mergePreferences(this.#defaultAssistantPreferences, preferences)
-    await this.#redisRepository.saveAssistantPreferences(userId, payload)
-    return payload
-  }
-
-  #updateAssistantPreferences = async (
-    userId: number,
-    partial: Partial<AssistantPreferences>
-  ): Promise<AssistantPreferences> => {
-    const current = await this.#getAssistantPreferences(userId)
-    const merged = this.#mergePreferences(current, partial)
-    await this.#redisRepository.saveAssistantPreferences(userId, merged)
-    return merged
-  }
-
-  #getAlertMetadata = async (alertId: number): Promise<AlertMetadata | null> => {
-    return await this.#redisRepository.getAlertMetadata(alertId)
-  }
-
-  #setAlertMetadata = async (
-    alertId: number,
-    metadata: Partial<AlertMetadata>
-  ): Promise<AlertMetadata | null> => {
-    await this.#redisRepository.saveAlertMetadata(alertId, metadata)
-    return await this.#redisRepository.getAlertMetadata(alertId)
-  }
-
-  #clearAlertMetadata = async (alertId: number): Promise<void> => {
-    await this.#redisRepository.deleteAlertMetadata(alertId)
-  }
-
-  #buildAlertMetadataMap = async (alerts: Alerts[]): Promise<Record<number, AlertMetadata>> => {
-    const results = await Promise.all(
-      alerts.map(async (alert) => {
-        const metadata = await this.#redisRepository.getAlertMetadata(alert.id)
-        return { id: alert.id, metadata }
-      })
-    )
-
-    const metadataMap: Record<number, AlertMetadata> = {}
-    results.forEach(({ id, metadata }) => {
-      if (!metadata) return
-      metadataMap[id] = metadata
-    })
-
-    return metadataMap
+  #setSnoozeMinutes = async (userId: number, minutes: number): Promise<void> => {
+    await this.#redisRepository.saveAlertSnoozeConfig(userId, { defaultSnoozeMinutes: minutes })
   }
 
   #buildAssistantResponse = (content: string, block?: { blocks: any[] }): IConversation => {
@@ -320,8 +222,7 @@ export default class ConversationsServices {
       }
 
       if (!minutes) {
-        const preferences = await this.#getAssistantPreferences(userId)
-        minutes = preferences.alertDefaultSnoozeMinutes ?? 10
+        minutes = await this.#getSnoozeMinutes(userId)
       }
 
       const result = await this.#handleAlertSnooze(alertId, userId, minutes, {
@@ -365,17 +266,14 @@ export default class ConversationsServices {
 
       if (scopeRaw === 'all' || scopeRaw === 'todas') {
         scope = 'all'
-        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'all' })
       } else if (scopeRaw === 'snoozed' || scopeRaw === 'snoozeadas') {
         scope = 'snoozed'
-        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'snoozed' })
       } else if (scopeRaw === 'resolved' || scopeRaw === 'resueltas') {
         scope = 'resolved'
       } else if (scopeRaw === 'overdue' || scopeRaw === 'atrasadas') {
         scope = 'overdue'
       } else {
         scope = 'pending'
-        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'pending' })
       }
 
       const result = await this.#listAlertsByScope(userId, scope)
@@ -398,26 +296,6 @@ export default class ConversationsServices {
       return this.#buildAssistantResponse(summary, result)
     }
 
-    const digestMatch = lower.match(/^digest\s+(daily|weekly|off)\b/)
-    if (digestMatch) {
-      const freqRaw = digestMatch[1]
-      if (freqRaw === 'off') {
-        await this.#updateAssistantPreferences(userId, { digestFrequency: 'off' })
-        return this.#buildAssistantResponse('Desactivé tus resúmenes automáticos.')
-      }
-
-      const digest = await this.generateAssistantDigest(userId, freqRaw as 'daily' | 'weekly')
-
-      if (typeof digest === 'string') {
-        return this.#buildAssistantResponse(digest)
-      }
-
-      const summary = `Te envié el resumen ${
-        freqRaw === 'daily' ? 'diario' : 'semanal'
-      } con lo más importante.`
-      return this.#buildAssistantResponse(summary, digest)
-    }
-
     const preferMatch = lower.match(
       /^(?:set|configurar|pref(?:erencia)?)\s+(?:snooze|snooze\s+default)\s+(\d+)([mh])/
     )
@@ -429,7 +307,7 @@ export default class ConversationsServices {
       }
 
       const minutes = unit === 'h' ? amount * 60 : amount
-      await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: minutes })
+      await this.#setSnoozeMinutes(userId, minutes)
       return this.#buildAssistantResponse(
         `Snooze preferido actualizado a ${minutes} minuto${minutes > 1 ? 's' : ''}.`
       )
@@ -548,8 +426,6 @@ export default class ConversationsServices {
             const alerts = await this.#alertsServices.getAlertsByUserId(userId)
 
             const alertsList = alerts.data ?? []
-            const metadataMap =
-              alertsList.length > 0 ? await this.#buildAlertMetadataMap(alertsList) : {}
 
             const messageToResponse =
               alertsList.length > 0
@@ -561,7 +437,7 @@ export default class ConversationsServices {
                     .join('\n')
                 : 'No tienes alertas'
 
-            const messageBlockToResponse = slackMsgUtils.msgAlertsList(alertsList, metadataMap)
+            const messageBlockToResponse = slackMsgUtils.msgAlertsList(alertsList)
 
             returnValue.responseMessage = {
               role: roleTypes.assistant,
@@ -909,9 +785,7 @@ export default class ConversationsServices {
           const alerts = await this.#alertsServices.getAlertsByUserId(userId)
           if (alerts.error) return null
           const alertsList = alerts.data ?? []
-          const metadataMap =
-            alertsList.length > 0 ? await this.#buildAlertMetadataMap(alertsList) : {}
-          const contentBlock = slackMsgUtils.msgAlertsList(alertsList, metadataMap)
+          const contentBlock = slackMsgUtils.msgAlertsList(alertsList)
           return {
             role: roleTypes.assistant,
             content: parsed.successMessage || `Mostrando ${alerts.data?.length || 0} alertas`,
@@ -1471,17 +1345,11 @@ export default class ConversationsServices {
       return res.error ?? 'No se pudo reprogramar la alerta. 😅'
     }
 
-    const snoozedUntil = new Date(res.data.date)
-    const metadata = await this.#setAlertMetadata(alertId, {
-      snoozedAt: new Date().toISOString(),
-      snoozedUntil: snoozedUntil.toISOString(),
-    })
-
     if (options.updatePreference) {
-      await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: minutes })
+      await this.#setSnoozeMinutes(userId, minutes)
     }
 
-    return slackMsgUtils.msgAlertDetail(res.data, metadata ?? undefined)
+    return slackMsgUtils.msgAlertDetail(res.data)
   }
 
   #handleAlertRepeat = async (
@@ -1496,12 +1364,7 @@ export default class ConversationsServices {
       return followUp.error ?? 'No se pudo crear la recurrencia. 😅'
     }
 
-    await this.#setAlertMetadata(alertId, { repeatPolicy: policy })
-    const newAlertMetadata = await this.#setAlertMetadata(followUp.data.id, {
-      repeatPolicy: policy,
-    })
-
-    const messageBlock = slackMsgUtils.msgAlertCreated(followUp.data, newAlertMetadata ?? undefined)
+    const messageBlock = slackMsgUtils.msgAlertCreated(followUp.data)
 
     messageBlock.blocks.push({
       type: 'context',
@@ -1532,7 +1395,6 @@ export default class ConversationsServices {
       return 'No tienes alertas guardadas.'
     }
 
-    const metadataMap = await this.#buildAlertMetadataMap(alerts)
     const now = new Date()
 
     let filtered = alerts
@@ -1544,11 +1406,9 @@ export default class ConversationsServices {
         emptyMessage = 'No tienes alertas pendientes.'
         break
       case 'snoozed':
-        filtered = alerts.filter((alert) => {
-          const metadata = metadataMap[alert.id]
-          return !alert.sent && Boolean(metadata?.snoozedAt)
-        })
-        emptyMessage = 'No tienes alertas snoozeadas.'
+        // Snoozed scope removed - show pending alerts instead
+        filtered = alerts.filter((alert) => !alert.sent)
+        emptyMessage = 'No tienes alertas pendientes.'
         break
       case 'overdue':
         filtered = alerts.filter((alert) => !alert.sent && new Date(alert.date) < now)
@@ -1569,7 +1429,7 @@ export default class ConversationsServices {
       return emptyMessage
     }
 
-    return slackMsgUtils.msgAlertsList(filtered, metadataMap)
+    return slackMsgUtils.msgAlertsList(filtered)
   }
 
   #handleAlertResolve = async (
@@ -1582,8 +1442,6 @@ export default class ConversationsServices {
       return res.error ?? 'No se pudo marcar la alerta como resuelta. 😅'
     }
 
-    await this.#clearAlertMetadata(alertId)
-
     return slackMsgUtils.msgAlertDetail(res.data)
   }
 
@@ -1592,24 +1450,16 @@ export default class ConversationsServices {
     userId: number
   ): Promise<string | { blocks: any[] }> => {
     switch (operation) {
-      case 'digest_daily':
-        return await this.generateAssistantDigest(userId, 'daily')
-      case 'digest_weekly':
-        return await this.generateAssistantDigest(userId, 'weekly')
-      case 'digest_off': {
-        await this.#updateAssistantPreferences(userId, { digestFrequency: 'off' })
-        return 'Se desactivaron los resúmenes automáticos.'
-      }
       case 'set_snooze_5m': {
-        await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: 5 })
+        await this.#setSnoozeMinutes(userId, 5)
         return 'Snooze preferido configurado en 5 minutos.'
       }
       case 'set_snooze_10m': {
-        await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: 10 })
+        await this.#setSnoozeMinutes(userId, 10)
         return 'Snooze preferido configurado en 10 minutos.'
       }
       case 'set_snooze_30m': {
-        await this.#updateAssistantPreferences(userId, { alertDefaultSnoozeMinutes: 30 })
+        await this.#setSnoozeMinutes(userId, 30)
         return 'Snooze preferido configurado en 30 minutos.'
       }
       default:
@@ -1644,8 +1494,7 @@ export default class ConversationsServices {
           return `No se encontró la alerta con Id: ${targetId}`
         }
 
-        const metadata = await this.#getAlertMetadata(alert.id)
-        return slackMsgUtils.msgAlertDetail(alert, metadata ?? undefined)
+        return slackMsgUtils.msgAlertDetail(alert)
       }
 
       case 'snooze_5m':
@@ -1655,8 +1504,7 @@ export default class ConversationsServices {
         return await this.#handleAlertSnooze(targetId, userId, 60)
 
       case 'snooze_default': {
-        const preferences = await this.#getAssistantPreferences(userId)
-        const minutes = preferences.alertDefaultSnoozeMinutes ?? 10
+        const minutes = await this.#getSnoozeMinutes(userId)
         return await this.#handleAlertSnooze(targetId, userId, minutes, { updatePreference: true })
       }
 
@@ -1672,28 +1520,20 @@ export default class ConversationsServices {
       case 'list_overdue':
         return await this.#listAlertsByScope(userId, 'overdue')
 
-      case 'list_snoozed': {
-        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'snoozed' })
+      case 'list_snoozed':
         return await this.#listAlertsByScope(userId, 'snoozed')
-      }
 
-      case 'list_all': {
-        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'all' })
+      case 'list_all':
         return await this.#listAlertsByScope(userId, 'all')
-      }
 
-      case 'list_pending': {
-        await this.#updateAssistantPreferences(userId, { preferredAlertScope: 'pending' })
+      case 'list_pending':
         return await this.#listAlertsByScope(userId, 'pending')
-      }
 
       case 'list_resolved':
         return await this.#listAlertsByScope(userId, 'resolved')
 
-      case 'list': {
-        const preferences = await this.#getAssistantPreferences(userId)
-        return await this.#listAlertsByScope(userId, preferences.preferredAlertScope ?? 'pending')
-      }
+      case 'list':
+        return await this.#listAlertsByScope(userId, 'pending')
 
       default:
         return 'Acción no reconocida.'
@@ -1815,163 +1655,42 @@ export default class ConversationsServices {
 
   getAssistantQuickHelp = async (userId: number): Promise<{ blocks: any[] } | string | null> => {
     try {
-      const [alertsRes, notesRes, tasksRes, preferences] = await Promise.all([
-        this.#alertsServices.getAlertsByUserId(userId, {}),
-        this.#notesServices.getNotesByUserId(userId),
-        this.#tasksServices.getTasksByUserId(userId),
-        this.#getAssistantPreferences(userId),
-      ])
-
-      const alerts = alertsRes.data ?? []
-      const notes = notesRes.data ?? []
-      const tasks = tasksRes.data ?? []
-
-      const metadataMap = alerts.length > 0 ? await this.#buildAlertMetadataMap(alerts) : {}
-
-      const now = new Date()
-      const alertsPending = alerts.filter((alert) => !alert.sent)
-      const alertsOverdue = alertsPending.filter((alert) => new Date(alert.date) < now).length
-      const alertsResolved = alerts.filter((alert) => alert.sent).length
-      const alertsSnoozed = alertsPending.filter((alert) =>
-        Boolean(metadataMap[alert.id]?.snoozedAt)
-      ).length
-
-      const tasksPending = tasks.filter((task) => {
-        const status = (task.status ?? '').toLowerCase()
-        return status !== 'completed' && status !== 'canceled'
-      }).length
-
-      return slackMsgUtils.msgAssistantQuickHelp({
-        alerts: alerts.length,
-        alertsPending: alertsPending.length,
-        alertsOverdue,
-        alertsResolved,
-        alertsSnoozed,
-        notes: notes.length,
-        tasks: tasks.length,
-        tasksPending,
-        digestFrequency: preferences.digestFrequency ?? 'off',
-        lastDigestAt: preferences.lastDigestSentAt,
-        defaultSnoozeMinutes: preferences.alertDefaultSnoozeMinutes,
-      })
-    } catch (error) {
-      console.log('getAssistantQuickHelp - error=', error)
-      return 'No pude obtener tu resumen en este momento. 😅'
-    }
-  }
-
-  generateAssistantDigest = async (
-    userId: number,
-    frequency: 'daily' | 'weekly'
-  ): Promise<{ blocks: any[] } | string> => {
-    try {
-      const now = new Date()
-      const rangeHours = frequency === 'daily' ? 24 : 24 * 7
-      const rangeMs = rangeHours * 60 * 60 * 1000
-      const rangeStart = new Date(now.getTime() - rangeMs)
-
       const [alertsRes, notesRes, tasksRes] = await Promise.all([
         this.#alertsServices.getAlertsByUserId(userId, {}),
         this.#notesServices.getNotesByUserId(userId),
         this.#tasksServices.getTasksByUserId(userId),
       ])
 
-      if (alertsRes.error || notesRes.error || tasksRes.error) {
-        return 'No pude generar tu digest ahora mismo. 😅'
-      }
-
       const alerts = alertsRes.data ?? []
       const notes = notesRes.data ?? []
       const tasks = tasksRes.data ?? []
 
-      const metadataMap = alerts.length > 0 ? await this.#buildAlertMetadataMap(alerts) : {}
-
+      const now = new Date()
       const alertsPending = alerts.filter((alert) => !alert.sent)
-      const alertsOverdue = alertsPending.filter(
-        (alert) => new Date(alert.date).getTime() < now.getTime()
-      ).length
+      const alertsOverdue = alertsPending.filter((alert) => new Date(alert.date) < now).length
       const alertsResolved = alerts.filter((alert) => alert.sent).length
-
-      const highlightAlerts = alerts
-        .filter((alert) => {
-          if (alert.sent) return false
-          const alertTime = new Date(alert.date).getTime()
-          const diff = alertTime - now.getTime()
-          return diff <= rangeMs && diff >= -rangeMs
-        })
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-      const highlightTasks = tasks
-        .filter((task) => {
-          const status = (task.status ?? '').toLowerCase()
-          if (status === 'completed' || status === 'canceled') return false
-          if (!task.alertDate) return true
-          const diff = new Date(task.alertDate).getTime() - now.getTime()
-          return diff <= rangeMs && diff >= -rangeMs
-        })
-        .sort((a, b) => {
-          const timeA = a.alertDate ? new Date(a.alertDate).getTime() : Number.MAX_SAFE_INTEGER
-          const timeB = b.alertDate ? new Date(b.alertDate).getTime() : Number.MAX_SAFE_INTEGER
-          return timeA - timeB
-        })
-
-      const highlightNotes = notes
-        .filter((note) => {
-          if (!note.createdAt) return false
-          return new Date(note.createdAt).getTime() >= rangeStart.getTime()
-        })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
       const tasksPending = tasks.filter((task) => {
         const status = (task.status ?? '').toLowerCase()
         return status !== 'completed' && status !== 'canceled'
       }).length
-      const tasksCompleted = tasks.filter(
-        (task) => (task.status ?? '').toLowerCase() === 'completed'
-      ).length
 
-      const rangeLabel = `Últimas ${
-        frequency === 'daily' ? '24 horas' : 'semana'
-      } · Desde ${formatDateToText(rangeStart, 'es', {
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`
+      const defaultSnoozeMinutes = await this.#getSnoozeMinutes(userId)
 
-      const digest = slackMsgUtils.msgAssistantDigest({
-        title: `Resumen ${frequency === 'daily' ? 'diario' : 'semanal'}`,
-        rangeLabel,
-        stats: {
-          alertsPending: alertsPending.length,
-          alertsOverdue,
-          alertsResolved,
-          tasksPending,
-          tasksCompleted,
-          notes: notes.length,
-        },
-        highlights: {
-          alerts: highlightAlerts,
-          tasks: highlightTasks,
-          notes: highlightNotes,
-        },
-        metadata: metadataMap,
+      return slackMsgUtils.msgAssistantQuickHelp({
+        alerts: alerts.length,
+        alertsPending: alertsPending.length,
+        alertsOverdue,
+        alertsResolved,
+        alertsSnoozed: 0,
+        notes: notes.length,
+        tasks: tasks.length,
+        tasksPending,
+        defaultSnoozeMinutes,
       })
-
-      await this.#redisRepository.saveAssistantDigestSnapshot(userId, {
-        generatedAt: now.toISOString(),
-        blocks: digest.blocks,
-      })
-
-      await this.#updateAssistantPreferences(userId, {
-        digestFrequency: frequency,
-        lastDigestSentAt: now.toISOString(),
-      })
-
-      return digest
     } catch (error) {
-      console.log('generateAssistantDigest - error=', error)
-      return 'No pude generar tu digest ahora mismo. 😅'
+      console.log('getAssistantQuickHelp - error=', error)
+      return 'No pude obtener tu resumen en este momento. 😅'
     }
   }
 }

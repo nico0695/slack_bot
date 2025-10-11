@@ -2,7 +2,6 @@ import { alertCronJob } from '../cronJob'
 
 const getAlertsToNotifyMock = jest.fn()
 const updateAlertAsNotifiedMock = jest.fn()
-const getAlertMetadataMock = jest.fn()
 const postMessageMock = jest.fn()
 const sendNotificationMock = jest.fn()
 const msgAlertDetailMock = jest.fn()
@@ -12,21 +11,10 @@ const alertsServicesInstance = {
   updateAlertAsNotified: updateAlertAsNotifiedMock,
 }
 
-const conversationsRedisInstance = {
-  getAlertMetadata: getAlertMetadataMock,
-}
-
 jest.mock('../../services/alerts.services', () => ({
   __esModule: true,
   default: {
     getInstance: () => alertsServicesInstance,
-  },
-}))
-
-jest.mock('../../../conversations/repositories/redis/conversations.redis', () => ({
-  __esModule: true,
-  RedisRepository: {
-    getInstance: () => conversationsRedisInstance,
   },
 }))
 
@@ -87,7 +75,6 @@ describe('alertCronJob', () => {
       },
     }
     getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
-    getAlertMetadataMock.mockResolvedValue({ priority: 'high' })
     msgAlertDetailMock.mockReturnValue({ blocks: ['block-data'] })
     postMessageMock.mockResolvedValue(undefined)
     sendNotificationMock.mockResolvedValue(undefined)
@@ -96,8 +83,7 @@ describe('alertCronJob', () => {
     await alertCronJob()
     await new Promise((resolve) => setImmediate(resolve))
 
-    expect(getAlertMetadataMock).toHaveBeenCalledWith(1)
-    expect(msgAlertDetailMock).toHaveBeenCalledWith(alert, { priority: 'high' })
+    expect(msgAlertDetailMock).toHaveBeenCalledWith(alert)
     expect(postMessageMock).toHaveBeenCalledWith({
       channel: 'channel',
       text: '🔔 Alerta: Ping',
@@ -142,7 +128,6 @@ describe('alertCronJob', () => {
       },
     }
     getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
-    getAlertMetadataMock.mockResolvedValue(undefined)
     msgAlertDetailMock.mockReturnValue({ blocks: [] })
     updateAlertAsNotifiedMock.mockResolvedValue(undefined)
 

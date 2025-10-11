@@ -8,7 +8,6 @@ const getAlertsByDateMock = jest.fn()
 const updateAlertAsNotifiedMock = jest.fn()
 const deleteAlertsMock = jest.fn()
 const getUsersSubscriptionsMock = jest.fn()
-const deleteAlertMetadataMock = jest.fn()
 const formatTextToDateMock = jest.fn()
 
 const alertsDataSourceInstance = {
@@ -25,11 +24,6 @@ const usersRedisInstance = {
   getUsersSubscriptions: getUsersSubscriptionsMock,
 }
 
-const redisRepositoryInstance = {
-  deleteAlertMetadata: deleteAlertMetadataMock,
-  getAlertMetadata: jest.fn(),
-}
-
 jest.mock('../../repositories/database/alerts.dataSource', () => ({
   __esModule: true,
   default: {
@@ -41,13 +35,6 @@ jest.mock('../../../users/repositories/redis/users.redis', () => ({
   __esModule: true,
   UsersRedis: {
     getInstance: () => usersRedisInstance,
-  },
-}))
-
-jest.mock('../../../conversations/repositories/redis/conversations.redis', () => ({
-  __esModule: true,
-  RedisRepository: {
-    getInstance: () => redisRepositoryInstance,
   },
 }))
 
@@ -258,21 +245,19 @@ describe('AlertsServices', () => {
   })
 
   describe('deleteAlert', () => {
-    it('deletes metadata when alert existed', async () => {
+    it('deletes alert when it exists', async () => {
       deleteAlertsMock.mockResolvedValue(1)
 
       const result = await services.deleteAlert(4, 8)
 
-      expect(deleteAlertMetadataMock).toHaveBeenCalledWith(4)
       expect(result).toEqual({ data: true })
     })
 
-    it('skips metadata removal when nothing deleted', async () => {
+    it('returns false when alert does not exist', async () => {
       deleteAlertsMock.mockResolvedValue(0)
 
       const result = await services.deleteAlert(4, 8)
 
-      expect(deleteAlertMetadataMock).not.toHaveBeenCalled()
       expect(result).toEqual({ data: false })
     })
 
