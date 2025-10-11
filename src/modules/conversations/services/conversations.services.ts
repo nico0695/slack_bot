@@ -34,6 +34,7 @@ import {
 } from '../shared/constants/prompt.constants'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 import SearchRepository from '../repositories/search/search.repository'
+import MessageProcessor from './messageProcessor.service'
 
 type TMembersNames = Record<string, string>
 
@@ -65,11 +66,14 @@ export default class ConversationsServices {
   #alertsServices: AlertsServices
   #tasksServices: TasksServices
   #notesServices: NotesServices
+  #messageProcessor: MessageProcessor
   #defaultSnoozeMinutes = 10
+  #maxContextMessages = 20
 
   private constructor(aiToUse = AIRepositoryType.OPENAI) {
     this.#aiRepository = AIRepositoryByType[aiToUse].getInstance()
     this.#redisRepository = RedisRepository.getInstance()
+    this.#messageProcessor = MessageProcessor.getInstance()
 
     this.#usersServices = UsersServices.getInstance()
     this.#alertsServices = AlertsServices.getInstance()
@@ -942,17 +946,13 @@ export default class ConversationsServices {
 
       const { conversation: conversationStored } = conversationFlow
 
-      // TODO: add filter for tokens
+      // Use MessageProcessor to handle the message
+      const result = await this.#messageProcessor.processAssistantMessage(message, userId)
+      const responseMessage = result.response
+
+      // Add messages to conversation history (limit to last 10)
       const newConversationUser = [...conversationStored.slice(-10), newConversation]
 
-      let responseMessage = await this.#handleAssistantCommand(userId, message)
-
-      if (!responseMessage) {
-        const managed = await this.#manageAssistantVariables(userId, message)
-        responseMessage = managed.responseMessage ?? null
-      }
-
-      // if bot response message, add to conversation
       if (responseMessage) {
         newConversationUser.push(responseMessage)
       }
@@ -1128,8 +1128,12 @@ export default class ConversationsServices {
         return null
       }
 
+      // Limit context sent to AI to last N messages to avoid overwhelming the model
+      const limitedConversation = conversationStored.slice(-this.#maxContextMessages)
+      const contextForAI = [...limitedConversation, newConversation]
+
       const promptGenerated = await this.#generatePrompt(
-        newConversationUser.map((message) => ({
+        contextForAI.map((message) => ({
           role: message.role,
           content: message.content,
           provider: message.provider,
@@ -1177,18 +1181,19 @@ export default class ConversationsServices {
 
       const { conversation: conversationStored } = conversationFlow
 
-      // TODO: add filter for tokens
-      const newConversationUser = [...conversationStored.slice(-10), newConversation]
+      // Limit context sent to AI to last N messages to avoid overwhelming the model
+      const limitedConversation = conversationStored.slice(-this.#maxContextMessages)
+      const contextForAI = [...limitedConversation, newConversation]
 
-      const promptGenerated = await this.#generatePrompt(newConversationUser)
+      const promptGenerated = await this.#generatePrompt(contextForAI)
 
       /** Generate conversation */
-      // const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
       const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
 
+      // Save full conversation (not limited) to Redis
       const newConversationGenerated: IConversationFlow = {
         ...conversationFlow,
-        conversation: [...newConversationUser, messageResponse],
+        conversation: [...conversationStored, newConversation, messageResponse],
         updatedAt: new Date(),
       }
 

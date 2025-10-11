@@ -31,8 +31,11 @@ export default class NotesDataSource {
 
       newNote.title = data.title
       newNote.description = data.description
-      newNote.tag = data.tag?.trim() ? data.tag.trim() : null
+      newNote.tag = data.tag?.trim() ?? ''
       newNote.user = user
+      if (data.channelId) {
+        newNote.channelId = data.channelId
+      }
 
       await newNote.save()
 

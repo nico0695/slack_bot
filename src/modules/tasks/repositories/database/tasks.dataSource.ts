@@ -36,6 +36,9 @@ export default class TasksDataSource {
       const trimmedTag = data.tag?.trim()
       newTask.tag = trimmedTag ?? null
       newTask.user = user
+      if (data.channelId) {
+        newTask.channelId = data.channelId
+      }
 
       await newTask.save()
 

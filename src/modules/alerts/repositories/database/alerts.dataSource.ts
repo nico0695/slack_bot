@@ -34,6 +34,9 @@ export default class AlertsDataSource {
       newAlert.message = data.message
       newAlert.date = data.date
       newAlert.user = user
+      if (data.channelId) {
+        newAlert.channelId = data.channelId
+      }
 
       await newAlert.save()
 
