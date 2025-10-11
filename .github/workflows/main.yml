@@ -27,6 +27,7 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           port: 5001
           script: |
+            set -e
             cd /app/slack_bot/
             git pull
             npm run build

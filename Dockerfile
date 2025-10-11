@@ -39,8 +39,8 @@ ENV BASE_PATH=/app/build
 ENV DB_URL=/database/database.sqlite
 ENV ADMIN_MAIL="admin@bot.com"
 
-ENV SOCKET_URL = "http://localhost:3001"
-ENV REDIS_HOST "redis://host.docker.internal"
+ENV SOCKET_URL="http://localhost:3001"
+ENV REDIS_HOST="redis://host.docker.internal"
 
 ENV SEARCH_API_KEY=${SEARCH_API_KEY}
 ENV SEARCH_API_KEY_CX=${SEARCH_API_KEY_CX}
@@ -49,7 +49,8 @@ COPY ./build /app/build
 COPY ./package.json /app/package.json
 COPY ./package-lock.json /app/package-lock.json
 
-RUN cd app && NODE_ENV=$NODE_ENV npm install
+WORKDIR /app
+RUN npm install
 
 # Expose the port your app is running on (e.g., 3000)
 EXPOSE 4000
