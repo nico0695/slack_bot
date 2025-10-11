@@ -6,7 +6,17 @@ import UsersServices from '../../modules/users/services/users.services'
 import { Profiles } from '../constants/auth.constants'
 
 // Create a single supabase client for interacting with your database
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_TOKEN)
+const supabase = (() => {
+  try {
+    return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_TOKEN)
+  } catch (error) {
+    console.log(
+      `Supabase error: ${String(error)} - ${process.env.SUPABASE_URL} - ${
+        process.env.SUPABASE_TOKEN
+      }`
+    )
+  }
+})()
 
 export const verifyToken = async (
   req: Request,

@@ -1,6 +1,6 @@
 
 # dependencies
-node_modules/
+# node_modules/
 
 # production
 # /build
@@ -8,5 +8,5 @@ node_modules/
 # misc
 .env
 
-src/
+# src/
 npm-debug.log*

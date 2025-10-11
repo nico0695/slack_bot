@@ -2,9 +2,9 @@
 
 ### ia api
 
-**OpenIA**
-**Leap**
-
+* OpenIA
+* Leap
+* transformers.js
 ---
 
 ## Config
@@ -32,27 +32,24 @@ VAPID_PUBLIC_KEY="VAPID_PUBLIC_KEY"
 VAPID_PRIVATE_KEY="VAPID_PRIVATE_KEY"
 ```
 
-## Installs
+## Install
 
-#### Install Redis
 
 ```
+// Redis (linux - macos)
 sudo apt-get install redis-server
-```
 
-#### Install backend (express)
-
-```
+// Dependence
 npm install
 ```
 
 ## Initialize
 
 ```
-# Start redis
+// Start redis
 redis-server
 
-# Start Backend
+// Start Backend
 npm run dev
 ```
 
@@ -65,7 +62,7 @@ npm run dev
 **Prefix:**
 
 ```
-    cb ${message} // send message to open ai chatbot
+    cb $message // send message to open ai chatbot
     cb_show // show conversation with user
     cb_clean // clean conversation with user
 ```
@@ -77,12 +74,12 @@ npm run dev
 **Messages:**
 
 ```
-    start conversation // Start flow conversation
-    end conversation // Finished flow conversation
-    show conversation // show chanel conversation
+    start conversation // Start conversation flow
+    end conversation // Finished conversation flow
+    show conversation // show chanel/user conversation
     clean conversation // clean flow conversation
     # Prefixs
-    + ${message} // add a message to the conversation without generating a bot responsee
+    + $message // add message to conversation store without generating a bot response
 ```
 
 ## Slack Generate Image
@@ -92,5 +89,5 @@ npm run dev
 **Prefix:**
 
 ```
-    img ${prompt} // generate and return an image
+    img ${prompt} // generate and response an image
 ```

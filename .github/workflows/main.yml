@@ -1,0 +1,36 @@
+name: Continuous Integration-Continuous Deployment
+
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Continuous Integration
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 18
+      - run: npm ci
+  deploy:
+    runs-on: ubuntu-latest
+    name: Continuous Deployment
+    needs: [build]
+    steps:
+      - name: Deploy using ssh
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 5001
+          script: |
+            cd /app/slack_bot/
+            git pull
+            npm run build
+            ./build-docker.sh
+            docker stop slack_bot
+            docker rm slack_bot
+            ./run-docker.sh
