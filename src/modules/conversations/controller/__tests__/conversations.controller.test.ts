@@ -142,7 +142,8 @@ describe('ConversationsController', () => {
       expect(ack).toHaveBeenCalled()
       expect(handleActionMock).toHaveBeenCalledWith(
         { entity: 'note', operation: 'detail', targetId: 21 },
-        123
+        123,
+        { channelId: undefined, isChannelContext: false }
       )
       expect(say).toHaveBeenCalledWith('ok')
     })

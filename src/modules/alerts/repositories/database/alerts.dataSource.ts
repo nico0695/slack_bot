@@ -1,4 +1,4 @@
-import { In, LessThan } from 'typeorm'
+import { FindOptionsWhere, In, IsNull, LessThan } from 'typeorm'
 
 import { Alerts } from '../../../../entities/alerts'
 import { Users } from '../../../../entities/users'
@@ -34,6 +34,9 @@ export default class AlertsDataSource {
       newAlert.message = data.message
       newAlert.date = data.date
       newAlert.user = user
+      if (data.channelId) {
+        newAlert.channelId = data.channelId
+      }
 
       await newAlert.save()
 
@@ -50,8 +53,31 @@ export default class AlertsDataSource {
    */
   async getAlertsByUserId(userId: number, options: Partial<IAlert> = {}): Promise<Alerts[]> {
     try {
+      const where: FindOptionsWhere<Alerts> = {}
+      const { channelId, userId: _userId, ...restOptions } = options ?? {}
+      const rawChannelId = channelId
+
+      if (typeof rawChannelId === 'string' && rawChannelId.trim().length > 0) {
+        where.channelId = rawChannelId.trim()
+      } else if (rawChannelId === null) {
+        where.channelId = IsNull()
+        where.user = { id: userId }
+      } else {
+        where.user = { id: userId }
+      }
+
+      // Filter sent = false by default unless explicitly overridden
+      if (!('sent' in restOptions)) {
+        where.sent = false
+      }
+
+      Object.assign(where, restOptions)
+
       const alerts = await Alerts.find({
-        where: { user: { id: userId }, ...options },
+        where,
+        order: {
+          date: 'ASC',
+        },
       })
 
       return alerts
@@ -100,6 +126,7 @@ export default class AlertsDataSource {
             slackId: true,
             slackChannelId: true,
           },
+          channelId: true,
         },
         relations: ['user'],
         where: { date: LessThan(date), sent: false },

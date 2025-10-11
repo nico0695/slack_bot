@@ -1,9 +1,7 @@
 import {
   rConversationKey,
   rConversationFlow,
-  rAssistantPreferences,
-  rAssistantDigestSnapshot,
-  rAlertMetadata,
+  rAlertSnoozeConfig,
   conversationFlowPrefix,
 } from '../redis.constants'
 
@@ -20,15 +18,7 @@ describe('redis.constants', () => {
     expect(rConversationFlow('chan')).toBe(`${conversationFlowPrefix}chan`)
   })
 
-  it('generates assistant preferences key with TTL prefix', () => {
-    expect(rAssistantPreferences(5)).toBe('cb_assistant_prefs_5')
-  })
-
-  it('generates assistant digest snapshot key', () => {
-    expect(rAssistantDigestSnapshot(7)).toBe('cb_assistant_digest_7')
-  })
-
-  it('generates alert metadata key', () => {
-    expect(rAlertMetadata(3)).toBe('cb_alert_meta_3')
+  it('generates alert snooze config key', () => {
+    expect(rAlertSnoozeConfig(5)).toBe('cb_alert_snooze_5')
   })
 })

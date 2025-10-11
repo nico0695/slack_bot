@@ -24,6 +24,9 @@ export class Alerts extends BaseEntity {
   @Column({ default: false })
   sent: boolean
 
+  @Column({ nullable: true })
+  channelId: string
+
   @ManyToOne((type) => Users)
   @JoinColumn({ name: 'userId' })
   user: Users

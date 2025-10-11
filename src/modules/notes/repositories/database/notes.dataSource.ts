@@ -1,3 +1,5 @@
+import { FindOptionsWhere, IsNull } from 'typeorm'
+
 import { Notes } from '../../../../entities/notes'
 import { Users } from '../../../../entities/users'
 
@@ -31,8 +33,11 @@ export default class NotesDataSource {
 
       newNote.title = data.title
       newNote.description = data.description
-      newNote.tag = data.tag?.trim() ? data.tag.trim() : null
+      newNote.tag = data.tag?.trim() ?? ''
       newNote.user = user
+      if (data.channelId) {
+        newNote.channelId = data.channelId
+      }
 
       await newNote.save()
 
@@ -51,11 +56,28 @@ export default class NotesDataSource {
     userId: number,
     options?: {
       tag?: string
+      channelId?: string | null
     }
   ): Promise<Notes[]> {
     try {
+      const where: FindOptionsWhere<Notes> = {}
+      const rawChannelId = options?.channelId
+
+      if (typeof rawChannelId === 'string' && rawChannelId.trim().length > 0) {
+        where.channelId = rawChannelId.trim()
+      } else {
+        where.user = { id: userId }
+        if (rawChannelId === null) {
+          where.channelId = IsNull()
+        }
+      }
+
+      if (options?.tag) {
+        where.tag = options.tag
+      }
+
       const notes = await Notes.find({
-        where: { user: { id: userId }, ...(options ?? {}) },
+        where,
       })
 
       return notes

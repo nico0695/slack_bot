@@ -11,7 +11,10 @@ export class RedisConfig {
       url: REDIS_HOST,
     })
 
-    void this.#connect()
+    // Don't connect during tests to avoid async operations after tests complete
+    if (process.env.NODE_ENV !== 'test') {
+      void this.#connect()
+    }
   }
 
   #connect = async (): Promise<void> => {
@@ -20,6 +23,17 @@ export class RedisConfig {
       console.log('~ Redis connected!')
     } catch (error) {
       console.error('x Redis - connect erro= ', error.message)
+    }
+  }
+
+  #disconnect = async (): Promise<void> => {
+    try {
+      if (this.#redisClient.isReady) {
+        await this.#redisClient.disconnect()
+        console.log('~ Redis disconnected!')
+      }
+    } catch (error) {
+      console.error('x Redis - disconnect error= ', error.message)
     }
   }
 
@@ -36,5 +50,15 @@ export class RedisConfig {
     const instance = RedisConfig.getInstance()
 
     return instance.#redisClient
+  }
+
+  static async disconnect(): Promise<void> {
+    if (this.#instance) {
+      await this.#instance.#disconnect()
+    }
+  }
+
+  static reset(): void {
+    this.#instance = null
   }
 }

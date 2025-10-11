@@ -3,11 +3,14 @@ import { Router } from 'express'
 import GenericController from '../../../shared/modules/genericController'
 
 import ConversationsServices from '../services/conversations.services'
+import MessageProcessor from '../services/messageProcessor.service'
+import ConversationFlowManager from '../services/conversationFlowManager.service'
 
 import { roleTypes } from '../shared/constants/openai'
 import { IConversation } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders, FlowKeys } from '../shared/constants/conversationFlow'
 import { SlackAuth, SlackAuthActions } from '../../../shared/middleware/auth'
+import { rPersonalConversationFlow } from '../repositories/redis/redis.constants'
 
 export default class ConversationsController extends GenericController {
   static #instance: ConversationsController
@@ -15,11 +18,15 @@ export default class ConversationsController extends GenericController {
   public router: Router
 
   #conversationServices: ConversationsServices
+  #messageProcessor: MessageProcessor
+  #flowManager: ConversationFlowManager
 
   private constructor() {
     super()
 
     this.#conversationServices = ConversationsServices.getInstance()
+    this.#messageProcessor = MessageProcessor.getInstance()
+    this.#flowManager = ConversationFlowManager.getInstance()
 
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
@@ -114,7 +121,7 @@ export default class ConversationsController extends GenericController {
   }
 
   /**
-   * Manage conversation flow between users and bot
+   * Manage conversation flow between users and bot (unified for personal and channels)
    */
   @SlackAuth
   public async conversationFlow(data: any): Promise<void> {
@@ -124,95 +131,140 @@ export default class ConversationsController extends GenericController {
       const incomingMessage = String(payload.text ?? '')
       const normalizedMessage = incomingMessage.trim().toLowerCase()
 
-      // Personal conversation
-      if (payload.channel_type === 'im') {
-        const userData = this.userData
+      const isPersonal = payload.channel_type === 'im'
+      const userData = this.userData
 
-        if (!userData) {
-          say('Ups! No se pudo obtener tu información 🤷‍♂️')
-          return
-        }
+      if (!userData) {
+        say('Ups! No se pudo obtener tu información 🤷‍♂️')
+      return
+    }
 
-        if (normalizedMessage === 'h' || normalizedMessage === 'help') {
-          const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id)
-          say(quickHelp ?? 'No pude mostrar tu resumen ahora mismo.')
-          return
-        }
-
-        const newMessage: string = incomingMessage
-
-        const newResponse = await this.#conversationServices.generateAssistantConversation(
-          newMessage,
-          userData?.id ?? payload.user,
-          userData?.id.toString().padStart(8, '9') ?? payload.user,
-          ConversationProviders.SLACK
-        )
-
-        if (newResponse) {
-          say(newResponse?.contentBlock ?? newResponse.content)
-        }
-        return
-      }
-
-      // Channel conversation
-      if (normalizedMessage === 'h' || normalizedMessage === 'help') {
-        const userData = this.userData
-        if (!userData) {
-          say('Ups! No se pudo obtener tu información 🤷‍♂️')
-          return
-        }
-
-        const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id)
+    // Handle help command
+    if (normalizedMessage === 'h' || normalizedMessage === 'help') {
+      const scopedChannelId =
+        !isPersonal && typeof payload.channel === 'string' ? payload.channel.trim() : undefined
+      const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id, {
+        channelId: scopedChannelId,
+        isChannelContext: !isPersonal,
+      })
         say(quickHelp ?? 'No pude mostrar tu resumen ahora mismo.')
         return
-      }
+    }
 
-      const message: string = incomingMessage
+      // Determine flow key (personal uses userId, channels use channelId)
+      const flowKey = isPersonal
+        ? rPersonalConversationFlow(userData.id.toString())
+        : payload.channel
 
-      switch (message.toLocaleLowerCase()) {
+      // Handle flow commands (start/end/show)
+      switch (normalizedMessage) {
         case FlowKeys.START: {
-          const response = await this.#conversationServices.startConversationFlow(
-            payload.channel,
-            ChannelType.SLACK
-          )
+          const response = await this.#flowManager.startFlow(flowKey, ChannelType.SLACK)
           say(response ?? 'No se pudo iniciar la conversación 🤷‍♂️')
-          break
+          return
         }
         case FlowKeys.END: {
-          const response = await this.#conversationServices.endConversationFlow(payload.channel)
+          const response = await this.#flowManager.endFlow(flowKey)
           say(response ?? 'No se pudo finalizar la conversación 🤷‍♂️')
-          break
+          return
         }
         case FlowKeys.SHOW: {
           const conversation = await this.#conversationServices.showConversationFlow(
-            payload.channel,
+            flowKey,
             body.team_id
           )
           say(conversation?.join('\n') ?? 'No hay ninguna conversación guardada 🤷‍♂️')
-          break
-        }
-
-        default: {
-          const conversationStarted = await this.#conversationServices.conversationFlowStarted(
-            payload.channel
-          )
-
-          if (conversationStarted) {
-            const newResponse = await this.#conversationServices.generateConversationFlow(
-              message,
-              payload.user,
-              payload.channel
-            )
-
-            say(newResponse?.content ?? 'No existe una conversación en curso en este canal.')
-          }
-
-          break
+          return
         }
       }
+
+      // Determine channelId for entity creation (null for IM, channelId for channels)
+      const channelId = isPersonal ? undefined : payload.channel
+
+      // Check if flow is active
+      const flowActive = await this.#flowManager.isFlowActive(flowKey)
+
+      if (flowActive) {
+        // Flow mode: send with context
+        await this.#handleFlowMessage(
+          incomingMessage,
+          payload.user,
+          flowKey,
+          userData.id,
+          channelId,
+          say
+        )
+      } else {
+        // Assistant mode: process as single message
+        await this.#handleAssistantMessage(incomingMessage, userData.id, isPersonal, channelId, say)
+      }
     } catch (error) {
+      console.log('conversationFlow - error=', error)
       say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
     }
+  }
+
+  /**
+   * Handle message in flow mode (with context)
+   */
+  #handleFlowMessage = async (
+    message: string,
+    userSlackId: string,
+    flowKey: string,
+    userId: number,
+    channelId: string | undefined,
+    say: any
+  ): Promise<void> => {
+    // Check if should skip AI generation
+    if (this.#messageProcessor.shouldSkipAI(message)) {
+      const cleanMessage = this.#messageProcessor.cleanSkipFlag(message)
+      await this.#conversationServices.sendMessageToConversationFlow(
+        cleanMessage,
+        userSlackId,
+        flowKey
+      )
+      return
+    }
+
+    // Generate with AI using full context
+    const newResponse = await this.#conversationServices.generateConversationFlow(
+      message,
+      userSlackId,
+      flowKey
+    )
+
+    if (newResponse) {
+      say(newResponse.content)
+    }
+  }
+
+  /**
+   * Handle message in assistant mode (single message)
+   */
+  #handleAssistantMessage = async (
+    message: string,
+    userId: number,
+    isPersonal: boolean,
+    channelId: string | undefined,
+    say: any
+  ): Promise<void> => {
+    // Process with MessageProcessor
+    const isChannelContext = !isPersonal
+    const scopedChannelId =
+      typeof channelId === 'string' && channelId.trim().length > 0 ? channelId.trim() : undefined
+    const result = await this.#messageProcessor.processAssistantMessage(
+      message,
+      userId,
+      scopedChannelId,
+      isChannelContext
+    )
+
+    if (result.response) {
+      say(result.response.contentBlock ?? result.response.content)
+    }
+
+    // If personal and no assistant response, still nothing to do (old behavior maintained)
+    // If channel and no assistant response, just acknowledge (nothing to say)
   }
 
   @SlackAuthActions
@@ -234,7 +286,15 @@ export default class ConversationsController extends GenericController {
       return
     }
 
-    const response = await this.#conversationServices.handleAction(parsedAction, userData.id)
+    const rawChannelId = String(body?.channel?.id ?? '')
+    const channelType = String(body?.channel?.type ?? '')
+    const isChannelContext = channelType !== 'im' && rawChannelId.trim().length > 0
+    const scopedChannelId = isChannelContext ? rawChannelId.trim() : undefined
+
+    const response = await this.#conversationServices.handleAction(parsedAction, userData.id, {
+      channelId: scopedChannelId,
+      isChannelContext,
+    })
 
     await say(response ?? 'No se pudo procesar la acción 🤷‍♂️')
   }

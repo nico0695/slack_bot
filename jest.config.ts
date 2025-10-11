@@ -17,6 +17,7 @@ const config: Config = {
   moduleNameMapper: {
     '^(\\.+/.*)\\.js$': '$1',
   },
+  setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
 }
 
 export default config
