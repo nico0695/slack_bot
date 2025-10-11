@@ -5,7 +5,7 @@ export interface ITask {
   userId: number
   title: string
   description: string
-  status: TaskStatus
-  alertDate?: Date
+  status?: TaskStatus
+  alertDate?: Date | null
   tag?: string
 }
