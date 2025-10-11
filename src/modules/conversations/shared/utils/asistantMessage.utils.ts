@@ -41,7 +41,7 @@ export class AssistantMessage {
         messageConfig = assistantMessageConfig[this.variable]
 
         // if variable has defaultValue set it, else initialize valueStored
-        if (messageConfig.defaultValue !== null) {
+        if (messageConfig?.defaultValue !== null) {
           this.value = messageConfig.defaultValue
         } else {
           valueStored = []

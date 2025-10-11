@@ -49,8 +49,7 @@ COPY ./build /app/build
 COPY ./package.json /app/package.json
 COPY ./package-lock.json /app/package-lock.json
 
-WORKDIR /app
-RUN npm install
+RUN cd app && NODE_ENV=$NODE_ENV npm install
 
 # Expose the port your app is running on (e.g., 3000)
 EXPOSE 4000
