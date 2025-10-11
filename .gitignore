@@ -3,13 +3,22 @@
 /build
 
 .vscode/
-.env
+.env*
 
 /*.rdb
 /src/database/*
 
 /src/assets/*
 
+/.claude
+/logs
+/scripts
 .build-docker.sh
 
 /coverage
+
+
+
+AGENTS.md
+CLAUDE.md
+GEMINI.md

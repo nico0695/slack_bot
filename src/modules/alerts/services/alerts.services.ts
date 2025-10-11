@@ -4,7 +4,6 @@ import { IAlertToNotify, IAlert } from '../shared/interfaces/alerts.interfaces'
 
 import AlertsDataSource from '../repositories/database/alerts.dataSource'
 import { UsersRedis } from '../../users/repositories/redis/users.redis'
-import { RedisRepository } from '../../conversations/repositories/redis/conversations.redis'
 
 import { formatTextToDate } from '../../../shared/utils/dates.utils'
 
@@ -13,12 +12,10 @@ export default class AlertsServices {
 
   #alertsDataSource: AlertsDataSource
   #usersRedis: UsersRedis
-  #redisRepository: RedisRepository
 
   private constructor() {
     this.#alertsDataSource = AlertsDataSource.getInstance()
     this.#usersRedis = UsersRedis.getInstance()
-    this.#redisRepository = RedisRepository.getInstance()
   }
 
   static getInstance(): AlertsServices {
@@ -40,7 +37,8 @@ export default class AlertsServices {
   public async createAssistantAlert(
     userId: number,
     dateText: string,
-    message: string
+    message: string,
+    channelId?: string
   ): Promise<GenericResponse<Alerts>> {
     try {
       const date = formatTextToDate(dateText)
@@ -49,6 +47,7 @@ export default class AlertsServices {
         userId,
         date,
         message,
+        channelId,
       })
 
       return {
@@ -255,11 +254,6 @@ export default class AlertsServices {
   public async deleteAlert(alertId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
       const res = await this.#alertsDataSource.deleteAlerts(alertId, userId)
-
-      // Clean up alert metadata from Redis when alert is deleted
-      if (res > 0) {
-        await this.#redisRepository.deleteAlertMetadata(alertId)
-      }
 
       return {
         data: res > 0,

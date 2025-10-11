@@ -40,6 +40,7 @@ export default class TasksServices {
       alertDate?: string
       status?: TaskStatus
       tag?: string
+      channelId?: string
     } = {}
   ): Promise<GenericResponse<Tasks>> {
     try {
@@ -54,6 +55,10 @@ export default class TasksServices {
 
       if (sanitizedTag && sanitizedTag.length > 0) {
         payload.tag = sanitizedTag
+      }
+
+      if (options.channelId) {
+        payload.channelId = options.channelId
       }
 
       const response = await this.#tasksDataSource.createTask(payload)
@@ -96,6 +101,7 @@ export default class TasksServices {
     userId: number,
     options?: {
       tag?: string
+      channelId?: string | null
     }
   ): Promise<GenericResponse<Tasks[]>> {
     try {
