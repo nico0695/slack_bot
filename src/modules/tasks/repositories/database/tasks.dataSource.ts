@@ -33,8 +33,8 @@ export default class TasksDataSource {
       newTask.description = data.description
       newTask.status = data.status
       newTask.alertDate = data.alertDate ?? null
-      const trimmedTag = data.tag?.trim();
-      newTask.tag = trimmedTag ? trimmedTag : null
+      const trimmedTag = data.tag?.trim()
+      newTask.tag = trimmedTag ?? null
       newTask.user = user
 
       await newTask.save()
