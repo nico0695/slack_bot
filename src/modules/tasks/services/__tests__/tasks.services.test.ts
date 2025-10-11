@@ -70,6 +70,27 @@ describe('TasksServices', () => {
         status: TaskStatus.PENDING,
       })
     })
+
+    it('trims tag input and ignores empty values', async () => {
+      createTaskMock.mockResolvedValue({ id: 3 })
+
+      await services.createAssistantTask(5, 'Task', 'Desc', { tag: ' team ' })
+
+      expect(createTaskMock).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          userId: 5,
+          tag: 'team',
+        })
+      )
+
+      await services.createAssistantTask(5, 'Task', 'Desc', { tag: '   ' })
+
+      expect(createTaskMock).toHaveBeenNthCalledWith(
+        2,
+        expect.not.objectContaining({ tag: expect.anything() })
+      )
+    })
   })
 
   it('creates task via repository', async () => {

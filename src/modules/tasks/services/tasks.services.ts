@@ -39,16 +39,24 @@ export default class TasksServices {
     options: {
       alertDate?: string
       status?: TaskStatus
+      tag?: string
     } = {}
   ): Promise<GenericResponse<Tasks>> {
     try {
-      const response = await this.#tasksDataSource.createTask({
+      const sanitizedTag = options.tag?.trim()
+      const payload: ITask = {
         userId,
         title,
         description,
         alertDate: options.alertDate ? formatTextToDate(options.alertDate) : null,
         status: options.status ?? TaskStatus.PENDING,
-      })
+      }
+
+      if (sanitizedTag && sanitizedTag.length > 0) {
+        payload.tag = sanitizedTag
+      }
+
+      const response = await this.#tasksDataSource.createTask(payload)
 
       return {
         data: response,
@@ -84,9 +92,14 @@ export default class TasksServices {
    * @param userId number - User id
    * @returns
    */
-  public async getTasksByUserId(userId: number): Promise<GenericResponse<Tasks[]>> {
+  public async getTasksByUserId(
+    userId: number,
+    options?: {
+      tag?: string
+    }
+  ): Promise<GenericResponse<Tasks[]>> {
     try {
-      const response = await this.#tasksDataSource.getTasksByUserId(userId)
+      const response = await this.#tasksDataSource.getTasksByUserId(userId, options)
 
       return {
         data: response,

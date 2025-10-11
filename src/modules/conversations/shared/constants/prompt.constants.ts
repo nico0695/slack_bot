@@ -14,8 +14,8 @@ CLASIFICACIÓN RÁPIDA (no menciones esto):
 
 COMANDOS (no abuses de ellos; sugiérelos si agiliza):
   - Alerta: .a 2h Revisar logs | .alert 45m Revisar servicio
-  - Nota:   .n Idea X | .note Reunión mañana
-  - Tarea:  .t Actualizar reporte | .task Preparar informe
+  - Nota:   .n Idea X -d Detalle breve (usa -t etiqueta opcional, ej: -t soporte)
+  - Tarea:  .t Actualizar reporte -d Detalle (-t etiqueta opcional; -l lista todas; -lt ventas filtra por tag, sin valor -> lista todo)
   - Pregunta: .q ¿...? | .question ¿...?
 
 FORMATO TIEMPO ALERTA:
@@ -77,7 +77,7 @@ OBJ: Responder solo lo imprescindible para crear, listar o contestar.
 CLAVES INTENCIÓN (no las menciones):
   recordar+duración→alerta | idea/dato→nota | acción pendiente→tarea | ver lista→listar | pregunta abierta→respuesta.
 
-COMANDOS (sugerir solo si acelera): .a/.alert | .n/.note | .t/.task | .q/.question
+COMANDOS (sugerir solo si acelera): .a/.alert | .n/.note | .t/.task | .q/.question (usa -d para descripción y -t etiqueta opcional; -l lista todo; -lt <tag> filtra, sin valor -> todos)
 TIEMPO ALERTA:
   Relativo: [w][d][h][m][s] (1w2d, 2d5h, 2h30m, 45m).
   Natural a absoluto usando HOY_ES: "hoy 11 de la noche"→HOY_ES 23:00; "mañana 8"→HOY_ES+1 08:00; etc.
@@ -116,16 +116,16 @@ export const assistantPromptFlags = `
      - Sin campos extra obligatorios.
 
    3) task.create
-     - Campos: title (obligatorio), description (opcional)
+     - Campos: title (obligatorio), description (opcional), tag (opcional, una sola palabra sin espacios, omitir si no aplica)
 
    4) task.list
-     - Sin campos extra obligatorios.
+     - Campo opcional: tag (si el usuario pide filtrar por etiqueta, inclúyela; si no, omitir o dejar "").
 
    5) note.create
-     - Campos: title (obligatorio), description (opcional), tag (opcional, una sola palabra sin espacios, deriva de contexto si claro; si no, vacío)
+     - Campos: title (obligatorio), description (opcional), tag (opcional, una sola palabra sin espacios, deriva de contexto si claro; si no, omitir)
 
    6) note.list
-     - Sin campos extra obligatorios.
+     - Campo opcional: tag (solo incluir si el usuario menciona una etiqueta específica; sin etiqueta -> todas las notas).
 
    7) question
      - No agregar campos extra.
@@ -150,9 +150,9 @@ alert.create: time, title.
   time relativo [w][d][h][m][s] O fecha/hora exacta (YYYY-MM-DD HH:mm) O referencia natural HOY_ES. Si solo hay tiempo sin descripción -> title="alerta".
   title breve; default "alerta" cuando no haya texto del usuario.
 
-task.create: title (oblig), description (opc).
+task.create: title (oblig), description (opc), tag (opc, una palabra; omite si no aplica).
 note.create: title (oblig), description (opc), tag (opc).
-*.list: sin extras.
+*.list: tag opcional para filtrar (si no se menciona, omítelo o usa "").
 question: sin extras.
 search: query optimizada si requiere datos actuales.
 

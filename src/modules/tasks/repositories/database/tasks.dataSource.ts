@@ -33,6 +33,7 @@ export default class TasksDataSource {
       newTask.description = data.description
       newTask.status = data.status
       newTask.alertDate = data.alertDate ?? null
+      newTask.tag = data.tag?.trim() ? data.tag.trim() : null
       newTask.user = user
 
       await newTask.save()
@@ -48,10 +49,21 @@ export default class TasksDataSource {
    * @param userId number - User id
    * @returns
    */
-  async getTasksByUserId(userId: number): Promise<Tasks[]> {
+  async getTasksByUserId(
+    userId: number,
+    options?: {
+      tag?: string
+    }
+  ): Promise<Tasks[]> {
     try {
+      const where: { user: { id: number }; tag?: string } = { user: { id: userId } }
+
+      if (options?.tag) {
+        where.tag = options.tag
+      }
+
       const tasks = await Tasks.find({
-        where: { user: { id: userId } },
+        where,
       })
 
       return tasks

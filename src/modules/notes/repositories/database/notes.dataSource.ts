@@ -31,7 +31,7 @@ export default class NotesDataSource {
 
       newNote.title = data.title
       newNote.description = data.description
-      newNote.tag = data.tag
+      newNote.tag = data.tag?.trim() ? data.tag.trim() : null
       newNote.user = user
 
       await newNote.save()
