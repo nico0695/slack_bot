@@ -101,6 +101,7 @@ export default class TasksServices {
     userId: number,
     options?: {
       tag?: string
+      channelId?: string | null
     }
   ): Promise<GenericResponse<Tasks[]>> {
     try {

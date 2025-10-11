@@ -136,15 +136,20 @@ export default class ConversationsController extends GenericController {
 
       if (!userData) {
         say('Ups! No se pudo obtener tu información 🤷‍♂️')
-        return
-      }
+      return
+    }
 
-      // Handle help command
-      if (normalizedMessage === 'h' || normalizedMessage === 'help') {
-        const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id)
+    // Handle help command
+    if (normalizedMessage === 'h' || normalizedMessage === 'help') {
+      const scopedChannelId =
+        !isPersonal && typeof payload.channel === 'string' ? payload.channel.trim() : undefined
+      const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id, {
+        channelId: scopedChannelId,
+        isChannelContext: !isPersonal,
+      })
         say(quickHelp ?? 'No pude mostrar tu resumen ahora mismo.')
         return
-      }
+    }
 
       // Determine flow key (personal uses userId, channels use channelId)
       const flowKey = isPersonal
@@ -244,7 +249,15 @@ export default class ConversationsController extends GenericController {
     say: any
   ): Promise<void> => {
     // Process with MessageProcessor
-    const result = await this.#messageProcessor.processAssistantMessage(message, userId, channelId)
+    const isChannelContext = !isPersonal
+    const scopedChannelId =
+      typeof channelId === 'string' && channelId.trim().length > 0 ? channelId.trim() : undefined
+    const result = await this.#messageProcessor.processAssistantMessage(
+      message,
+      userId,
+      scopedChannelId,
+      isChannelContext
+    )
 
     if (result.response) {
       say(result.response.contentBlock ?? result.response.content)
@@ -273,7 +286,15 @@ export default class ConversationsController extends GenericController {
       return
     }
 
-    const response = await this.#conversationServices.handleAction(parsedAction, userData.id)
+    const rawChannelId = String(body?.channel?.id ?? '')
+    const channelType = String(body?.channel?.type ?? '')
+    const isChannelContext = channelType !== 'im' && rawChannelId.trim().length > 0
+    const scopedChannelId = isChannelContext ? rawChannelId.trim() : undefined
+
+    const response = await this.#conversationServices.handleAction(parsedAction, userData.id, {
+      channelId: scopedChannelId,
+      isChannelContext,
+    })
 
     await say(response ?? 'No se pudo procesar la acción 🤷‍♂️')
   }

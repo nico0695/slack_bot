@@ -186,6 +186,21 @@ export default class ConversationsServices {
     await this.#redisRepository.saveAlertSnoozeConfig(userId, { defaultSnoozeMinutes: minutes })
   }
 
+  #getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
+    if (!isChannelContext) {
+      return null
+    }
+
+    if (typeof channelId === 'string') {
+      const trimmed = channelId.trim()
+      if (trimmed.length > 0) {
+        return trimmed
+      }
+    }
+
+    return null
+  }
+
   #buildAssistantResponse = (content: string, block?: { blocks: any[] }): IConversation => {
     return {
       role: roleTypes.assistant,
@@ -280,7 +295,7 @@ export default class ConversationsServices {
         scope = 'pending'
       }
 
-      const result = await this.#listAlertsByScope(userId, scope)
+      const result = await this.#listAlertsByScope(userId, scope, null)
 
       if (typeof result === 'string') {
         return this.#buildAssistantResponse(result)
@@ -947,7 +962,18 @@ export default class ConversationsServices {
       const { conversation: conversationStored } = conversationFlow
 
       // Use MessageProcessor to handle the message
-      const result = await this.#messageProcessor.processAssistantMessage(message, userId)
+      const trimmedChannelId = channelId.trim()
+      const isSlackChannel =
+        provider === ConversationProviders.SLACK &&
+        typeof trimmedChannelId === 'string' &&
+        /^[CG]/.test(trimmedChannelId)
+
+      const result = await this.#messageProcessor.processAssistantMessage(
+        message,
+        userId,
+        trimmedChannelId,
+        isSlackChannel
+      )
       const responseMessage = result.response
 
       // Add messages to conversation history (limit to last 10)
@@ -1306,7 +1332,11 @@ export default class ConversationsServices {
       operation: string
       targetId: number
     },
-    userId: number
+    userId: number,
+    context: {
+      channelId?: string
+      isChannelContext?: boolean
+    } = {}
   ): Promise<string | { blocks: any[] }> => {
     const entity = typeof data.entity === 'string' ? data.entity.toLowerCase() : ''
     const operation = typeof data.operation === 'string' ? data.operation.toLowerCase() : ''
@@ -1319,11 +1349,11 @@ export default class ConversationsServices {
     try {
       switch (entity) {
         case 'alert':
-          return await this.#handleAlertAction(operation, targetId, userId)
+          return await this.#handleAlertAction(operation, targetId, userId, context)
         case 'note':
-          return await this.#handleNoteAction(operation, targetId, userId)
+          return await this.#handleNoteAction(operation, targetId, userId, context)
         case 'task':
-          return await this.#handleTaskAction(operation, targetId, userId)
+          return await this.#handleTaskAction(operation, targetId, userId, context)
         case 'assistant':
           return await this.#handleAssistantAction(operation, userId)
         default:
@@ -1388,9 +1418,12 @@ export default class ConversationsServices {
 
   #listAlertsByScope = async (
     userId: number,
-    scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved'
+    scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved',
+    channelId: string | null
   ): Promise<string | { blocks: any[] }> => {
-    const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {})
+    const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {
+      channelId,
+    })
     if (alertsRes.error) {
       return 'No se pudieron obtener las alertas. 😅'
     }
@@ -1475,8 +1508,14 @@ export default class ConversationsServices {
   #handleAlertAction = async (
     operation: string,
     targetId: number,
-    userId: number
+    userId: number,
+    context: { channelId?: string; isChannelContext?: boolean }
   ): Promise<string | { blocks: any[] }> => {
+    const scopeChannelId = this.#getScopeChannelId(
+      context.channelId,
+      context.isChannelContext ?? false
+    )
+
     switch (operation) {
       case 'delete': {
         const deleteRes = await this.#alertsServices.deleteAlert(targetId, userId)
@@ -1489,7 +1528,9 @@ export default class ConversationsServices {
       }
 
       case 'detail': {
-        const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {})
+        const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {
+          channelId: scopeChannelId,
+        })
         if (alertsRes.error) {
           return 'No se pudieron obtener las alertas. 😅'
         }
@@ -1523,22 +1564,22 @@ export default class ConversationsServices {
         return await this.#handleAlertResolve(targetId, userId)
 
       case 'list_overdue':
-        return await this.#listAlertsByScope(userId, 'overdue')
+        return await this.#listAlertsByScope(userId, 'overdue', scopeChannelId)
 
       case 'list_snoozed':
-        return await this.#listAlertsByScope(userId, 'snoozed')
+        return await this.#listAlertsByScope(userId, 'snoozed', scopeChannelId)
 
       case 'list_all':
-        return await this.#listAlertsByScope(userId, 'all')
+        return await this.#listAlertsByScope(userId, 'all', scopeChannelId)
 
       case 'list_pending':
-        return await this.#listAlertsByScope(userId, 'pending')
+        return await this.#listAlertsByScope(userId, 'pending', scopeChannelId)
 
       case 'list_resolved':
-        return await this.#listAlertsByScope(userId, 'resolved')
+        return await this.#listAlertsByScope(userId, 'resolved', scopeChannelId)
 
       case 'list':
-        return await this.#listAlertsByScope(userId, 'pending')
+        return await this.#listAlertsByScope(userId, 'pending', scopeChannelId)
 
       default:
         return 'Acción no reconocida.'
@@ -1548,8 +1589,14 @@ export default class ConversationsServices {
   #handleNoteAction = async (
     operation: string,
     targetId: number,
-    userId: number
+    userId: number,
+    context: { channelId?: string; isChannelContext?: boolean }
   ): Promise<string | { blocks: any[] }> => {
+    const scopeChannelId = this.#getScopeChannelId(
+      context.channelId,
+      context.isChannelContext ?? false
+    )
+
     switch (operation) {
       case 'delete': {
         const deleteRes = await this.#notesServices.deleteNote(targetId, userId)
@@ -1562,7 +1609,9 @@ export default class ConversationsServices {
       }
 
       case 'detail': {
-        const notesRes = await this.#notesServices.getNotesByUserId(userId)
+        const notesRes = await this.#notesServices.getNotesByUserId(userId, {
+          channelId: scopeChannelId,
+        })
         if (notesRes.error) {
           return 'No se pudieron obtener las notas. 😅'
         }
@@ -1576,7 +1625,9 @@ export default class ConversationsServices {
       }
 
       case 'list': {
-        const notesRes = await this.#notesServices.getNotesByUserId(userId)
+        const notesRes = await this.#notesServices.getNotesByUserId(userId, {
+          channelId: scopeChannelId,
+        })
         if (notesRes.error) {
           return 'No se pudieron obtener las notas. 😅'
         }
@@ -1595,8 +1646,14 @@ export default class ConversationsServices {
   #handleTaskAction = async (
     operation: string,
     targetId: number,
-    userId: number
+    userId: number,
+    context: { channelId?: string; isChannelContext?: boolean }
   ): Promise<string | { blocks: any[] }> => {
+    const scopeChannelId = this.#getScopeChannelId(
+      context.channelId,
+      context.isChannelContext ?? false
+    )
+
     switch (operation) {
       case 'delete': {
         const deleteRes = await this.#tasksServices.deleteTask(targetId, userId)
@@ -1609,7 +1666,9 @@ export default class ConversationsServices {
       }
 
       case 'detail': {
-        const tasksRes = await this.#tasksServices.getTasksByUserId(userId)
+        const tasksRes = await this.#tasksServices.getTasksByUserId(userId, {
+          channelId: scopeChannelId,
+        })
         if (tasksRes.error) {
           return 'No se pudieron obtener las tareas. 😅'
         }
@@ -1623,7 +1682,9 @@ export default class ConversationsServices {
       }
 
       case 'list': {
-        const tasksRes = await this.#tasksServices.getTasksByUserId(userId)
+        const tasksRes = await this.#tasksServices.getTasksByUserId(userId, {
+          channelId: scopeChannelId,
+        })
         if (tasksRes.error) {
           return 'No se pudieron obtener las tareas. 😅'
         }
@@ -1658,12 +1719,20 @@ export default class ConversationsServices {
     return `Tarea #${task.id}\n• Título: ${task.title}\n• Estado: ${task.status}\n• Descripción: ${task.description}\n• Recordatorio: ${dueDate}`
   }
 
-  getAssistantQuickHelp = async (userId: number): Promise<{ blocks: any[] } | string | null> => {
+  getAssistantQuickHelp = async (
+    userId: number,
+    options: { channelId?: string; isChannelContext?: boolean } = {}
+  ): Promise<{ blocks: any[] } | string | null> => {
     try {
+      const scopeChannelId = this.#getScopeChannelId(
+        options.channelId,
+        options.isChannelContext ?? false
+      )
+
       const [alertsRes, notesRes, tasksRes] = await Promise.all([
-        this.#alertsServices.getAlertsByUserId(userId, {}),
-        this.#notesServices.getNotesByUserId(userId),
-        this.#tasksServices.getTasksByUserId(userId),
+        this.#alertsServices.getAlertsByUserId(userId, { channelId: scopeChannelId }),
+        this.#notesServices.getNotesByUserId(userId, { channelId: scopeChannelId }),
+        this.#tasksServices.getTasksByUserId(userId, { channelId: scopeChannelId }),
       ])
 
       const alerts = alertsRes.data ?? []

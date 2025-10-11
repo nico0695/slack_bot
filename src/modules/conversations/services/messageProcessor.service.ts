@@ -68,7 +68,8 @@ export default class MessageProcessor {
   processAssistantMessage = async (
     message: string,
     userId: number,
-    channelId?: string
+    channelId?: string,
+    isChannelContext = false
   ): Promise<IProcessMessageResult> => {
     // Check if message should skip AI generation
     const shouldSkipAI = this.shouldSkipAI(message)
@@ -78,18 +79,42 @@ export default class MessageProcessor {
     }
 
     // Try assistant commands first (snooze, repeat, alerts list, etc)
-    const commandResponse = await this.#handleAssistantCommand(userId, message, channelId)
+    const commandResponse = await this.#handleAssistantCommand(
+      userId,
+      message,
+      channelId,
+      isChannelContext
+    )
     if (commandResponse) {
       return { response: commandResponse, shouldSkipAI: false }
     }
 
     // Try assistant variables/flags (.a, .t, .n, etc)
-    const variableResponse = await this.#manageAssistantVariables(userId, message, channelId)
+    const variableResponse = await this.#manageAssistantVariables(
+      userId,
+      message,
+      channelId,
+      isChannelContext
+    )
     if (variableResponse) {
       return { response: variableResponse, shouldSkipAI: false }
     }
 
     return { response: null, shouldSkipAI: false }
+  }
+
+  #getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
+    if (!isChannelContext) {
+      return null
+    }
+
+    if (typeof channelId === 'string') {
+      const trimmed = channelId.trim()
+      if (trimmed.length > 0) {
+        return trimmed
+      }
+    }
+    return null
   }
 
   /**
@@ -140,7 +165,8 @@ export default class MessageProcessor {
   #handleAssistantCommand = async (
     userId: number,
     message: string,
-    channelId?: string
+    channelId: string | undefined,
+    isChannelContext: boolean
   ): Promise<IConversation | null> => {
     const trimmed = message.trim()
     if (!trimmed) {
@@ -148,6 +174,7 @@ export default class MessageProcessor {
     }
 
     const lower = trimmed.toLowerCase()
+    const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
 
     const snoozeMatch = lower.match(/^snooze\s+#?(\d+)(?:\s+(\d+)([mh]))?/)
     if (snoozeMatch) {
@@ -223,7 +250,7 @@ export default class MessageProcessor {
         scope = 'pending'
       }
 
-      const result = await this.#listAlertsByScope(userId, scope)
+      const result = await this.#listAlertsByScope(userId, scope, scopeChannelId)
 
       if (typeof result === 'string') {
         return this.#buildAssistantResponse(result)
@@ -289,13 +316,20 @@ export default class MessageProcessor {
   #manageAssistantVariables = async (
     userId: number,
     message: string,
-    channelId?: string
+    channelId: string | undefined,
+    isChannelContext: boolean
   ): Promise<IConversation | null> => {
     const assistantMessage = new AssistantMessage(message)
+    const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
 
     if (!assistantMessage.variable) {
       // No variable found, try AI fallback
-      return await this.#intentFallbackRouter(userId, assistantMessage.cleanMessage, channelId)
+      return await this.#intentFallbackRouter(
+        userId,
+        assistantMessage.cleanMessage,
+        channelId,
+        isChannelContext
+      )
     }
 
     let responseMessage: IConversation | null = null
@@ -303,7 +337,10 @@ export default class MessageProcessor {
     switch (assistantMessage.variable) {
       case AssistantsVariables.ALERT: {
         if (assistantMessage.flags[AssistantsFlags.LIST]) {
-          const alerts = await this.#alertsServices.getAlertsByUserId(userId)
+          const alerts = await this.#alertsServices.getAlertsByUserId(userId, {
+            sent: false,
+            channelId: scopeChannelId,
+          })
           const alertsList = alerts.data ?? []
           const messageToResponse =
             alertsList.length > 0
@@ -356,7 +393,9 @@ export default class MessageProcessor {
 
       case AssistantsVariables.TASK: {
         const sendGeneralTaskList = async (): Promise<IConversation> => {
-          const tasks = await this.#tasksServices.getTasksByUserId(userId)
+          const tasks = await this.#tasksServices.getTasksByUserId(userId, {
+            channelId: scopeChannelId,
+          })
 
           const messageToResponse =
             tasks?.data?.length > 0
@@ -391,6 +430,7 @@ export default class MessageProcessor {
 
           const tasks = await this.#tasksServices.getTasksByUserId(userId, {
             tag: normalizedTag,
+            channelId: scopeChannelId,
           })
 
           const messageToResponse =
@@ -442,7 +482,9 @@ export default class MessageProcessor {
 
       case AssistantsVariables.NOTE: {
         const sendGeneralNotesList = async (): Promise<IConversation> => {
-          const notes = await this.#notesServices.getNotesByUserId(userId)
+          const notes = await this.#notesServices.getNotesByUserId(userId, {
+            channelId: scopeChannelId,
+          })
 
           const messageToResponse =
             notes?.data?.length > 0
@@ -477,6 +519,7 @@ export default class MessageProcessor {
 
           const notes = await this.#notesServices.getNotesByUserId(userId, {
             tag: normalizedTag,
+            channelId: scopeChannelId,
           })
 
           const messageToResponse =
@@ -562,10 +605,12 @@ export default class MessageProcessor {
   #intentFallbackRouter = async (
     userId: number,
     cleanMessage: string,
-    channelId?: string
+    channelId: string | undefined,
+    isChannelContext: boolean
   ): Promise<IConversation | null> => {
     try {
       if (!cleanMessage) return null
+      const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
 
       const classificationPrompt = [
         {
@@ -643,7 +688,9 @@ export default class MessageProcessor {
           }
         }
         case 'alert.list': {
-          const alerts = await this.#alertsServices.getAlertsByUserId(userId)
+          const alerts = await this.#alertsServices.getAlertsByUserId(userId, {
+            channelId: scopeChannelId,
+          })
           if (alerts.error) return null
           const alertsList = alerts.data ?? []
           const contentBlock = slackMsgUtils.msgAlertsList(alertsList)
@@ -683,10 +730,10 @@ export default class MessageProcessor {
             typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
               ? parsed.tag.trim()
               : undefined
-          const tasks = await this.#tasksServices.getTasksByUserId(
-            userId,
-            normalizedTag ? { tag: normalizedTag } : undefined
-          )
+          const taskFilters = normalizedTag
+            ? { tag: normalizedTag, channelId: scopeChannelId }
+            : { channelId: scopeChannelId }
+          const tasks = await this.#tasksServices.getTasksByUserId(userId, taskFilters)
           const totalTasks = Array.isArray(tasks.data) ? tasks.data.length : 0
           const tagLabel: string = normalizedTag ?? ''
           const tasksCountText: string = totalTasks.toString()
@@ -733,10 +780,10 @@ export default class MessageProcessor {
             typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
               ? parsed.tag.trim()
               : undefined
-          const notes = await this.#notesServices.getNotesByUserId(
-            userId,
-            normalizedTag ? { tag: normalizedTag } : undefined
-          )
+          const noteFilters = normalizedTag
+            ? { tag: normalizedTag, channelId: scopeChannelId }
+            : { channelId: scopeChannelId }
+          const notes = await this.#notesServices.getNotesByUserId(userId, noteFilters)
           const totalNotes = Array.isArray(notes.data) ? notes.data.length : 0
           const noteTagLabel: string = normalizedTag ?? ''
           const notesCountText = totalNotes.toString()
@@ -872,9 +919,12 @@ export default class MessageProcessor {
 
   #listAlertsByScope = async (
     userId: number,
-    scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved'
+    scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved',
+    channelId: string | null
   ): Promise<string | { blocks: any[] }> => {
-    const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {})
+    const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {
+      channelId,
+    })
     if (alertsRes.error) {
       return 'No se pudieron obtener las alertas. 😅'
     }

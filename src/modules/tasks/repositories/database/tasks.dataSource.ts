@@ -1,3 +1,5 @@
+import { FindOptionsWhere, IsNull } from 'typeorm'
+
 import { Tasks } from '../../../../entities/tasks'
 import { Users } from '../../../../entities/users'
 
@@ -57,10 +59,22 @@ export default class TasksDataSource {
     userId: number,
     options?: {
       tag?: string
+      channelId?: string | null
     }
   ): Promise<Tasks[]> {
     try {
-      const where: { user: { id: number }; tag?: string } = { user: { id: userId } }
+      const where: FindOptionsWhere<Tasks> = {}
+
+      const rawChannelId = options?.channelId
+
+      if (typeof rawChannelId === 'string' && rawChannelId.trim().length > 0) {
+        where.channelId = rawChannelId.trim()
+      } else {
+        where.user = { id: userId }
+        if (rawChannelId === null) {
+          where.channelId = IsNull()
+        }
+      }
 
       if (options?.tag) {
         where.tag = options.tag

@@ -93,6 +93,7 @@ export default class NotesServices {
     userId: number,
     options?: {
       tag?: string
+      channelId?: string | null
     }
   ): Promise<GenericResponse<Notes[]>> {
     try {

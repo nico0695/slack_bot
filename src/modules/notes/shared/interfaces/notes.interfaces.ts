@@ -5,5 +5,5 @@ export interface INote {
   tag?: string
 
   userId: number
-  channelId?: string
+  channelId?: string | null
 }
