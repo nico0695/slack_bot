@@ -50,6 +50,20 @@ describe('AlertsDataSource', () => {
 
     expect(findSpy).toHaveBeenCalledWith({
       where: { user: { id: 3 }, sent: true },
+      order: { date: 'ASC' },
+    })
+    expect(result).toBe(alerts)
+  })
+
+  it('retrieves alerts for user with default sent=false filter', async () => {
+    const alerts = [{ id: 2 }] as any
+    const findSpy = jest.spyOn(Alerts, 'find').mockResolvedValue(alerts)
+
+    const result = await dataSource.getAlertsByUserId(5)
+
+    expect(findSpy).toHaveBeenCalledWith({
+      where: { user: { id: 5 }, sent: false },
+      order: { date: 'ASC' },
     })
     expect(result).toBe(alerts)
   })
@@ -82,10 +96,7 @@ describe('AlertsDataSource', () => {
 
     const result = await dataSource.updateAlert(4, 2, { message: 'Hey' })
 
-    expect(Alerts.update).toHaveBeenCalledWith(
-      { id: 4, user: { id: 2 } },
-      { message: 'Hey' }
-    )
+    expect(Alerts.update).toHaveBeenCalledWith({ id: 4, user: { id: 2 } }, { message: 'Hey' })
     expect(refreshSpy).toHaveBeenCalledWith(4, 2)
     expect(result).toBe(refreshedAlert)
   })

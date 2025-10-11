@@ -66,10 +66,18 @@ export default class AlertsDataSource {
         where.user = { id: userId }
       }
 
+      // Filter sent = false by default unless explicitly overridden
+      if (!('sent' in restOptions)) {
+        where.sent = false
+      }
+
       Object.assign(where, restOptions)
 
       const alerts = await Alerts.find({
         where,
+        order: {
+          date: 'ASC',
+        },
       })
 
       return alerts
@@ -118,6 +126,7 @@ export default class AlertsDataSource {
             slackId: true,
             slackChannelId: true,
           },
+          channelId: true,
         },
         relations: ['user'],
         where: { date: LessThan(date), sent: false },
