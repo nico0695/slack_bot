@@ -1002,7 +1002,7 @@ export default class ConversationsServices {
           )
           const totalNotes = Array.isArray(notes.data) ? notes.data.length : 0
           const noteTagLabel: string = normalizedTag ?? ''
-          const notesCountText: string = totalNotes.toString()
+          const notesCountText = totalNotes.toString()
           if (notes.error) return null
           const contentBlock = slackMsgUtils.msgNotesList(notes.data ?? [])
           return {
