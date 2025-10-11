@@ -29,10 +29,15 @@ describe('OpenaiRepository', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.spyOn(console, 'error').mockImplementation(() => {})
     const fn = openaiMocks.createChatCompletion
     if (fn) {
       fn.mockReset()
     }
+  })
+
+  afterEach(() => {
+    ;(console.error as jest.Mock).mockRestore()
   })
 
   it('sends completion request using default model', async () => {
@@ -58,10 +63,9 @@ describe('OpenaiRepository', () => {
       data: { choices: [{ message: { role: 'assistant', content: 'classified' } }] },
     })
 
-    await repository.chatCompletion(
-      [{ role: 'user', content: 'hola' } as any],
-      { mode: 'classification' }
-    )
+    await repository.chatCompletion([{ role: 'user', content: 'hola' } as any], {
+      mode: 'classification',
+    })
 
     const payload = chatCompletion.mock.calls[0][0]
     expect(payload.model).toBe('gpt-4.1-nano')

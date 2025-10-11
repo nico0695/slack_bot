@@ -602,7 +602,7 @@ export default class ConversationsServices {
         }
 
         case AssistantsVariables.TASK: {
-          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+          const sendGeneralTaskList = async (): Promise<void> => {
             const tasks = await this.#tasksServices.getTasksByUserId(userId)
 
             const messageToResponse =
@@ -620,6 +620,39 @@ export default class ConversationsServices {
               contentBlock: messageBlockToResponse,
               provider: ConversationProviders.ASSISTANT,
             }
+          }
+
+          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+            await sendGeneralTaskList()
+
+            break
+          }
+
+          if (assistantMessage.flags[AssistantsFlags.LIST_TAG] !== undefined) {
+            const tagRaw = String(assistantMessage.flags[AssistantsFlags.LIST_TAG] ?? '')
+            const normalizedTag = tagRaw.trim()
+
+            if (!normalizedTag) {
+              await sendGeneralTaskList()
+              break
+            }
+
+            const tasks = await this.#tasksServices.getTasksByUserId(userId, {
+              tag: normalizedTag,
+            })
+
+            const messageToResponse =
+              tasks?.data?.length > 0
+                ? tasks?.data
+                    ?.map((task) => `• Id: _#${task.id}_ - *${task.title}*: ${task.description}`)
+                    .join('\n')
+                : 'No tienes tareas'
+
+            returnValue.responseMessage = {
+              role: roleTypes.assistant,
+              content: `#### Tareas - tag: ${normalizedTag} \n ` + messageToResponse,
+              provider: ConversationProviders.ASSISTANT,
+            }
 
             break
           }
@@ -628,10 +661,16 @@ export default class ConversationsServices {
             throw new Error('Ups! No se pudo crear la tarea, debes ingresar un título. 😅')
           }
 
+          const tagFlagRaw = (assistantMessage?.flags?.[AssistantsFlags.TAG] as string) ?? ''
+          const normalizedTaskTag = tagFlagRaw.trim()
+
           const task = await this.#tasksServices.createAssistantTask(
             userId,
             assistantMessage.value as string,
-            (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? ''
+            (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
+            {
+              tag: normalizedTaskTag || undefined,
+            }
           )
 
           if (task.error) {
@@ -651,7 +690,7 @@ export default class ConversationsServices {
         }
 
         case AssistantsVariables.NOTE: {
-          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+          const sendGeneralNotesList = async (): Promise<void> => {
             const notes = await this.#notesServices.getNotesByUserId(userId)
 
             const messageToResponse =
@@ -669,25 +708,25 @@ export default class ConversationsServices {
               contentBlock: messageBlockToResponse,
               provider: ConversationProviders.ASSISTANT,
             }
+          }
+
+          if (assistantMessage.flags[AssistantsFlags.LIST]) {
+            await sendGeneralNotesList()
 
             break
           }
 
           if (assistantMessage.flags[AssistantsFlags.LIST_TAG] !== undefined) {
-            const tag = assistantMessage.flags[AssistantsFlags.LIST_TAG] as string
+            const tagRaw = String(assistantMessage.flags[AssistantsFlags.LIST_TAG] ?? '')
+            const normalizedTag = tagRaw.trim()
 
-            if (!tag) {
-              returnValue.responseMessage = {
-                role: roleTypes.assistant,
-                content: 'Ups! Debes ingresar un tag para listar las notas. 😅',
-                provider: ConversationProviders.ASSISTANT,
-              }
-
+            if (!normalizedTag) {
+              await sendGeneralNotesList()
               break
             }
 
             const notes = await this.#notesServices.getNotesByUserId(userId, {
-              tag,
+              tag: normalizedTag,
             })
 
             const messageToResponse =
@@ -699,7 +738,7 @@ export default class ConversationsServices {
 
             returnValue.responseMessage = {
               role: roleTypes.assistant,
-              content: `#### Notas - tag: ${tag ?? ''} \n ` + messageToResponse,
+              content: `#### Notas - tag: ${normalizedTag} \n ` + messageToResponse,
               provider: ConversationProviders.ASSISTANT,
             }
 
@@ -710,11 +749,14 @@ export default class ConversationsServices {
             throw new Error('Ups! No se pudo crear la nota, debes ingresar un título. 😅')
           }
 
+          const noteTagRaw = (assistantMessage?.flags?.[AssistantsFlags.TAG] as string) ?? ''
+          const normalizedNoteTag = noteTagRaw.trim()
+
           const note = await this.#notesServices.createAssistantNote(
             userId,
             assistantMessage.value as string,
             (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
-            (assistantMessage?.flags?.[AssistantsFlags.TAG] as string) ?? ''
+            normalizedNoteTag || undefined
           )
 
           if (note.error) {
@@ -879,10 +921,17 @@ export default class ConversationsServices {
         }
         case 'task.create': {
           if (!parsed.title) return null
+          const normalizedTag =
+            typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
+              ? parsed.tag.trim()
+              : undefined
           const task = await this.#tasksServices.createAssistantTask(
             userId,
             parsed.title,
-            parsed.description || ''
+            parsed.description || '',
+            {
+              tag: normalizedTag,
+            }
           )
           if (task.error) return null
           const contentBlock = slackMsgUtils.msgTaskCreated(task.data)
@@ -894,7 +943,17 @@ export default class ConversationsServices {
           }
         }
         case 'task.list': {
-          const tasks = await this.#tasksServices.getTasksByUserId(userId)
+          const normalizedTag =
+            typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
+              ? parsed.tag.trim()
+              : undefined
+          const tasks = await this.#tasksServices.getTasksByUserId(
+            userId,
+            normalizedTag ? { tag: normalizedTag } : undefined
+          )
+          const totalTasks = Array.isArray(tasks.data) ? tasks.data.length : 0
+          const tagLabel: string = normalizedTag ?? ''
+          const tasksCountText: string = totalTasks.toString()
           ;(tasks.data || []).sort(
             (a: any, b: any) => +new Date(a.createdAt) - +new Date(b.createdAt)
           )
@@ -902,18 +961,26 @@ export default class ConversationsServices {
           const contentBlock = slackMsgUtils.msgTasksList(tasks.data ?? [])
           return {
             role: roleTypes.assistant,
-            content: parsed.successMessage || `Mostrando ${tasks.data?.length || 0} tareas`,
+            content:
+              parsed.successMessage ||
+              (normalizedTag
+                ? `Mostrando ${tasksCountText} tareas con tag "${tagLabel}"`
+                : `Mostrando ${tasksCountText} tareas`),
             contentBlock,
             provider: ConversationProviders.ASSISTANT,
           }
         }
         case 'note.create': {
           if (!parsed.title) return null
+          const normalizedTag =
+            typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
+              ? parsed.tag.trim()
+              : undefined
           const note = await this.#notesServices.createAssistantNote(
             userId,
             parsed.title,
             parsed.description || '',
-            parsed.tag || ''
+            normalizedTag
           )
           if (note.error) return null
           const contentBlock = slackMsgUtils.msgNoteCreated(note.data)
@@ -925,12 +992,26 @@ export default class ConversationsServices {
           }
         }
         case 'note.list': {
-          const notes = await this.#notesServices.getNotesByUserId(userId)
+          const normalizedTag =
+            typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
+              ? parsed.tag.trim()
+              : undefined
+          const notes = await this.#notesServices.getNotesByUserId(
+            userId,
+            normalizedTag ? { tag: normalizedTag } : undefined
+          )
+          const totalNotes = Array.isArray(notes.data) ? notes.data.length : 0
+          const noteTagLabel: string = normalizedTag ?? ''
+          const notesCountText = totalNotes.toString()
           if (notes.error) return null
           const contentBlock = slackMsgUtils.msgNotesList(notes.data ?? [])
           return {
             role: roleTypes.assistant,
-            content: parsed.successMessage || `Mostrando ${notes.data?.length || 0} notas`,
+            content:
+              parsed.successMessage ||
+              (normalizedTag
+                ? `Mostrando ${notesCountText} notas con tag "${noteTagLabel}"`
+                : `Mostrando ${notesCountText} notas`),
             contentBlock,
             provider: ConversationProviders.ASSISTANT,
           }

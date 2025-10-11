@@ -1,7 +1,12 @@
 import LeapRepository from '../repositories/leap/leap.repository'
 import ImagesDataSources from '../repositories/database/images.dataSource'
 import { LeapStatus } from '../shared/constants/leap'
-import { IImage, ILeapImages, IUserData } from '../shared/interfaces/images.interfaces'
+import {
+  IImage,
+  IInferaceJobResponse,
+  ILeapImages,
+  IUserData,
+} from '../shared/interfaces/images.interfaces'
 import { IPaginationOptions, IPaginationResponse } from '../../../shared/interfaces/pagination'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { Images } from '../../../entities/images'
@@ -58,12 +63,14 @@ export default class ImagesServices {
 
       let status = inference?.status
 
-      let returnValue = null
+      let returnValue: IInferaceJobResponse = null
 
       // Wait until inference is finished
       while (status !== LeapStatus.finished) {
         // ask for inference status and image generated
-        const inferaceJob = await this.#leapRepository.getInterfaceJob(inference?.inferenceId)
+        const inferaceJob: IInferaceJobResponse = await this.#leapRepository.getInterfaceJob(
+          inference?.inferenceId
+        )
 
         status = inferaceJob.state
 
@@ -75,13 +82,13 @@ export default class ImagesServices {
       if (returnValue !== null && returnValue.images.length > 0) {
         // Save images
         await Promise.all(
-          returnValue.images.map(async (image) => {
+          returnValue.images.map(async (image: ILeapImages) => {
             await this.#storeUserImages(userData, image, prompt)
           })
         )
 
         return returnValue.images
-          .map((image, index) => `Imagen #${index + 1}: ${image.uri}`)
+          .map((image: ILeapImages, index: number) => `Imagen #${index + 1}: ${image.uri}`)
           .join('\n')
       }
 

@@ -84,6 +84,12 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
       [AssistantsFlags.LIST]: {
         defaultValue: true,
       },
+      [AssistantsFlags.TAG]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.LIST_TAG]: {
+        defaultValue: null,
+      },
     },
   },
   [AssistantsVariables.NOTE]: {
