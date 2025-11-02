@@ -8,6 +8,7 @@ export enum AssistantsVariables {
   TASK = 'task',
   NOTE = 'note',
   QUESTION = 'question',
+  IMAGE = 'image',
 }
 
 export const assistantsVariablesKey: {
@@ -24,6 +25,10 @@ export const assistantsVariablesKey: {
 
   question: AssistantsVariables.QUESTION,
   q: AssistantsVariables.QUESTION,
+
+  image: AssistantsVariables.IMAGE,
+  img: AssistantsVariables.IMAGE,
+  i: AssistantsVariables.IMAGE,
 }
 
 export enum AssistantsFlags {
@@ -31,6 +36,10 @@ export enum AssistantsFlags {
   LIST = 'list',
   LIST_TAG = 'list_tag',
   TAG = 'tag',
+  SIZE = 'size',
+  QUALITY = 'quality',
+  STYLE = 'style',
+  NUMBER = 'number',
 }
 
 export const assistantFlagsKey: {
@@ -47,6 +56,18 @@ export const assistantFlagsKey: {
 
   listTag: AssistantsFlags.LIST_TAG,
   lt: AssistantsFlags.LIST_TAG,
+
+  size: AssistantsFlags.SIZE,
+  s: AssistantsFlags.SIZE,
+
+  quality: AssistantsFlags.QUALITY,
+  qty: AssistantsFlags.QUALITY,
+
+  style: AssistantsFlags.STYLE,
+  st: AssistantsFlags.STYLE,
+
+  number: AssistantsFlags.NUMBER,
+  num: AssistantsFlags.NUMBER,
 }
 
 interface IFlagOptions {
@@ -109,5 +130,29 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
   },
   [AssistantsVariables.QUESTION]: {
     defaultValue: true,
+  },
+  [AssistantsVariables.IMAGE]: {
+    defaultValue: null,
+    manyWords: true,
+    flags: {
+      [AssistantsFlags.LIST]: {
+        defaultValue: true,
+      },
+      [AssistantsFlags.LIST_TAG]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.SIZE]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.QUALITY]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.STYLE]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.NUMBER]: {
+        defaultValue: null,
+      },
+    },
   },
 }

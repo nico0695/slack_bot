@@ -43,9 +43,14 @@ describe('GeminiImagesRepository', () => {
     jest.clearAllMocks()
     mockGenerateImages.mockClear()
 
+    process.env.GEMINI_API_KEY = 'test-key'
     // Reset singleton instance for each test
     ;(GeminiImagesRepository as any).instance = undefined
     repository = GeminiImagesRepository.getInstance()
+  })
+
+  afterEach(() => {
+    delete process.env.GEMINI_API_KEY
   })
 
   describe('Singleton Pattern', () => {

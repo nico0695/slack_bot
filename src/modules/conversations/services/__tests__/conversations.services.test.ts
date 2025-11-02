@@ -41,6 +41,11 @@ const notesServicesMock = {
   getNotesByUserId: jest.fn(),
 }
 
+const imagesServicesMock = {
+  generateImageForAssistant: jest.fn(),
+  getImages: jest.fn(),
+}
+
 jest.mock('../../repositories/openai/openai.repository', () => ({
   __esModule: true,
   default: {
@@ -93,6 +98,13 @@ jest.mock('../../../notes/services/notes.services', () => ({
   },
 }))
 
+jest.mock('../../../images/services/images.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => imagesServicesMock,
+  },
+}))
+
 jest.mock('../../repositories/search/search.repository', () => ({
   __esModule: true,
   default: {
@@ -130,9 +142,9 @@ describe('ConversationsServices', () => {
 
       const result = await service.generateConversation(
         {
-        role: roleTypes.user,
-        content: 'hello',
-        provider: ConversationProviders.SLACK,
+          role: roleTypes.user,
+          content: 'hello',
+          provider: ConversationProviders.SLACK,
         },
         'user1',
         'channel1'
@@ -154,9 +166,9 @@ describe('ConversationsServices', () => {
 
       const result = await service.generateConversation(
         {
-        role: roleTypes.user,
-        content: 'hola',
-        provider: ConversationProviders.SLACK,
+          role: roleTypes.user,
+          content: 'hola',
+          provider: ConversationProviders.SLACK,
         },
         'user1'
       )

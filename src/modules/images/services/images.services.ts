@@ -4,6 +4,10 @@ import {
   IUserData,
   IImageRepository,
 } from '../shared/interfaces/images.interfaces'
+import {
+  IImageGenerationOptions,
+  IImageGenerationResponse,
+} from '../shared/interfaces/imageRepository.interface'
 import { IPaginationOptions, IPaginationResponse } from '../../../shared/interfaces/pagination'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { Images } from '../../../entities/images'
@@ -12,6 +16,7 @@ import {
   ImageRepositoryByType,
   getDefaultImageRepositoryType,
 } from '../shared/constants/imageRepository'
+import UsersServices from '../../users/services/users.services'
 
 /**
  * Images Service
@@ -102,6 +107,58 @@ export default class ImagesServices {
     } catch (error) {
       console.error('ImagesServices generateImages error:', error.message)
       return 'No se pudo generar la imagen'
+    }
+  }
+
+  /**
+   * Generate images for assistant (returns response object instead of formatted string)
+   *
+   * @param prompt - Text description of the image to generate
+   * @param userId - User ID for tracking
+   * @param options - Image generation options (size, quality, style, numberOfImages)
+   * @returns Image generation response with images array and provider info
+   */
+  generateImageForAssistant = async (
+    prompt: string,
+    userId: number,
+    options?: IImageGenerationOptions
+  ): Promise<IImageGenerationResponse | null> => {
+    try {
+      // Generate image using repository
+      const response = await this.#imageRepository.generateImage(prompt, options)
+
+      if (!response?.images?.length) {
+        return null
+      }
+
+      // Get user info for database storage
+      const userService = UsersServices.getInstance()
+      const user = await userService.getUserById(userId)
+
+      if (!user?.data) {
+        console.error('ImagesServices: User not found for ID:', userId)
+        return response // Return images but don't store
+      }
+
+      // Save all generated images to database
+      await Promise.all(
+        response.images.map(async (image) => {
+          const imageData: IImage = {
+            imageUrl: image.url,
+            inferenceId: response.inferenceId || image.id || 'unknown',
+            slackId: user.data.slackId,
+            slackTeamId: user.data.slackTeamId,
+            username: user.data.name,
+            prompt,
+          }
+          await this.#storeUserImages(imageData)
+        })
+      )
+
+      return response
+    } catch (error) {
+      console.error('ImagesServices generateImageForAssistant error:', error.message)
+      return null
     }
   }
 

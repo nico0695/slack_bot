@@ -71,13 +71,23 @@ HOY_ES: <fecha>
 
 // Versión ligera del prompt principal para usos donde se necesita máximo foco y mínimo contexto.
 export const assistantPromptLite = `
-ROL: Asistente organización (alertas, tareas, notas, preguntas).
+ROL: Asistente organización (alertas, tareas, notas, preguntas, imágenes).
 OBJ: Responder solo lo imprescindible para crear, listar o contestar.
 
 CLAVES INTENCIÓN (no las menciones):
-  recordar+duración→alerta | idea/dato→nota | acción pendiente→tarea | ver lista→listar | pregunta abierta→respuesta.
+  recordar+duración→alerta | idea/dato→nota | acción pendiente→tarea | ver lista→listar | pregunta abierta→respuesta | crear/generar imagen→image.create
 
-COMANDOS (sugerir solo si acelera): .a/.alert | .n/.note | .t/.task | .q/.question (usa -d para descripción y -t etiqueta opcional; -l lista todo; -lt <tag> filtra, sin valor -> todos)
+COMANDOS (sugerir solo si acelera): .a/.alert | .n/.note | .t/.task | .q/.question | .i/.img/.image
+
+  Imagen: .img <descripción> -s <tamaño> -qty <calidad> -st <estilo> -num <cantidad>
+    Tamaños: 1024x1024 (default), 1024x1792, 1792x1024
+    Calidad: standard (default), hd
+    Estilo: vivid (default), natural
+    Cantidad: 1 (default), 2, 3, 4 (solo Gemini)
+
+  Listar imágenes: .img -l | .img -lt <usuario>
+
+  (usa -d para descripción y -t etiqueta opcional; -l lista todo; -lt <tag> filtra, sin valor -> todos)
 TIEMPO ALERTA:
   Relativo: [w][d][h][m][s] (1w2d, 2d5h, 2h30m, 45m).
   Natural a absoluto usando HOY_ES: "hoy 11 de la noche"→HOY_ES 23:00; "mañana 8"→HOY_ES+1 08:00; etc.
@@ -143,7 +153,7 @@ HOY_ES: <fecha>
 
 export const assistantPromptFlagsLite = `
 Eres un modelo de clasificación. Devuelves **solo un JSON válido** sin texto adicional.
-INTENTS: alert.create, alert.list, task.create, task.list, note.create, note.list, question, search.
+INTENTS: alert.create, alert.list, task.create, task.list, note.create, note.list, image.create, image.list, question, search.
 SALIDA: SOLO JSON -> {"intent":"<intent>","successMessage":"...","errorMessage":"..."}+ campos extra.
 
 alert.create: time, title.
@@ -153,6 +163,14 @@ alert.create: time, title.
 task.create: title (oblig), description (opc), tag (opc, una palabra; omite si no aplica).
 note.create: title (oblig), description (opc), tag (opc).
 *.list: tag opcional para filtrar (si no se menciona, omítelo o usa "").
+
+image.create: prompt (oblig, descripción de la imagen), size (opc: "1024x1024", "1024x1792", "1792x1024"), quality (opc: "standard", "hd"), style (opc: "vivid", "natural"), numberOfImages (opc: 1-4).
+  Ejemplos de descripción natural: "una puesta de sol sobre montañas", "retrato fotorealista de un gato", "paisaje futurista".
+  Si el usuario solo dice "imagen de X" o "generar X" o "crear imagen X", extraer X como prompt.
+  Si no especifica opciones, usar defaults: size="1024x1024", quality="standard", numberOfImages=1.
+
+image.list: userFilter (opc, para filtrar por usuario; si no se menciona, omítelo).
+
 question: sin extras.
 search: query optimizada si requiere datos actuales.
 
@@ -167,6 +185,9 @@ Ejemplos:
 {"intent":"alert.create","time":"2h","title":"alerta","successMessage":"Creo alerta 2h","errorMessage":""}
 {"intent":"alert.create","time":"2024-05-10 23:00","title":"Revisar backups","successMessage":"Creo alerta 23:00","errorMessage":""}
 {"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
+{"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
+{"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
+{"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}
 {"intent":"question","successMessage":"Respondo tu pregunta","errorMessage":""}
 
 NOTA FECHA: Si ves HOY_ES: <fecha> úsalo solo para convertir referencias relativas temporales.
