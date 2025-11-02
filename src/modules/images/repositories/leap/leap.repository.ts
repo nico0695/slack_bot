@@ -2,9 +2,18 @@ import axios from 'axios'
 import {
   IGenerateImageResponse,
   IInferaceJobResponse,
+  IImageRepository,
+  IImageGenerationOptions,
+  IImageGenerationResponse,
+  ImageProvider,
 } from '../../shared/interfaces/images.interfaces'
+import { LeapStatus } from '../../shared/constants/leap'
 
-export default class LeapRepository {
+/**
+ * Leap API Image Generation Repository
+ * Implements IImageRepository interface following the same pattern as conversations module
+ */
+export default class LeapRepository implements IImageRepository {
   static #instance: LeapRepository
 
   #header
@@ -30,15 +39,66 @@ export default class LeapRepository {
     return this.#instance
   }
 
-  // generate image and get inference id
-  generateImage = async (prompt: string): Promise<IGenerateImageResponse | null> => {
+  /**
+   * Generate image using Leap API (IImageRepository interface implementation)
+   * Handles the entire flow: initial request + polling until completion
+   *
+   * @param prompt - Text description of the image to generate
+   * @param options - Generation options (size, quality, etc.)
+   * @returns Unified response with generated images or null on error
+   */
+  async generateImage(
+    prompt: string,
+    options?: IImageGenerationOptions
+  ): Promise<IImageGenerationResponse | null> {
     try {
+      // Step 1: Call Leap API to start image generation
+      const initialResponse = await this.#callGenerateImage(prompt, options)
+      if (!initialResponse) {
+        return null
+      }
+
+      // Step 2: Poll until the job is finished
+      const finalResponse = await this.#pollUntilComplete(initialResponse.inferenceId)
+      if (!finalResponse?.images || finalResponse.images.length === 0) {
+        return null
+      }
+
+      // Step 3: Return in unified format
+      return {
+        images: finalResponse.images.map((img) => ({
+          url: img.uri,
+          id: img.id,
+          createdAt: img.createdAt,
+        })),
+        provider: ImageProvider.LEAP,
+        inferenceId: initialResponse.inferenceId,
+      }
+    } catch (error) {
+      console.error('LeapRepository generateImage error:', error.message)
+      return null
+    }
+  }
+
+  /**
+   * Call Leap API to start image generation (private method)
+   * Returns inference ID for polling
+   */
+  #callGenerateImage = async (
+    prompt: string,
+    options?: IImageGenerationOptions
+  ): Promise<IGenerateImageResponse | null> => {
+    try {
+      // Map options to Leap API parameters
+      const size = options?.size === '1024x1024' ? 1024 : 512
+      const numberOfImages = options?.numberOfImages || 1
+
       const payload = {
         prompt,
         steps: 50,
-        width: 512,
-        height: 512,
-        numberOfImages: 1,
+        width: size,
+        height: size,
+        numberOfImages,
         promptStrength: 7,
         enhancePrompt: false,
         restoreFaces: true,
@@ -58,17 +118,52 @@ export default class LeapRepository {
         status: response.data.status,
       }
     } catch (error) {
-      console.log('error= ', error.message)
+      console.error('LeapRepository #callGenerateImage error:', error.message)
       return null
     }
   }
 
-  // ask for inference status and image by inference id
-  getInterfaceJob = async (inferenceId: string): Promise<IInferaceJobResponse> => {
+  /**
+   * Poll Leap API until image generation is complete
+   * Extracted from ImagesServices to keep polling logic in repository
+   */
+  #pollUntilComplete = async (inferenceId: string): Promise<IInferaceJobResponse | null> => {
     try {
-      const url = `https://api.tryleap.ai/api/v1/images/models/${
-        this.#modelId
-      }/inferences/${inferenceId}`
+      let status = LeapStatus.queued
+      let result: IInferaceJobResponse | null = null
+
+      // Poll until finished
+      while (status !== LeapStatus.finished) {
+        const jobResponse = await this.#getInferenceJob(inferenceId)
+        if (!jobResponse) {
+          return null
+        }
+
+        status = jobResponse.state
+
+        if (status === LeapStatus.finished) {
+          result = jobResponse
+        }
+
+        // Small delay to avoid hammering the API
+        if (status !== LeapStatus.finished) {
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+        }
+      }
+
+      return result
+    } catch (error) {
+      console.error('LeapRepository #pollUntilComplete error:', error.message)
+      return null
+    }
+  }
+
+  /**
+   * Ask for inference status and images by inference ID (private method)
+   */
+  #getInferenceJob = async (inferenceId: string): Promise<IInferaceJobResponse | null> => {
+    try {
+      const url = `https://api.tryleap.ai/api/v1/images/models/${this.#modelId}/inferences/${inferenceId}`
 
       const response = await axios.get(url, {
         headers: this.#header,
@@ -79,7 +174,29 @@ export default class LeapRepository {
         images: response.data.images ?? undefined,
       }
     } catch (error) {
-      console.log('error getInterfaceJob= ', error.message)
+      console.error('LeapRepository #getInferenceJob error:', error.message)
+      return null
     }
+  }
+
+  // ===============================================
+  // Legacy methods (kept for backward compatibility if needed)
+  // Will be removed once ImagesServices is refactored
+  // ===============================================
+
+  /**
+   * @deprecated Use generateImage() instead (implements IImageRepository)
+   * Legacy method - kept for backward compatibility during migration
+   */
+  legacyGenerateImage = async (prompt: string): Promise<IGenerateImageResponse | null> => {
+    return await this.#callGenerateImage(prompt)
+  }
+
+  /**
+   * @deprecated Will be removed once ImagesServices is refactored
+   * Legacy method - kept for backward compatibility during migration
+   */
+  getInterfaceJob = async (inferenceId: string): Promise<IInferaceJobResponse> => {
+    return await this.#getInferenceJob(inferenceId)
   }
 }

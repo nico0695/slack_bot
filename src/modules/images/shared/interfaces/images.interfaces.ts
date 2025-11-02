@@ -1,5 +1,9 @@
 import { LeapStatus } from '../constants/leap'
 
+// Re-export common repository interfaces
+export * from './imageRepository.interface'
+
+// Leap-specific interfaces (legacy)
 export interface IGenerateImageResponse {
   status: LeapStatus
   inferenceId: string
@@ -16,6 +20,7 @@ export interface IInferaceJobResponse {
   images?: ILeapImages[]
 }
 
+// Database and user interfaces (shared across all providers)
 export interface IImage {
   imageUrl: string
   inferenceId: string
