@@ -37,7 +37,8 @@ export default class AlertsServices {
   public async createAssistantAlert(
     userId: number,
     dateText: string,
-    message: string
+    message: string,
+    channelId?: string
   ): Promise<GenericResponse<Alerts>> {
     try {
       const date = formatTextToDate(dateText)
@@ -46,6 +47,7 @@ export default class AlertsServices {
         userId,
         date,
         message,
+        channelId,
       })
 
       return {

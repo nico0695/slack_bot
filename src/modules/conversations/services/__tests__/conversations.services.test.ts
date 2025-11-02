@@ -14,6 +14,7 @@ const redisRepositoryMock = {
   getAlertMetadata: jest.fn(),
   saveAssistantDigestSnapshot: jest.fn(),
   getAssistantDigestSnapshot: jest.fn(),
+  getAlertSnoozeConfig: jest.fn(),
 }
 
 const aiRepositoryMock = {
@@ -120,6 +121,10 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgAlertDetail: jest.fn(() => buildBlocksMock()),
   msgAlertCreated: jest.fn(() => buildBlocksMock()),
   msgNoteCreated: jest.fn(() => buildBlocksMock()),
+  msgAlertsList: jest.fn(() => buildBlocksMock()),
+  msgTasksList: jest.fn(() => buildBlocksMock()),
+  msgNotesList: jest.fn(() => buildBlocksMock()),
+  msgAssistantQuickHelp: jest.fn(() => buildBlocksMock()),
 }))
 
 describe('ConversationsServices', () => {
@@ -283,5 +288,56 @@ describe('ConversationsServices', () => {
 
     expect(usersServicesMock.getUsersByTeamId).toHaveBeenCalledWith('team1')
     expect(result).toBe('bot: Hola\nNick: Que tal?')
+  })
+
+  describe('getAssistantQuickHelp', () => {
+    const slackMessagesUtils = jest.requireMock('../../../../shared/utils/slackMessages.utils')
+
+    beforeEach(() => {
+      redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+      slackMessagesUtils.msgAssistantQuickHelp.mockReturnValue({ blocks: [] })
+    })
+
+    it('queries channel-scoped data when called from a channel context', async () => {
+      const now = new Date()
+      alertsServicesMock.getAlertsByUserId.mockResolvedValue({
+        data: [{ id: 1, sent: false, date: now, message: 'Ping', userId: 12 }],
+      })
+      notesServicesMock.getNotesByUserId.mockResolvedValue({ data: [{ id: 3 }] as any })
+      tasksServicesMock.getTasksByUserId.mockResolvedValue({
+        data: [{ id: 5, status: 'pending' } as any],
+      })
+
+      await service.getAssistantQuickHelp(42, { channelId: 'C123', isChannelContext: true })
+
+      expect(alertsServicesMock.getAlertsByUserId).toHaveBeenCalledWith(42, {
+        channelId: 'C123',
+      })
+      expect(notesServicesMock.getNotesByUserId).toHaveBeenCalledWith(42, {
+        channelId: 'C123',
+      })
+      expect(tasksServicesMock.getTasksByUserId).toHaveBeenCalledWith(42, {
+        channelId: 'C123',
+      })
+      expect(slackMessagesUtils.msgAssistantQuickHelp).toHaveBeenCalled()
+    })
+
+    it('uses personal scope when context is not a channel', async () => {
+      alertsServicesMock.getAlertsByUserId.mockResolvedValue({ data: [] })
+      notesServicesMock.getNotesByUserId.mockResolvedValue({ data: [] })
+      tasksServicesMock.getTasksByUserId.mockResolvedValue({ data: [] })
+
+      await service.getAssistantQuickHelp(7, { channelId: 'D555', isChannelContext: false })
+
+      expect(alertsServicesMock.getAlertsByUserId).toHaveBeenCalledWith(7, {
+        channelId: null,
+      })
+      expect(notesServicesMock.getNotesByUserId).toHaveBeenCalledWith(7, {
+        channelId: null,
+      })
+      expect(tasksServicesMock.getTasksByUserId).toHaveBeenCalledWith(7, {
+        channelId: null,
+      })
+    })
   })
 })

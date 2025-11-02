@@ -5,6 +5,7 @@ export interface IAlert {
   message: string
   date: Date
   userId: number
+  channelId?: string | null
 
   sent?: boolean
 }

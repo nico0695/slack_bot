@@ -31,6 +31,9 @@ export class Tasks extends BaseEntity {
   @Column({ default: '' })
   tag: string
 
+  @Column({ nullable: true })
+  channelId: string
+
   @ManyToOne((type) => Users)
   @JoinColumn({ name: 'userId' })
   user: Users

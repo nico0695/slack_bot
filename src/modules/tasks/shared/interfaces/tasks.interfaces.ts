@@ -8,4 +8,5 @@ export interface ITask {
   status?: TaskStatus
   alertDate?: Date | null
   tag?: string
+  channelId?: string | null
 }

@@ -34,7 +34,8 @@ export default class NotesServices {
     userId: number,
     title: string,
     description: string,
-    tag?: string
+    tag?: string,
+    channelId?: string
   ): Promise<GenericResponse<Notes>> {
     try {
       const sanitizedTag = tag?.trim()
@@ -46,6 +47,10 @@ export default class NotesServices {
 
       if (sanitizedTag && sanitizedTag.length > 0) {
         payload.tag = sanitizedTag
+      }
+
+      if (channelId) {
+        payload.channelId = channelId
       }
 
       const response = await this.#notesDataSource.createNote(payload)
@@ -88,6 +93,7 @@ export default class NotesServices {
     userId: number,
     options?: {
       tag?: string
+      channelId?: string | null
     }
   ): Promise<GenericResponse<Notes[]>> {
     try {

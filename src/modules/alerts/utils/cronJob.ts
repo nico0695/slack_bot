@@ -24,13 +24,15 @@ export const alertCronJob = async (): Promise<void> => {
     }
 
     alerts?.data.forEach(async (alert) => {
-      if (alert.user.slackChannelId) {
+      const targetChannel = alert.channelId ?? alert.user.slackChannelId
+
+      if (targetChannel) {
         // Send rich message to slack
         const messageBlock = slackMsgUtils.msgAlertDetail(alert as any)
 
         // Send rich message to slack
         await slackApp.client.chat.postMessage({
-          channel: alert.user.slackChannelId,
+          channel: targetChannel,
           text: `🔔 Alerta: ${alert.message}`,
           blocks: messageBlock.blocks,
         })
