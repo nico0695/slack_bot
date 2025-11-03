@@ -1,131 +1,256 @@
-# 🤖 AI-Powered Slack Bot
+# Slack Bot with AI Integration
 
-An intelligent Slack bot integrating various AI services to provide conversational AI, image generation, and more. This project also features a web interface with real-time communication capabilities.
+Multi-functional Slack bot integrating AI services (OpenAI, Gemini) for conversational AI, image generation, task management, alerts, and notes. Includes web interface with real-time Socket.io communication.
 
-## ✨ Features
+## Features
 
-- **Conversational AI:** Engage with AI models (OpenAI, Gemini) directly within Slack.
-- **Image Generation:** Create images from prompts using integrated AI services.
-- **Real-time Web Interface:** A web dashboard with real-time updates via Socket.io.
-- **Persistent Storage:** Utilizes a database sqlite for data persistence.
-- **Caching:** Leverages Redis for efficient data caching.
-- **Modular Architecture:** Organized into distinct modules for maintainability and scalability.
+### Core Capabilities
+- **AI Conversations** - OpenAI and Gemini integration with conversation history
+- **Image Generation** - AI-powered image creation via Leap API
+- **Task Management** - Create, view, and manage tasks
+- **Alert System** - Time-based notifications with cron scheduling
+- **Notes** - Simple note-taking system
+- **Text-to-Speech** - TTS functionality using Transformers.js
+- **Summarization** - Text summarization capabilities
+- **Web Interface** - Real-time web dashboard with Socket.io
 
-## 🚀 Getting Started
+### Technical Features
+- Slack Socket Mode (no webhook required)
+- Redis conversation caching
+- TypeORM with SQLite (Supabase compatible)
+- Web Push notifications
+- Modular architecture with singleton pattern
+- Full TypeScript implementation
+- Comprehensive test coverage
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+## Quick Start
 
 ### Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-- [Node.js](https://nodejs.org/en/) (LTS version recommended)
-- [npm](https://www.npmjs.com/) (comes with Node.js)
-- [Redis Server](https://redis.io/docs/getting-started/installation/)
-  - _For Linux/macOS:_ `sudo apt-get install redis-server` (or equivalent for your package manager)
+- Node.js (LTS)
+- Redis Server
+- Slack workspace with bot configured
 
 ### Installation
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd slack_bot
-    ```
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-3.  **Environment Variables:**
-    Create a `.env` file in the project root based on `.env.example` (or the `Env` section below) and fill in your credentials.
+```bash
+# Clone and install
+git clone <repository-url>
+cd slack_bot
+npm install
 
-        ```
-        # SLACK
-        SLACK_SIGNING_SECRET="your_slack_signing_secret"
-        SLACK_BOT_TOKEN="your_slack_bot_token"
-        APP_TOKEN="your_slack_app_token"
+# Configure environment
+cp ".env copy" .env
+# Edit .env with your credentials
 
-        # OPEN AI
-        OPENAI_API_KEY="your_openai_api_key"
+# Start Redis
+redis-server
 
-        # GEMINI (if applicable)
-        GEMINI_API_KEY="your_gemini_api_key"
+# Development mode
+npm run dev
 
-        # LEAP (tryleap.ai)
-        LEAP_API_KEY="your_leap_api_key"
+# Production build
+npm run build
+npm start
+```
 
-        # SUPABASE (or other database)
-        SUPABASE_URL="your_supabase_url"
-        SUPABASE_TOKEN="your_supabase_token"
+### Environment Variables
 
-        # WEB PUSH NOTIFICATIONS
-        VAPID_PUBLIC_KEY="your_vapid_public_key"
+```bash
+# Slack
+SLACK_SIGNING_SECRET=
+SLACK_BOT_TOKEN=
+APP_TOKEN=
 
-    VAPID_PRIVATE_KEY="your_vapid_private_key"
+# AI Services
+OPENAI_API_KEY=
+GEMINI_API_KEY=
+LEAP_API_KEY=
 
-    ```
-    _Note: Replace placeholder values with your actual API keys and secrets._
-    ```
+# Database (optional, defaults to SQLite)
+DB_URL=
+SUPABASE_URL=
+SUPABASE_TOKEN=
 
-### Running the Application
+# Redis (optional, defaults to localhost)
+REDIS_HOST=
 
-1.  **Start Redis Server:**
-    ```bash
-    redis-server
-    ```
-2.  **Start the Backend (Development Mode):**
+# Web Push
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
 
-    ```bash
-    npm run dev
-    ```
+# Search (optional)
+SEARCH_API_KEY=
+SEARCH_API_KEY_CX=
+```
 
-    The application will restart automatically on code changes.
+## Usage
 
-3.  **Build and Start (Production Mode):**
-    ```bash
-    npm run build
-    npm start
-    ```
+### Slack Commands
 
-## 🛠️ Development
+**Conversations:**
+```
+cb <message>          - Send message to AI
+cb_show               - Show conversation history
+cb_clean              - Clear conversation
+start conversation    - Enter flow mode (all messages processed)
+end conversation      - Exit flow mode
++ <message>           - Add to conversation without AI response
+```
 
-### Technologies Used
+**Utilities:**
+```
+img <prompt>          - Generate image
+/help                 - Show command list
+```
 
-- **Backend:** Node.js, Express.js, TypeScript
-- **Slack Integration:** Bolt Framework
-- **Real-time Communication:** Socket.io
-- **Database:** TypeORM (configured for Supabase)
-- **Caching:** Redis
-- **AI Integrations:** OpenAI, Gemini, Leap AI, Transformers.js
-- **Linting:** ESLint
+**Task/Alert/Note Creation:**
+```
+.alert/.a <time> <message>  - Create alert (e.g., ".alert 1d14h12m Reminder")
+.task/.t <time> <message>   - Create task
+.note/.n <message>          - Create note
+-list/-l                    - List all items
+```
+
+### Web API Endpoints
+
+- `POST /conversations` - Create conversation
+- `GET /alerts` - List alerts
+- `POST /tasks` - Create task
+- `GET /notes` - List notes
+- `POST /images` - Generate image
+- `POST /text-to-speech` - Generate TTS
+- `POST /summary` - Summarize text
+
+### Socket.io Events
+
+**Public Channels:**
+```javascript
+socket.emit('join_room', { username, channel })
+socket.emit('send_message', { message, username, channel, iaEnabled })
+socket.on('receive_message', (data) => {})
+```
+
+**Assistant (Private):**
+```javascript
+socket.emit('join_assistant_room', { username, channel: userId })
+socket.emit('send_assistant_message', { message, userId, iaEnabled })
+socket.on('receive_assistant_message', (data) => {})
+```
+
+## Architecture
+
+### Module Structure
+```
+src/modules/{feature}/
+├── controller/
+│   ├── {feature}.controller.ts       # Slack handlers
+│   └── {feature}Web.controller.ts    # REST/Socket.io handlers
+├── services/
+│   └── {feature}.services.ts         # Business logic
+├── repositories/
+│   ├── database/                     # TypeORM entities
+│   ├── redis/                        # Caching
+│   └── {api}/                        # External API clients
+└── shared/
+    ├── constants/
+    └── interfaces/
+```
+
+### Available Modules
+- `conversations` - AI chat management
+- `alerts` - Time-based reminders
+- `tasks` - Task tracking
+- `notes` - Note storage
+- `images` - Image generation
+- `textToSpeech` - TTS
+- `summary` - Text summarization
+- `users` - User management
+- `constants` - System constants
+
+### Key Technologies
+- **Backend:** Node.js, Express, TypeScript
+- **Slack:** Bolt SDK (Socket Mode)
+- **Real-time:** Socket.io
+- **Database:** TypeORM, SQLite/Supabase
+- **Cache:** Redis
+- **AI:** OpenAI, Gemini, Leap API, Transformers.js
 - **Testing:** Jest
-- **Pre-commit Hooks:** Husky
+- **Linting:** ESLint
+- **Hooks:** Husky
+
+## Development
+
+### Commands
+```bash
+npm run dev              # Development with hot reload
+npm run build            # Compile TypeScript
+npm start                # Run production build
+npm run lint             # Run ESLint
+npm test                 # Run tests
+npm run test:watch       # Watch mode
+npm run test:coverage    # Coverage report
+```
 
 ### Project Structure
-
-The project follows a modular structure:
-
 ```
 src/
-├── app.ts              # Main application setup
-├── index.ts            # Application entry point
-├── config/             # Configuration files (Slack, Redis, DB, etc.)
-├── database/           # Database connection and setup
-├── entities/           # TypeORM entities (database models)
-├── modules/            # Feature-specific modules (alerts, conversations, images, etc.)
-│   ├── [feature-name]/ # Each module contains its own controllers, services, repositories
-│   └── ...
-├── shared/             # Shared utilities, middleware, constants, interfaces
-└── ...
+├── app.ts              # Application setup
+├── index.ts            # Entry point
+├── config/             # Configuration (Slack, Redis, DB, Socket.io)
+├── database/           # Database files
+├── entities/           # TypeORM entities
+├── modules/            # Feature modules
+└── shared/             # Utilities, middleware, constants
 ```
 
-### Linting and Testing
+### Redis Keys
+- Conversations: `${conversationFlowPrefix}:${channelId}`
+- User conversations: `rConvo:${userId}`
 
-- **Linting:**
-  ```bash
-  npm run lint
-  ```
-- **Testing:**
-  ```bash
-  npm run test
-  ```
-- **Pre-commit Hooks:** Husky is configured to run linting and tests automatically before each commit.
+### Database
+Default: SQLite at `src/database/database.sqlite`
+Override: Set `DB_URL` for Supabase/Postgres
+
+## Docker Deployment
+
+```bash
+# Build image
+./build-docker.sh
+
+# Run container
+docker run -p 4000:4000 -p 3001:3001 \
+  -e SLACK_BOT_TOKEN=... \
+  -e OPENAI_API_KEY=... \
+  slack-bot
+```
+
+## Testing
+
+```bash
+npm test                 # Run all tests
+npm run test:watch       # Watch mode
+npm run test:coverage    # Generate coverage
+```
+
+Tests located in `__tests__/` directories within each module layer.
+
+## Documentation
+
+Detailed documentation available in `/doc`:
+- [Architecture](doc/ARCHITECTURE.md) - System design and patterns
+- [API Reference](doc/API_REFERENCE.md) - Complete API documentation
+- [Development Guide](doc/DEVELOPMENT.md) - Development workflows
+- [Deployment Guide](doc/DEPLOYMENT.md) - Docker and production setup
+- [Troubleshooting](doc/TROUBLESHOOTING.md) - Common issues and solutions
+
+## Recent Updates
+
+- Fixed Redis digest and assistant preference handling
+- Improved Docker configuration
+- Enhanced CI/CD with error handling
+- Husky production build optimization
+- Task datasource linting improvements
+
+## License
+
+ISC
