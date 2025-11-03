@@ -360,54 +360,18 @@ export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
 
 export const msgAlertDetail = (alert: Alerts): { blocks: any[] } => {
   const tokens = getAlertStatusTokens(alert)
-  const actions = [
-    {
-      type: 'button',
-      action_id: `alert_actions:snooze_default:${alert.id}`,
-      text: { type: 'plain_text', text: 'Snooze preferido' },
-      value: `alert:snooze_default:${alert.id}`,
-    },
-    {
-      type: 'button',
-      action_id: `alert_actions:snooze_5m:${alert.id}`,
-      text: { type: 'plain_text', text: 'Snooze 5m' },
-      value: `alert:snooze_5m:${alert.id}`,
-    },
-    {
-      type: 'button',
-      action_id: `alert_actions:repeat_daily:${alert.id}`,
-      text: { type: 'plain_text', text: 'Repetir diario' },
-      value: `alert:repeat_daily:${alert.id}`,
-    },
-    {
-      type: 'button',
-      action_id: `alert_actions:repeat_weekly:${alert.id}`,
-      text: { type: 'plain_text', text: 'Repetir semanal' },
-      value: `alert:repeat_weekly:${alert.id}`,
-    },
-    {
-      type: 'button',
-      action_id: `alert_actions:resolve:${alert.id}`,
-      text: { type: 'plain_text', text: 'Marcar resuelta' },
-      style: 'primary',
-      value: `alert:resolve:${alert.id}`,
-    },
-  ]
-
+  const truncatedMessage = truncateText(alert.message ?? '', 80)
   return {
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `${tokens.icon} *Alerta #${alert.id}*\n>${
-            alert.message || '_Sin descripción_'
+          text: `${tokens.icon} *Alerta #${alert.id}* ${
+            truncatedMessage || '_Sin descripción_'
           }\n> ${tokens.statusLine}\n> ${tokens.helper}`,
         },
-      },
-      {
-        type: 'actions',
-        elements: actions,
+        accessory: alertOverflowAccessory(alert.id),
       },
     ],
   }
@@ -417,16 +381,15 @@ export const msgAlertDetail = (alert: Alerts): { blocks: any[] } => {
 
 export const msgNoteCreated = (data: Notes): { blocks: any[] } => {
   const truncatedTitle = truncateText(data.title ?? '', 60)
-  const truncatedDescription = truncateText(data.description ?? '', 120)
+  const truncatedDescription = truncateText(data.description ?? '', 80)
   const tagLabel = data.tag ? ` · #${truncateText(data.tag, 20)}` : ''
-
   return {
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `:memo: *Nota creada*\n*#${data.id}* ${truncatedTitle}${tagLabel}\n> ${
+          text: `:memo: *Nota #${data.id}* ${truncatedTitle}${tagLabel}\n> ${
             truncatedDescription || '_Sin descripción_'
           }`,
         },
@@ -455,21 +418,19 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
   )
 
   notes.forEach((note) => {
-    const truncatedTitle = truncateText(note.title, 40)
-    const truncatedDescription = truncateText(note.description, 70)
+    const truncatedTitle = truncateText(note.title ?? '', 40)
+    const truncatedDescription = truncateText(note.description ?? '', 60)
     const tagLabel = note.tag ? ` · #${truncateText(note.tag, 15)}` : ''
-
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*#${note.id}* ${truncatedTitle}${tagLabel}\n> ${
+        text: `:memo: *Nota #${note.id}* ${truncatedTitle}${tagLabel}\n> ${
           truncatedDescription || '_Sin descripción_'
         }`,
       },
       accessory: overflowAccessory('note', note.id),
     })
-
     blocks.push({
       type: 'divider',
     })
@@ -482,18 +443,17 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
 
 export const msgTaskCreated = (data: Tasks): { blocks: any[] } => {
   const truncatedTitle = truncateText(data.title ?? '', 60)
-  const truncatedDescription = truncateText(data.description ?? '', 120)
+  const truncatedDescription = truncateText(data.description ?? '', 80)
   const tokens = getTaskStatusTokens(data)
-
   return {
     blocks: [
       {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `${tokens.icon} *Tarea creada*\n*#${data.id}* ${truncatedTitle} • ${
-            tokens.statusLine
-          }\n> ${truncatedDescription || '_Sin descripción_'}\n> ${tokens.helper}`,
+          text: `${tokens.icon} *Tarea #${data.id}* ${truncatedTitle} • ${tokens.statusLine}\n> ${
+            truncatedDescription || '_Sin descripción_'
+          }\n> ${tokens.helper}`,
         },
         accessory: overflowAccessory('task', data.id),
       },
@@ -518,21 +478,19 @@ export const msgTasksList = (tasks: Tasks[]): { blocks: any[] } => {
   )
 
   tasks.forEach((task) => {
-    const truncatedTitle = truncateText(task.title, 40)
-    const truncatedDescription = truncateText(task.description, 70)
+    const truncatedTitle = truncateText(task.title ?? '', 40)
+    const truncatedDescription = truncateText(task.description ?? '', 60)
     const tokens = getTaskStatusTokens(task)
-
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${tokens.icon} *#${task.id}* ${truncatedTitle}\n> ${tokens.statusLine}\n> ${
+        text: `${tokens.icon} *Tarea #${task.id}* ${truncatedTitle} • ${tokens.statusLine}\n> ${
           truncatedDescription || '_Sin descripción_'
         }\n> ${tokens.helper}`,
       },
       accessory: overflowAccessory('task', task.id),
     })
-
     blocks.push({
       type: 'divider',
     })
