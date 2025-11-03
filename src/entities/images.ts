@@ -23,6 +23,9 @@ export class Images extends BaseEntity {
   @Column({ default: '', nullable: false })
   prompt: string
 
+  @Column({ nullable: true })
+  provider?: string
+
   @CreateDateColumn()
   createdAt: Date
 }

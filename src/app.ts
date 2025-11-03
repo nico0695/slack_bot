@@ -146,7 +146,10 @@ export default class App {
       safeHandler(this.#imagesController.generateImages)
     )
 
-    this.#slackApp.message('', safeHandler(this.#conversationController.conversationFlow))
+    this.#slackApp.message(
+      slackListenersKey.conversationFlow,
+      safeHandler(this.#conversationController.conversationFlow)
+    )
 
     this.#slackApp.command('/help', async ({ ack, body, client }: any): Promise<void> => {
       ack(slackHelperMessage)

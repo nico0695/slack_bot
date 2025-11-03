@@ -1,101 +1,164 @@
-import LeapRepository from '../repositories/leap/leap.repository'
 import ImagesDataSources from '../repositories/database/images.dataSource'
-import { LeapStatus } from '../shared/constants/leap'
 import {
   IImage,
-  IInferaceJobResponse,
-  ILeapImages,
   IUserData,
+  IImageRepository,
 } from '../shared/interfaces/images.interfaces'
+import {
+  IImageGenerationOptions,
+  IImageGenerationResponse,
+} from '../shared/interfaces/imageRepository.interface'
 import { IPaginationOptions, IPaginationResponse } from '../../../shared/interfaces/pagination'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { Images } from '../../../entities/images'
+import {
+  ImageRepositoryType,
+  ImageRepositoryByType,
+  getDefaultImageRepositoryType,
+} from '../shared/constants/imageRepository'
+import UsersServices from '../../users/services/users.services'
 
+/**
+ * Images Service
+ * Handles business logic for image generation using repository abstraction
+ * Follows the same pattern as ConversationsServices (AIRepositoryType pattern)
+ */
 export default class ImagesServices {
   static #instance: ImagesServices
 
-  #leapRepository: LeapRepository
+  #imageRepository: IImageRepository // Interface, not concrete class
   #imagesDataSources: ImagesDataSources
 
-  private constructor() {
-    this.#leapRepository = LeapRepository.getInstance()
+  private constructor(repositoryType: ImageRepositoryType = getDefaultImageRepositoryType()) {
+    // Factory pattern: select repository based on type
+    this.#imageRepository = ImageRepositoryByType[repositoryType].getInstance()
     this.#imagesDataSources = ImagesDataSources.getInstance()
 
     this.generateImages = this.generateImages.bind(this)
   }
 
-  static getInstance(): ImagesServices {
+  static getInstance(repositoryType?: ImageRepositoryType): ImagesServices {
     if (this.#instance) {
       return this.#instance
     }
 
-    this.#instance = new ImagesServices()
+    this.#instance = new ImagesServices(repositoryType)
     return this.#instance
   }
 
-  #storeUserImages = async (
-    userData: IUserData,
-    image: ILeapImages,
-    prompt?: string
-  ): Promise<void> => {
-    const imageData: IImage = {
-      imageUrl: image.uri,
-      inferenceId: image.id,
-      slackId: userData.slackId,
-      slackTeamId: userData.slackTeamId,
-      username: userData.username,
-      prompt,
-    }
-
+  /**
+   * Store generated image in database
+   * Refactored to accept generic image data instead of Leap-specific types
+   */
+  #storeUserImages = async (imageData: IImage): Promise<void> => {
     await this.#imagesDataSources.createImages(imageData)
   }
 
+  /**
+   * Generate images using the configured repository
+   * Simplified: repository now handles polling and returns complete response
+   *
+   * @param prompt - Text description of the image to generate
+   * @param userData - User information for tracking
+   * @param say - Slack say function for sending messages
+   * @returns Formatted string with image URLs or error message
+   */
   generateImages = async (
     prompt: string,
     userData: IUserData,
     say: (message: string) => void
   ): Promise<string> => {
     try {
-      // Generate image and get inference id
-      const inference = await this.#leapRepository.generateImage(prompt)
-
+      // Notify user that generation started
       say('Generando imagen...')
 
-      let status = inference?.status
+      // Call repository - it handles all the polling logic now
+      const response = await this.#imageRepository.generateImage(prompt, {
+        size: '1024x1024',
+        quality: 'standard',
+      })
 
-      let returnValue: IInferaceJobResponse = null
-
-      // Wait until inference is finished
-      while (status !== LeapStatus.finished) {
-        // ask for inference status and image generated
-        const inferaceJob: IInferaceJobResponse = await this.#leapRepository.getInterfaceJob(
-          inference?.inferenceId
-        )
-
-        status = inferaceJob.state
-
-        if (status === LeapStatus.finished) {
-          returnValue = inferaceJob
-        }
+      // Check if generation was successful
+      if (!response?.images?.length) {
+        return 'No se pudo generar la imagen'
       }
 
-      if (returnValue !== null && returnValue.images.length > 0) {
-        // Save images
-        await Promise.all(
-          returnValue.images.map(async (image: ILeapImages) => {
-            await this.#storeUserImages(userData, image, prompt)
-          })
-        )
+      // Save all generated images to database
+      await Promise.all(
+        response.images.map(async (image) => {
+          const imageData: IImage = {
+            imageUrl: image.url,
+            inferenceId: response.inferenceId || image.id || 'unknown',
+            slackId: userData.slackId,
+            slackTeamId: userData.slackTeamId,
+            username: userData.username,
+            prompt,
+          }
+          await this.#storeUserImages(imageData)
+        })
+      )
 
-        return returnValue.images
-          .map((image: ILeapImages, index: number) => `Imagen #${index + 1}: ${image.uri}`)
-          .join('\n')
-      }
+      // Format response with provider info
+      const imageUrls = response.images
+        .map((image, index) => `Imagen #${index + 1}: ${image.url}`)
+        .join('\n')
 
-      return 'No se pudo generar la imagen'
+      return `Imágenes generadas con ${response.provider}:\n${imageUrls}`
     } catch (error) {
-      console.log('error= ', error.message)
+      console.error('ImagesServices generateImages error:', error.message)
       return 'No se pudo generar la imagen'
+    }
+  }
+
+  /**
+   * Generate images for assistant (returns response object instead of formatted string)
+   *
+   * @param prompt - Text description of the image to generate
+   * @param userId - User ID for tracking
+   * @param options - Image generation options (size, quality, style, numberOfImages)
+   * @returns Image generation response with images array and provider info
+   */
+  generateImageForAssistant = async (
+    prompt: string,
+    userId: number,
+    options?: IImageGenerationOptions
+  ): Promise<IImageGenerationResponse | null> => {
+    try {
+      // Generate image using repository
+      const response = await this.#imageRepository.generateImage(prompt, options)
+
+      if (!response?.images?.length) {
+        return null
+      }
+
+      // Get user info for database storage
+      const userService = UsersServices.getInstance()
+      const user = await userService.getUserById(userId)
+
+      if (!user?.data) {
+        console.error('ImagesServices: User not found for ID:', userId)
+        return response // Return images but don't store
+      }
+
+      // Save all generated images to database
+      await Promise.all(
+        response.images.map(async (image) => {
+          const imageData: IImage = {
+            imageUrl: image.url,
+            inferenceId: response.inferenceId || image.id || 'unknown',
+            slackId: user.data.slackId,
+            slackTeamId: user.data.slackTeamId,
+            username: user.data.name,
+            prompt,
+          }
+          await this.#storeUserImages(imageData)
+        })
+      )
+
+      return response
+    } catch (error) {
+      console.error('ImagesServices generateImageForAssistant error:', error.message)
+      return null
     }
   }
 
