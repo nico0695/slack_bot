@@ -125,7 +125,6 @@ export default class ConversationsController extends GenericController {
    */
   @SlackAuth
   public async conversationFlow(data: any): Promise<void> {
-    console.log('## Conversation Flow ##')
     const { payload, say, body }: any = data
     try {
       const incomingMessage = String(payload.text ?? '')
@@ -136,20 +135,20 @@ export default class ConversationsController extends GenericController {
 
       if (!userData) {
         say('Ups! No se pudo obtener tu información 🤷‍♂️')
-      return
-    }
+        return
+      }
 
-    // Handle help command
-    if (normalizedMessage === 'h' || normalizedMessage === 'help') {
-      const scopedChannelId =
-        !isPersonal && typeof payload.channel === 'string' ? payload.channel.trim() : undefined
-      const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id, {
-        channelId: scopedChannelId,
-        isChannelContext: !isPersonal,
-      })
+      // Handle help command
+      if (normalizedMessage === 'h' || normalizedMessage === 'help') {
+        const scopedChannelId =
+          !isPersonal && typeof payload.channel === 'string' ? payload.channel.trim() : undefined
+        const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id, {
+          channelId: scopedChannelId,
+          isChannelContext: !isPersonal,
+        })
         say(quickHelp ?? 'No pude mostrar tu resumen ahora mismo.')
         return
-    }
+      }
 
       // Determine flow key (personal uses userId, channels use channelId)
       const flowKey = isPersonal
