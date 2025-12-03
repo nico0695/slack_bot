@@ -1,7 +1,7 @@
 {
   "name": "slack-bot",
   "version": "1.1.0",
-  "description": "",
+  "description": "ai - slack bot - web api",
   "scripts": {
     "dev": "nodemon --exec ts-node ./src/index.ts",
     "auxprebuild": "tslint -c tslint.json -p tsconfig.json --fix",
