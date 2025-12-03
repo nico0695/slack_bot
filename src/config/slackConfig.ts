@@ -13,11 +13,11 @@ export const connectionSlackApp = new SlackApp({
 
 // Regex to listen slack messages
 export const slackListenersKey = {
-  generateConversation: /^cb?\b/,
-  cleanConversation: /^cb_clean?\b/,
-  showConversation: /^cb_show?\b/,
+  generateConversation: /^cb?\b/i,
+  cleanConversation: /^cb_clean?\b/i,
+  showConversation: /^cb_show?\b/i,
 
-  generateImages: /^img?\b/,
+  generateImages: /^img?\b/i,
 
-  conversationFlow: /^(?!img|cb_clean|cb_show|cb\b)/,
+  conversationFlow: /^(?!img|cb_clean|cb_show|cb\b)/i,
 }
