@@ -16,7 +16,7 @@
 .build-docker.sh
 
 /coverage
-
+/doc
 
 
 AGENTS.md

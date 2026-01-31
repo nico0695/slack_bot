@@ -26,6 +26,11 @@ const notesServicesMock = {
   createAssistantNote: jest.fn(),
 }
 
+const imagesServicesMock = {
+  getImages: jest.fn(),
+  generateImageForAssistant: jest.fn(),
+}
+
 jest.mock('../../repositories/redis/conversations.redis', () => ({
   RedisRepository: {
     getInstance: () => redisRepositoryMock,
@@ -64,6 +69,13 @@ jest.mock('../../../notes/services/notes.services', () => ({
   __esModule: true,
   default: {
     getInstance: () => notesServicesMock,
+  },
+}))
+
+jest.mock('../../../images/services/images.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => imagesServicesMock,
   },
 }))
 
@@ -133,5 +145,128 @@ describe('MessageProcessor - channel scoped lookups', () => {
       channelId: null,
     })
     expect(result.response).toBeTruthy()
+  })
+})
+
+describe('MessageProcessor - image handling', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = MessageProcessor.getInstance()
+  })
+
+  it('lists images when using .img -l variable', async () => {
+    imagesServicesMock.getImages.mockResolvedValue({
+      data: {
+        data: [
+          { imageUrl: 'https://example.com/img1.png', prompt: 'A cat', provider: 'openai' },
+          { imageUrl: 'https://example.com/img2.png', prompt: 'A dog', provider: 'openai' },
+        ],
+      },
+    })
+
+    const result = await processor.processAssistantMessage('.img -l', 99, undefined, false)
+
+    expect(imagesServicesMock.getImages).toHaveBeenCalledWith(1, 10)
+    expect(result.response).toBeTruthy()
+    expect(result.response?.content).toContain('Tus imágenes recientes')
+  })
+
+  it('returns empty message when no images exist', async () => {
+    imagesServicesMock.getImages.mockResolvedValue({
+      data: { data: [] },
+    })
+
+    const result = await processor.processAssistantMessage('.img -l', 99, undefined, false)
+
+    expect(result.response?.content).toBe('No tienes imágenes generadas')
+  })
+
+  it('generates image when using .img variable with prompt', async () => {
+    imagesServicesMock.generateImageForAssistant.mockResolvedValue({
+      images: [{ url: 'https://example.com/generated.png', id: '1', createdAt: new Date() }],
+      provider: 'openai',
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.img a beautiful sunset',
+      99,
+      undefined,
+      false
+    )
+
+    expect(imagesServicesMock.generateImageForAssistant).toHaveBeenCalledWith(
+      'a beautiful sunset',
+      99,
+      {}
+    )
+    expect(result.response).toBeTruthy()
+    expect(result.response?.content).toContain('Generated')
+    expect(result.response?.content).toContain('openai')
+  })
+
+  it('parses image options from flags', async () => {
+    imagesServicesMock.generateImageForAssistant.mockResolvedValue({
+      images: [{ url: 'https://example.com/generated.png', id: '1', createdAt: new Date() }],
+      provider: 'openai',
+    })
+
+    // Note: -s is shorthand for -size, -qty for -quality, -st for -style, -num for -number
+    const result = await processor.processAssistantMessage(
+      '.img a cat -size 1024x1792 -quality hd -style vivid -num 2',
+      99,
+      undefined,
+      false
+    )
+
+    expect(imagesServicesMock.generateImageForAssistant).toHaveBeenCalledWith(
+      'a cat',
+      99,
+      {
+        size: '1024x1792',
+        quality: 'hd',
+        style: 'vivid',
+        numberOfImages: 2,
+      }
+    )
+    expect(result.response).toBeTruthy()
+  })
+
+  it('handles image generation errors gracefully', async () => {
+    imagesServicesMock.generateImageForAssistant.mockRejectedValue(
+      new Error('API rate limit exceeded')
+    )
+
+    const result = await processor.processAssistantMessage(
+      '.img a beautiful sunset',
+      99,
+      undefined,
+      false
+    )
+
+    expect(result.response?.content).toContain('API rate limit exceeded')
+  })
+})
+
+describe('MessageProcessor - skip AI flag', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    processor = MessageProcessor.getInstance()
+  })
+
+  it('returns shouldSkipAI true when message starts with +', async () => {
+    const result = await processor.processAssistantMessage('+ some message', 99, undefined, false)
+
+    expect(result.shouldSkipAI).toBe(true)
+    expect(result.response).toBeNull()
+  })
+
+  it('cleanSkipFlag removes the + prefix', () => {
+    expect(processor.cleanSkipFlag('+ some message')).toBe('some message')
+    expect(processor.cleanSkipFlag('+message')).toBe('message')
   })
 })

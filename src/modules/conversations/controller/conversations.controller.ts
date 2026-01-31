@@ -261,9 +261,6 @@ export default class ConversationsController extends GenericController {
     if (result.response) {
       say(result.response.contentBlock ?? result.response.content)
     }
-
-    // If personal and no assistant response, still nothing to do (old behavior maintained)
-    // If channel and no assistant response, just acknowledge (nothing to say)
   }
 
   @SlackAuthActions
