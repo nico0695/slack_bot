@@ -12,10 +12,12 @@ import {
 import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
+import ImagesServices from '../../images/services/images.services'
 import SearchRepository from '../repositories/search/search.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
 import { RedisRepository } from '../repositories/redis/conversations.redis'
+import { IGeneratedImage, ImageProvider } from '../../images/shared/interfaces/images.interfaces'
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
@@ -43,6 +45,7 @@ export default class MessageProcessor {
   #alertsServices: AlertsServices
   #tasksServices: TasksServices
   #notesServices: NotesServices
+  #imagesServices: ImagesServices
   #defaultSnoozeMinutes = 10
 
   private constructor(aiToUse = AIRepositoryType.OPENAI) {
@@ -51,6 +54,7 @@ export default class MessageProcessor {
     this.#alertsServices = AlertsServices.getInstance()
     this.#tasksServices = TasksServices.getInstance()
     this.#notesServices = NotesServices.getInstance()
+    this.#imagesServices = ImagesServices.getInstance()
   }
 
   static getInstance(): MessageProcessor {
@@ -158,6 +162,40 @@ export default class MessageProcessor {
       role: roleTypes.assistant,
       content,
       ...(block ? { contentBlock: block } : {}),
+      provider: ConversationProviders.ASSISTANT,
+    }
+  }
+
+  /**
+   * Build assistant response for image generation
+   * Formats image URLs with provider info and metadata
+   */
+  #buildImageResponse = (
+    images: IGeneratedImage[],
+    provider: ImageProvider,
+    prompt: string,
+    options?: { size?: string; quality?: string; style?: string }
+  ): IConversation => {
+    const imageList = images
+      .map((img, index) => {
+        const metadata = []
+        if (options?.size) metadata.push(`Size: ${options.size}`)
+        if (options?.quality) metadata.push(`Quality: ${options.quality}`)
+        if (options?.style) metadata.push(`Style: ${options.style}`)
+
+        const metadataStr = metadata.length > 0 ? ` (${metadata.join(', ')})` : ''
+
+        return `• <${img.url}|Image #${index + 1}>${metadataStr}`
+      })
+      .join('\n')
+
+    const content = `✅ Generated ${images.length} image${
+      images.length > 1 ? 's' : ''
+    } with ${provider}:\n${imageList}`
+
+    return {
+      role: roleTypes.assistant,
+      content,
       provider: ConversationProviders.ASSISTANT,
     }
   }
@@ -567,6 +605,114 @@ export default class MessageProcessor {
         break
       }
 
+      case AssistantsVariables.IMAGE: {
+        // Handle list command (.img -l)
+        if (assistantMessage.flags[AssistantsFlags.LIST]) {
+          const images = await this.#imagesServices.getImages(1, 10)
+
+          if (images.error || !images.data?.data?.length) {
+            responseMessage = {
+              role: roleTypes.assistant,
+              content: 'No tienes imágenes generadas',
+              provider: ConversationProviders.ASSISTANT,
+            }
+            break
+          }
+
+          const imagesList = images.data.data
+            .map(
+              (img, index) =>
+                `${index + 1}. <${img.imageUrl}|${img.prompt}> (${String(
+                  img.provider || 'unknown'
+                )})`
+            )
+            .join('\n')
+
+          responseMessage = {
+            role: roleTypes.assistant,
+            content: `Tus imágenes recientes:\n${imagesList}`,
+            provider: ConversationProviders.ASSISTANT,
+          }
+
+          break
+        }
+
+        // Validate prompt
+        if (!assistantMessage.value && !assistantMessage.cleanMessage) {
+          throw new Error('Ups! Necesito una descripción de la imagen que quieres generar. 😅')
+        }
+
+        // Extract prompt
+        const imagePrompt = (assistantMessage.value as string) || assistantMessage.cleanMessage
+
+        if (!imagePrompt.trim()) {
+          throw new Error('Ups! La descripción de la imagen no puede estar vacía. 😅')
+        }
+
+        // Parse options from flags
+        const imageOptions: any = {}
+
+        if (assistantMessage.flags[AssistantsFlags.SIZE]) {
+          const size = assistantMessage.flags[AssistantsFlags.SIZE] as string
+          const validSizes = ['1024x1024', '1024x1792', '1792x1024', '512x512']
+          if (validSizes.includes(size)) {
+            imageOptions.size = size
+          }
+        }
+
+        if (assistantMessage.flags[AssistantsFlags.QUALITY]) {
+          const quality = assistantMessage.flags[AssistantsFlags.QUALITY] as string
+          if (quality === 'standard' || quality === 'hd') {
+            imageOptions.quality = quality
+          }
+        }
+
+        if (assistantMessage.flags[AssistantsFlags.STYLE]) {
+          const style = assistantMessage.flags[AssistantsFlags.STYLE] as string
+          if (style === 'vivid' || style === 'natural') {
+            imageOptions.style = style
+          }
+        }
+
+        if (assistantMessage.flags[AssistantsFlags.NUMBER]) {
+          const numStr = assistantMessage.flags[AssistantsFlags.NUMBER] as string
+          const num = parseInt(numStr, 10)
+          if (num >= 1 && num <= 4) {
+            imageOptions.numberOfImages = num
+          }
+        }
+
+        // Generate image
+        try {
+          const response = await this.#imagesServices.generateImageForAssistant(
+            imagePrompt,
+            userId,
+            imageOptions
+          )
+
+          if (!response?.images?.length) {
+            throw new Error('No se pudo generar la imagen')
+          }
+
+          // Build response with images
+          responseMessage = this.#buildImageResponse(response.images, response.provider, imagePrompt, {
+            size: imageOptions.size,
+            quality: imageOptions.quality,
+            style: imageOptions.style,
+          })
+        } catch (error: any) {
+          responseMessage = {
+            role: roleTypes.assistant,
+            content: `❌ ${
+              String(error.message) || 'No se pudo generar la imagen. Intenta nuevamente.'
+            }`,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+
+        break
+      }
+
       case AssistantsVariables.QUESTION: {
         const promptGenerated = [
           {
@@ -797,6 +943,99 @@ export default class MessageProcessor {
                 ? `Mostrando ${notesCountText} notas con tag "${noteTagLabel}"`
                 : `Mostrando ${notesCountText} notas`),
             contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'image.create': {
+          // Validate required fields
+          if (!parsed.prompt || typeof parsed.prompt !== 'string') {
+            return null
+          }
+
+          const imagePrompt = parsed.prompt.trim()
+
+          if (!imagePrompt) {
+            return null
+          }
+
+          // Parse options
+          const imageOptions: any = {}
+
+          if (parsed.size && typeof parsed.size === 'string') {
+            const validSizes = ['1024x1024', '1024x1792', '1792x1024', '512x512']
+            if (validSizes.includes(parsed.size)) {
+              imageOptions.size = parsed.size
+            }
+          }
+
+          if (parsed.quality && typeof parsed.quality === 'string') {
+            if (parsed.quality === 'standard' || parsed.quality === 'hd') {
+              imageOptions.quality = parsed.quality
+            }
+          }
+
+          if (parsed.style && typeof parsed.style === 'string') {
+            if (parsed.style === 'vivid' || parsed.style === 'natural') {
+              imageOptions.style = parsed.style
+            }
+          }
+
+          if (parsed.numberOfImages && typeof parsed.numberOfImages === 'number') {
+            const num = parsed.numberOfImages
+            if (num >= 1 && num <= 4) {
+              imageOptions.numberOfImages = num
+            }
+          }
+
+          // Generate image
+          try {
+            const response = await this.#imagesServices.generateImageForAssistant(
+              imagePrompt,
+              userId,
+              imageOptions
+            )
+
+            if (!response?.images?.length) {
+              return null
+            }
+
+            // Build and return response
+            return this.#buildImageResponse(response.images, response.provider, imagePrompt, {
+              size: imageOptions.size,
+              quality: imageOptions.quality,
+              style: imageOptions.style,
+            })
+          } catch (error) {
+            console.error('Intent fallback router - image.create error:', error)
+            return null
+          }
+        }
+        case 'image.list': {
+          // Get recent images
+          const images = await this.#imagesServices.getImages(1, 10)
+
+          if (images.error || !images.data?.data?.length) {
+            return {
+              role: roleTypes.assistant,
+              content: 'No tienes imágenes generadas todavía.',
+              provider: ConversationProviders.ASSISTANT,
+            }
+          }
+
+          const imagesList = images.data.data
+            .map((img, index) => {
+              const providerLabel = img.provider ? ` (${String(img.provider)})` : ''
+              const truncatedPrompt =
+                img.prompt.length > 50 ? img.prompt.substring(0, 47) + '...' : img.prompt
+              return `${index + 1}. <${img.imageUrl}|${truncatedPrompt}>${providerLabel}`
+            })
+            .join('\n')
+
+          return {
+            role: roleTypes.assistant,
+            content:
+              parsed.successMessage ||
+              `Tus últimas imágenes (${images.data.data.length}):\n${imagesList}`,
             provider: ConversationProviders.ASSISTANT,
           }
         }
