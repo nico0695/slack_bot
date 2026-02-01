@@ -138,12 +138,28 @@ export default class MessageProcessor {
   #withDateContext = (prompt: string): string => {
     if (!prompt.includes('<fecha>')) return prompt
     const now = new Date()
-    const formatted = new Intl.DateTimeFormat('en-CA', {
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Argentina/Buenos_Aires',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
-    }).format(now)
+      weekday: 'short',
+    })
+    const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+    const parts = dateFormatter.formatToParts(now)
+    const weekday = parts.find((p) => p.type === 'weekday')?.value ?? ''
+    const date = parts
+      .filter((p) => p.type !== 'weekday' && p.type !== 'literal')
+      .map((p) => p.value)
+      .join('-')
+    const time = timeFormatter.format(now)
+    const formatted = `${weekday}, ${date} ${time}`
 
     return prompt.replace(/<fecha>/g, formatted)
   }
@@ -695,11 +711,16 @@ export default class MessageProcessor {
           }
 
           // Build response with images
-          responseMessage = this.#buildImageResponse(response.images, response.provider, imagePrompt, {
-            size: imageOptions.size,
-            quality: imageOptions.quality,
-            style: imageOptions.style,
-          })
+          responseMessage = this.#buildImageResponse(
+            response.images,
+            response.provider,
+            imagePrompt,
+            {
+              size: imageOptions.size,
+              quality: imageOptions.quality,
+              style: imageOptions.style,
+            }
+          )
         } catch (error: any) {
           responseMessage = {
             role: roleTypes.assistant,

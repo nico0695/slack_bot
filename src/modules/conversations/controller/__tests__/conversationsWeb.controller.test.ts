@@ -5,7 +5,6 @@ const showConversationFlowWebMock = jest.fn()
 const generateConversationFlowMock = jest.fn()
 const sendMessageToConversationFlowMock = jest.fn()
 const generateAssistantConversationMock = jest.fn()
-const generateConversationFlowAssistantMock = jest.fn()
 const showChannelsConversationFlowMock = jest.fn()
 const endConversationFlowMock = jest.fn()
 
@@ -15,7 +14,6 @@ const conversationServicesMock = {
   generateConversationFlow: generateConversationFlowMock,
   sendMessageToConversationFlow: sendMessageToConversationFlowMock,
   generateAssistantConversation: generateAssistantConversationMock,
-  generateConversationFlowAssistant: generateConversationFlowAssistantMock,
   showChannelsConversationFlow: showChannelsConversationFlowMock,
   endConversationFlow: endConversationFlowMock,
 }
@@ -111,7 +109,7 @@ describe('ConversationsWebController', () => {
     it('returns message when user not found', async () => {
       getUserByIdMock.mockResolvedValue({ data: null })
 
-      const result = await controller.conversationAssistantFlow(42, 'hola', true)
+      const result = await controller.conversationAssistantFlow(42, 'hola')
 
       expect(result).toEqual({
         role: 'assistant',
@@ -120,40 +118,40 @@ describe('ConversationsWebController', () => {
       })
     })
 
-    it('returns direct assistant response when available', async () => {
+    it('returns assistant response when available', async () => {
       getUserByIdMock.mockResolvedValue({ data: { id: 42 } })
       const assistantResponse = {
         role: 'assistant',
         content: 'todo listo',
         provider: 'assistant',
       }
-      generateAssistantConversationMock.mockResolvedValue(assistantResponse)
+      generateAssistantConversationMock.mockResolvedValue({
+        response: assistantResponse,
+        skipped: false,
+      })
 
-      const result = await controller.conversationAssistantFlow(42, 'hola', false)
+      const result = await controller.conversationAssistantFlow(42, 'hola')
 
       expect(generateAssistantConversationMock).toHaveBeenCalledWith('hola', 42, '99999942', 'web')
       expect(result).toBe(assistantResponse)
     })
 
-    it('falls back to IA flow when enabled and first call returns null', async () => {
+    it('returns null when message is skipped with + prefix', async () => {
       getUserByIdMock.mockResolvedValue({ data: { id: 42 } })
-      generateAssistantConversationMock.mockResolvedValue(null)
-      const fallbackResponse = {
-        role: 'assistant',
-        content: 'fallback',
-        provider: 'assistant',
-      }
-      generateConversationFlowAssistantMock.mockResolvedValue(fallbackResponse)
+      generateAssistantConversationMock.mockResolvedValue({
+        response: null,
+        skipped: true,
+      })
 
-      const result = await controller.conversationAssistantFlow(42, 'hola', true)
+      const result = await controller.conversationAssistantFlow(42, '+nota importante')
 
-      expect(generateConversationFlowAssistantMock).toHaveBeenCalledWith(
-        'hola',
+      expect(generateAssistantConversationMock).toHaveBeenCalledWith(
+        '+nota importante',
         42,
         '99999942',
         'web'
       )
-      expect(result).toBe(fallbackResponse)
+      expect(result).toBeNull()
     })
   })
 
