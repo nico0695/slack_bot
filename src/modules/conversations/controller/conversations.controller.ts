@@ -238,7 +238,8 @@ export default class ConversationsController extends GenericController {
   }
 
   /**
-   * Handle message in assistant mode (single message)
+   * Handle message in assistant mode (unified with Web)
+   * Uses generateAssistantConversation for consistent behavior and history saving
    */
   #handleAssistantMessage = async (
     message: string,
@@ -247,14 +248,15 @@ export default class ConversationsController extends GenericController {
     channelId: string | undefined,
     say: any
   ): Promise<void> => {
-    // Process with MessageProcessor
     const isChannelContext = !isPersonal
-    const scopedChannelId =
-      typeof channelId === 'string' && channelId.trim().length > 0 ? channelId.trim() : undefined
-    const result = await this.#messageProcessor.processAssistantMessage(
+    // Use padded userId for personal (like web), channelId for channels
+    const assistantChannelId = isPersonal ? userId.toString().padStart(8, '9') : channelId
+
+    const result = await this.#conversationServices.generateAssistantConversation(
       message,
       userId,
-      scopedChannelId,
+      assistantChannelId,
+      ConversationProviders.SLACK,
       isChannelContext
     )
 

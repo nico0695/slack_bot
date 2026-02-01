@@ -117,13 +117,13 @@ export default class ConversationsWebController {
   }
 
   /**
-   * Manage conversation flow between users and bot
+   * Manage assistant conversation (unified with Slack)
+   * Skip AI by prefixing message with "+"
    */
   public conversationAssistantFlow = async (
     userId: number,
-    message: string,
-    iaEnabled: boolean
-  ): Promise<IConversation> => {
+    message: string
+  ): Promise<IConversation | null> => {
     try {
       const userData = await this.#usersServices.getUserById(userId)
 
@@ -135,33 +135,18 @@ export default class ConversationsWebController {
         }
       }
 
-      const newResponse = await this.#conversationServices.generateAssistantConversation(
+      const result = await this.#conversationServices.generateAssistantConversation(
         message,
         userId,
         userId.toString().padStart(8, '9'),
         ConversationProviders.WEB
       )
 
-      if (newResponse) {
-        return newResponse
-      }
-
-      if (iaEnabled) {
-        const newResponseIa = await this.#conversationServices.generateConversationFlowAssistant(
-          message,
-          userId,
-          userId.toString().padStart(8, '9'),
-          ConversationProviders.WEB
-        )
-
-        if (newResponseIa) {
-          return newResponseIa
-        }
-      }
-
-      throw new Error('No se pudo generar la conversación')
+      // Return response (null if skipped with "+")
+      return result.response
     } catch (error) {
       console.log('conversationAssistantFlow controller - error= ', error)
+      return null
     }
   }
 

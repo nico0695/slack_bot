@@ -21,3 +21,8 @@ export interface IConversationFlow {
   channelType: ChannelType
   socketChannel?: string
 }
+
+export interface IAssistantResponse {
+  response: IConversation | null
+  skipped: boolean
+}
