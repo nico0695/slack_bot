@@ -17,6 +17,7 @@ import { RedisRepository } from '../repositories/redis/conversations.redis'
 import { conversationFlowPrefix, rConversationKey } from '../repositories/redis/redis.constants'
 
 import {
+  IAssistantResponse,
   IConversation,
   IConversationFlow,
   IUserConversation,
@@ -225,14 +226,21 @@ export default class ConversationsServices {
     message: string,
     userId: number,
     channelId: string,
-    provider: ConversationProviders
-  ): Promise<IConversation | null> => {
+    provider: ConversationProviders,
+    isChannelContext = false
+  ): Promise<IAssistantResponse> => {
     try {
+      // Check skip FIRST (message starts with "+")
+      const shouldSkip = this.#messageProcessor.shouldSkipAI(message)
+      const cleanMessage = shouldSkip
+        ? this.#messageProcessor.cleanSkipFlag(message)
+        : message
+
       const conversationFlow = await this.#getOrInitConversationFlow(channelId)
 
       const newConversation: IUserConversation = {
         role: roleTypes.user,
-        content: message,
+        content: cleanMessage,
         userId,
         provider,
       }
@@ -246,46 +254,61 @@ export default class ConversationsServices {
 
       const { conversation: conversationStored } = conversationFlow
 
+      // If skip requested, save message and return without processing
+      if (shouldSkip) {
+        const updatedConversation = [
+          ...conversationStored.slice(-(this.#maxContextMessages - 1)),
+          newConversation,
+        ]
+
+        await this.#redisRepository.saveConversationFlow(channelId, {
+          ...conversationFlow,
+          conversation: updatedConversation,
+          updatedAt: new Date(),
+        })
+
+        return { response: null, skipped: true }
+      }
+
       // Use MessageProcessor to handle the message
       const trimmedChannelId = channelId.trim()
-      const isSlackChannel =
-        provider === ConversationProviders.SLACK &&
-        typeof trimmedChannelId === 'string' &&
-        /^[CG]/.test(trimmedChannelId)
 
       const result = await this.#messageProcessor.processAssistantMessage(
-        message,
+        cleanMessage,
         userId,
         trimmedChannelId,
-        isSlackChannel
+        isChannelContext
       )
       const responseMessage = result.response
 
-      // Add messages to conversation history (limit to last 10)
-      const newConversationUser = [...conversationStored.slice(-10), newConversation]
+      // Add messages to conversation history (limit to last N)
+      const updatedConversation = [
+        ...conversationStored.slice(-(this.#maxContextMessages - 1)),
+        newConversation,
+      ]
 
       if (responseMessage) {
-        newConversationUser.push(responseMessage)
+        updatedConversation.push(responseMessage)
       }
 
       const newConversationGenerated: IConversationFlow = {
         ...conversationFlow,
-        conversation: [...newConversationUser],
+        conversation: updatedConversation,
         updatedAt: new Date(),
       }
 
       /** Save conversation */
       await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
-      // Send alert message
-      if (responseMessage) {
-        return responseMessage
-      }
+      return { response: responseMessage, skipped: false }
     } catch (error) {
       return {
-        role: roleTypes.assistant,
-        content: error.message ?? 'Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️',
-        provider: ConversationProviders.ASSISTANT,
+        response: {
+          role: roleTypes.assistant,
+          content: error.message ?? 'Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️',
+          provider: ConversationProviders.ASSISTANT,
+        },
+        skipped: false,
       }
     }
   }
@@ -466,55 +489,6 @@ export default class ConversationsServices {
       return messageResponse
     } catch (error) {
       throw new Error('No se pudo generar la respuesta')
-    }
-  }
-
-  generateConversationFlowAssistant = async (
-    message: string,
-    userId: number,
-    chanelId: string,
-    provider: ConversationProviders
-  ): Promise<IConversation | null> => {
-    try {
-      /** Get conversation */
-      const conversationFlow = await this.#redisRepository.getConversationFlow(chanelId)
-
-      if (conversationFlow === null) {
-        return null
-      }
-
-      const newConversation: IUserConversation = {
-        role: roleTypes.user,
-        content: message,
-        userId,
-        provider,
-      }
-
-      const { conversation: conversationStored } = conversationFlow
-
-      // Limit context sent to AI to last N messages to avoid overwhelming the model
-      const limitedConversation = conversationStored.slice(-this.#maxContextMessages)
-      const contextForAI = [...limitedConversation, newConversation]
-
-      const promptGenerated = await this.#generatePrompt(contextForAI)
-
-      /** Generate conversation */
-      const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
-
-      // Save full conversation (not limited) to Redis
-      const newConversationGenerated: IConversationFlow = {
-        ...conversationFlow,
-        conversation: [...conversationStored, newConversation, messageResponse],
-        updatedAt: new Date(),
-      }
-
-      /** Save conversation */
-      await this.#redisRepository.saveConversationFlow(chanelId, newConversationGenerated)
-
-      return messageResponse
-    } catch (error) {
-      console.log('error= ', error.message)
-      return null
     }
   }
 

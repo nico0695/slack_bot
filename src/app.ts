@@ -228,16 +228,12 @@ export default class App {
       })
 
       socket.on('send_assistant_message', async (data) => {
-        const { message, userId, iaEnabled } = data
+        const { message, userId } = data
 
         const channel = userId?.toString().padStart(8, '9')
 
         const conversationResponse =
-          await this.#conversationWebController.conversationAssistantFlow(
-            userId,
-            message,
-            iaEnabled
-          )
+          await this.#conversationWebController.conversationAssistantFlow(userId, message)
 
         if (conversationResponse) {
           io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender
