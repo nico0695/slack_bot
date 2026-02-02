@@ -1,4 +1,4 @@
-import { IConversation } from '../shared/interfaces/converstions'
+import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
 import { roleTypes } from '../shared/constants/openai'
 import { ConversationProviders } from '../shared/constants/conversationFlow'
 import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
@@ -18,6 +18,8 @@ import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
 import { RedisRepository } from '../repositories/redis/conversations.redis'
 import { IGeneratedImage, ImageProvider } from '../../images/shared/interfaces/images.interfaces'
+
+import { buildUserDataContext, formatConversationHistory } from '../shared/utils/userContext.utils'
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
@@ -66,23 +68,19 @@ export default class MessageProcessor {
     return this.#instance
   }
 
-  /**
-   * Main entry point to process assistant messages
-   */
   processAssistantMessage = async (
     message: string,
     userId: number,
     channelId?: string,
-    isChannelContext = false
+    isChannelContext = false,
+    conversationHistory?: IUserConversation[]
   ): Promise<IProcessMessageResult> => {
-    // Check if message should skip AI generation
     const shouldSkipAI = this.shouldSkipAI(message)
 
     if (shouldSkipAI) {
       return { response: null, shouldSkipAI: true }
     }
 
-    // Try assistant commands first (snooze, repeat, alerts list, etc)
     const commandResponse = await this.#handleAssistantCommand(
       userId,
       message,
@@ -93,12 +91,12 @@ export default class MessageProcessor {
       return { response: commandResponse, shouldSkipAI: false }
     }
 
-    // Try assistant variables/flags (.a, .t, .n, etc)
     const variableResponse = await this.#manageAssistantVariables(
       userId,
       message,
       channelId,
-      isChannelContext
+      isChannelContext,
+      conversationHistory
     )
     if (variableResponse) {
       return { response: variableResponse, shouldSkipAI: false }
@@ -162,6 +160,46 @@ export default class MessageProcessor {
     const formatted = `${weekday}, ${date} ${time}`
 
     return prompt.replace(/<fecha>/g, formatted)
+  }
+
+  #fetchUserDataContext = async (
+    userId: number,
+    channelId?: string | null,
+    options: { maxItems?: number } = {}
+  ): Promise<string> => {
+    try {
+      const [alertsRes, tasksRes, notesRes] = await Promise.all([
+        this.#alertsServices.getAlertsByUserId(userId, { sent: false, channelId: channelId ?? undefined }),
+        this.#tasksServices.getTasksByUserId(userId, { channelId: channelId ?? undefined }),
+        this.#notesServices.getNotesByUserId(userId, { channelId: channelId ?? undefined }),
+      ])
+
+      return buildUserDataContext(
+        {
+          alerts: alertsRes.data ?? [],
+          tasks: tasksRes.data ?? [],
+          notes: notesRes.data ?? [],
+        },
+        { maxItems: options.maxItems ?? 5 }
+      )
+    } catch (error) {
+      console.error('Error fetching user data context:', error)
+      return ''
+    }
+  }
+
+  #buildContextBlock = (userDataContext: string, historyContext: string): string => {
+    const parts: string[] = []
+
+    if (userDataContext && userDataContext !== '[SIN_DATOS_PREVIOS]') {
+      parts.push(`\nDATOS_USUARIO:\n${userDataContext}`)
+    }
+
+    if (historyContext) {
+      parts.push(`\nHISTORIAL:\n${historyContext}`)
+    }
+
+    return parts.length > 0 ? '\n' + parts.join('\n') : ''
   }
 
   #getSnoozeMinutes = async (userId: number): Promise<number> => {
@@ -371,18 +409,19 @@ export default class MessageProcessor {
     userId: number,
     message: string,
     channelId: string | undefined,
-    isChannelContext: boolean
+    isChannelContext: boolean,
+    conversationHistory?: IUserConversation[]
   ): Promise<IConversation | null> => {
     const assistantMessage = new AssistantMessage(message)
     const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
 
     if (!assistantMessage.variable) {
-      // No variable found, try AI fallback
       return await this.#intentFallbackRouter(
         userId,
         assistantMessage.cleanMessage,
         channelId,
-        isChannelContext
+        isChannelContext,
+        conversationHistory
       )
     }
 
@@ -773,16 +812,24 @@ export default class MessageProcessor {
     userId: number,
     cleanMessage: string,
     channelId: string | undefined,
-    isChannelContext: boolean
+    isChannelContext: boolean,
+    conversationHistory?: IUserConversation[]
   ): Promise<IConversation | null> => {
     try {
       if (!cleanMessage) return null
       const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
 
+      const [userDataContext, historyContext] = await Promise.all([
+        this.#fetchUserDataContext(userId, scopeChannelId),
+        Promise.resolve(formatConversationHistory(conversationHistory ?? [], 3)),
+      ])
+
+      const contextBlock = this.#buildContextBlock(userDataContext, historyContext)
+
       const classificationPrompt = [
         {
           role: roleTypes.system,
-          content: this.#withDateContext(assistantPromptFlagsLite),
+          content: this.#withDateContext(assistantPromptFlagsLite) + contextBlock,
           provider: ConversationProviders.ASSISTANT,
         },
         {

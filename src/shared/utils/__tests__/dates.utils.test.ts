@@ -1,4 +1,4 @@
-import { formatDateToText, formatTextToDate, formatTimeLeft } from '../dates.utils'
+import { formatDateToText, formatTextToDate, formatTimeLeft, getRelativeTimeCompact } from '../dates.utils'
 
 describe('formatTimeLeft', () => {
   const mockNow = new Date('2024-01-01T12:00:00Z')
@@ -73,5 +73,33 @@ describe('formatDateToText', () => {
     })
 
     expect(result).toBe('2024')
+  })
+})
+
+describe('getRelativeTimeCompact', () => {
+  const baseDate = new Date('2024-01-15T12:00:00Z')
+
+  it('returns minutes for times less than 1 hour away', () => {
+    const target = new Date('2024-01-15T12:30:00Z')
+    expect(getRelativeTimeCompact(target, baseDate)).toBe('30m')
+  })
+
+  it('returns hours for times less than 24 hours away', () => {
+    const target = new Date('2024-01-15T15:00:00Z')
+    expect(getRelativeTimeCompact(target, baseDate)).toBe('3h')
+  })
+
+  it('returns overdue minutes for recent past', () => {
+    const target = new Date('2024-01-15T11:30:00Z')
+    expect(getRelativeTimeCompact(target, baseDate)).toBe('venc30m')
+  })
+
+  it('returns overdue hours for times more than 1 hour past', () => {
+    const target = new Date('2024-01-15T09:00:00Z')
+    expect(getRelativeTimeCompact(target, baseDate)).toBe('venc3h')
+  })
+
+  it('returns 0m for current time', () => {
+    expect(getRelativeTimeCompact(baseDate, baseDate)).toBe('0m')
   })
 })
