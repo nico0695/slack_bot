@@ -270,14 +270,14 @@ export default class ConversationsServices {
         return { response: null, skipped: true }
       }
 
-      // Use MessageProcessor to handle the message
       const trimmedChannelId = channelId.trim()
 
       const result = await this.#messageProcessor.processAssistantMessage(
         cleanMessage,
         userId,
         trimmedChannelId,
-        isChannelContext
+        isChannelContext,
+        conversationStored
       )
       const responseMessage = result.response
 

@@ -77,6 +77,51 @@ export const formatDateToText = (
   return new Intl.DateTimeFormat(local, baseOptions).format(date)
 }
 
+// Output: "2h", "30m", "venc1h", "mañana10:00", "15/0310:00"
+export const getRelativeTimeCompact = (date: Date, now: Date = new Date()): string => {
+  const diffMs = date.getTime() - now.getTime()
+  const diffMins = Math.round(diffMs / 60000)
+
+  if (diffMins < -60) {
+    const hoursAgo = Math.round(Math.abs(diffMins) / 60)
+    return `venc${String(hoursAgo)}h`
+  }
+  if (diffMins < 0) {
+    return `venc${String(Math.abs(diffMins))}m`
+  }
+  if (diffMins < 60) {
+    return `${String(diffMins)}m`
+  }
+  if (diffMins < 1440) {
+    const hours = Math.round(diffMins / 60)
+    return `${String(hours)}h`
+  }
+
+  const tomorrow = new Date(now)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(0, 0, 0, 0)
+  const dayAfter = new Date(tomorrow)
+  dayAfter.setDate(dayAfter.getDate() + 1)
+
+  const timeStr = date.toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Argentina/Buenos_Aires',
+  })
+
+  if (date >= tomorrow && date < dayAfter) {
+    return `mañana${timeStr}`
+  }
+
+  const dateStr = date.toLocaleDateString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  })
+  return `${dateStr}${timeStr}`
+}
+
 /**
  * Formats the time difference between a target date and the current time.
  * @param {Date} targetDate The date of the alert.

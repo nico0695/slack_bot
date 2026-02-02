@@ -10,7 +10,6 @@
 
 /src/assets/*
 
-/.claude
 /logs
 /scripts
 .build-docker.sh
@@ -18,7 +17,12 @@
 /coverage
 /doc
 
+/.claude
+/.agents
+/.gemini
+/.github/skills
 
+AGENTS_AND_SKILLS.md
 AGENTS.md
 CLAUDE.md
 GEMINI.md

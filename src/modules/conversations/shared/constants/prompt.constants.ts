@@ -157,40 +157,44 @@ INTENTS: alert.create, alert.list, task.create, task.list, note.create, note.lis
 SALIDA: SOLO JSON -> {"intent":"<intent>","successMessage":"...","errorMessage":"..."}+ campos extra.
 
 alert.create: time, title.
-  time relativo [w][d][h][m][s] O fecha/hora exacta (YYYY-MM-DD HH:mm) O referencia natural HOY_ES. Si solo hay tiempo sin descripción -> title="alerta".
-  title breve; default "alerta" cuando no haya texto del usuario.
+  time relativo [w][d][h][m][s] O fecha/hora exacta (YYYY-MM-DD HH:mm) O referencia natural HOY_ES.
+  title breve; default "alerta" si no hay texto.
 
-task.create: title (oblig), description (opc), tag (opc, una palabra; omite si no aplica).
+task.create: title (oblig), description (opc), tag (opc).
 note.create: title (oblig), description (opc), tag (opc).
-*.list: tag opcional para filtrar (si no se menciona, omítelo o usa "").
+*.list: tag opcional para filtrar.
 
-image.create: prompt (oblig, descripción de la imagen), size (opc: "1024x1024", "1024x1792", "1792x1024"), quality (opc: "standard", "hd"), style (opc: "vivid", "natural"), numberOfImages (opc: 1-4).
-  Ejemplos de descripción natural: "una puesta de sol sobre montañas", "retrato fotorealista de un gato", "paisaje futurista".
-  Si el usuario solo dice "imagen de X" o "generar X" o "crear imagen X", extraer X como prompt.
-  Si no especifica opciones, usar defaults: size="1024x1024", quality="standard", numberOfImages=1.
-
-image.list: userFilter (opc, para filtrar por usuario; si no se menciona, omítelo).
+image.create: prompt (oblig), size (opc), quality (opc), style (opc), numberOfImages (opc: 1-4).
+image.list: userFilter (opc).
 
 question: sin extras.
 search: query optimizada si requiere datos actuales.
+
+CONTEXTO (si presente):
+- DATOS_USUARIO: alertas [A:n], tareas [T:n], notas [N:n] del usuario con formato #id"titulo"info.
+- HISTORIAL: últimos mensajes U:usuario A:asistente.
+
+USO DEL CONTEXTO:
+- Referencias como "esa", "la última", "igual", "la del deploy" -> buscar en DATOS_USUARIO o HISTORIAL.
+- "hacela para 2h" sin especificar qué -> usar última alerta/tarea del HISTORIAL.
+- "eliminá la nota sobre X" -> buscar #id en DATOS_USUARIO que coincida con X.
+- Si el usuario pide modificar algo existente, incluir "targetId" con el #id encontrado.
+
+CAMPOS ADICIONALES (cuando aplique):
+- targetId: número del item a modificar (ej: si dice "cambiá la alerta #5" -> targetId:5).
 
 Reglas:
 - Campos faltantes -> "".
 - No inventes datos.
 - Sin markdown ni texto extra.
 - Un solo objeto JSON.
-- Usa HOY_ES solo para hoy/mañana/pasado mañana.
 
 Ejemplos:
 {"intent":"alert.create","time":"2h","title":"alerta","successMessage":"Creo alerta 2h","errorMessage":""}
-{"intent":"alert.create","time":"2024-05-10 23:00","title":"Revisar backups","successMessage":"Creo alerta 23:00","errorMessage":""}
-{"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
-{"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
-{"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
-{"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}
+{"intent":"alert.create","time":"2h","title":"revisar server","targetId":15,"successMessage":"Modifico alerta #15","errorMessage":""}
+{"intent":"task.list","tag":"trabajo","successMessage":"Listando tareas de trabajo","errorMessage":""}
 {"intent":"question","successMessage":"Respondo tu pregunta","errorMessage":""}
 
-NOTA FECHA: Si ves HOY_ES: <fecha> úsalo solo para convertir referencias relativas temporales.
 HOY_ES: <fecha>
 `
 
