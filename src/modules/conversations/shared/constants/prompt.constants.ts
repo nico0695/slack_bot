@@ -188,13 +188,18 @@ Reglas:
 - No inventes datos.
 - Sin markdown ni texto extra.
 - Un solo objeto JSON.
+- Usa HOY_ES cuando el usuario pide fechas relativas  hoy/mañana/pasado mañana/el lunes que viene/la semana que viene/etc.
 
 Ejemplos:
 {"intent":"alert.create","time":"2h","title":"alerta","successMessage":"Creo alerta 2h","errorMessage":""}
-{"intent":"alert.create","time":"2h","title":"revisar server","targetId":15,"successMessage":"Modifico alerta #15","errorMessage":""}
-{"intent":"task.list","tag":"trabajo","successMessage":"Listando tareas de trabajo","errorMessage":""}
+{"intent":"alert.create","time":"2024-05-10 23:00","title":"Revisar backups","successMessage":"Creo alerta 23:00","errorMessage":""}
+{"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
+{"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
+{"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
+{"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}
 {"intent":"question","successMessage":"Respondo tu pregunta","errorMessage":""}
 
+NOTA FECHA: Si ves HOY_ES: <fecha> úsalo solo para convertir referencias relativas temporales.
 HOY_ES: <fecha>
 `
 
