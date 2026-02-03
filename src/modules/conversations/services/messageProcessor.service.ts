@@ -4,7 +4,7 @@ import { ConversationProviders } from '../shared/constants/conversationFlow'
 import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
 import { AssistantsFlags, AssistantsVariables } from '../shared/constants/assistant.constants'
 import {
-  assistantPromptFlagsLite,
+  assistantPromptFlagsLite2,
   assistantPromptLite,
   assistantSearchSummaryLite,
 } from '../shared/constants/prompt.constants'
@@ -169,7 +169,10 @@ export default class MessageProcessor {
   ): Promise<string> => {
     try {
       const [alertsRes, tasksRes, notesRes] = await Promise.all([
-        this.#alertsServices.getAlertsByUserId(userId, { sent: false, channelId: channelId ?? undefined }),
+        this.#alertsServices.getAlertsByUserId(userId, {
+          sent: false,
+          channelId: channelId ?? undefined,
+        }),
         this.#tasksServices.getTasksByUserId(userId, { channelId: channelId ?? undefined }),
         this.#notesServices.getNotesByUserId(userId, { channelId: channelId ?? undefined }),
       ])
@@ -829,7 +832,7 @@ export default class MessageProcessor {
       const classificationPrompt = [
         {
           role: roleTypes.system,
-          content: this.#withDateContext(assistantPromptFlagsLite) + contextBlock,
+          content: this.#withDateContext(assistantPromptFlagsLite2) + contextBlock,
           provider: ConversationProviders.ASSISTANT,
         },
         {
