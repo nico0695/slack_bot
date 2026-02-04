@@ -248,15 +248,14 @@ export default class ConversationsController extends GenericController {
     channelId: string | undefined,
     say: any
   ): Promise<void> => {
+    // Process with MessageProcessor
     const isChannelContext = !isPersonal
-    // Use padded userId for personal (like web), channelId for channels
-    const assistantChannelId = isPersonal ? userId.toString().padStart(8, '9') : channelId
-
-    const result = await this.#conversationServices.generateAssistantConversation(
+    const scopedChannelId =
+      typeof channelId === 'string' && channelId.trim().length > 0 ? channelId.trim() : undefined
+    const result = await this.#messageProcessor.processAssistantMessage(
       message,
       userId,
-      assistantChannelId,
-      ConversationProviders.SLACK,
+      scopedChannelId,
       isChannelContext
     )
 
