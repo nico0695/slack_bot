@@ -7,6 +7,9 @@ import SlackRepository from '../repositories/slack/slack.repository'
 import { UsersRedis } from '../repositories/redis/users.redis'
 
 import { IPaginationResponse, IPaginationOptions } from '../../../shared/interfaces/pagination'
+import { createModuleLogger } from '../../../config/logger'
+
+const log = createModuleLogger('users.service')
 
 export default class UsersServices {
   static #instance: UsersServices
@@ -48,10 +51,13 @@ export default class UsersServices {
 
       const response = await this.#usersDataSource.createUser(dataUser)
 
+      log.info({ userId: response.id }, 'User created')
+
       return {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error }, 'createUser failed')
       return {
         error: 'Error al crear el usuario',
       }
@@ -70,6 +76,7 @@ export default class UsersServices {
         error: 'Usuario no encontrado',
       }
     } catch (error) {
+      log.error({ err: error }, 'getUserByEmail failed')
       return {
         error: 'Error al recuperar el usuario',
       }
@@ -88,6 +95,7 @@ export default class UsersServices {
         error: 'Usuario no encontrado',
       }
     } catch (error) {
+      log.error({ err: error, userId: id }, 'getUserById failed')
       return {
         error: 'Error al recuperar el usuario',
       }
@@ -132,10 +140,13 @@ export default class UsersServices {
         throw new Error()
       }
 
+      log.info({ userId: responseCreateUser.id }, 'User auto-created via Supabase')
+
       return {
         data: responseCreateUser,
       }
     } catch (error) {
+      log.error({ err: error, supabaseId }, 'getOrCreateUserSupabase failed')
       return {
         error: 'Error al crear el usuario',
       }
@@ -161,6 +172,7 @@ export default class UsersServices {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId: id }, 'updateUserById failed')
       return {
         error: 'Error al actualizar el usuario',
       }
@@ -205,6 +217,7 @@ export default class UsersServices {
 
       return { data: members }
     } catch (error) {
+      log.error({ err: error, teamId }, 'getUsersByTeamId failed')
       return {
         error: 'Error al recuperar los usuarios del equipo',
       }
@@ -235,6 +248,7 @@ export default class UsersServices {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId }, 'subscribeNotifications failed')
       return {
         error: 'Error al suscribir al usuario',
       }
@@ -256,6 +270,7 @@ export default class UsersServices {
 
       return { data: usersDb }
     } catch (error) {
+      log.error({ err: error }, 'getUsers failed')
       return {
         error: 'Error al recuperar los usuarios',
       }
@@ -324,9 +339,11 @@ export default class UsersServices {
       const responseCreateUser = await this.createUser(newUser)
 
       if (responseCreateUser?.data !== undefined) {
+        log.info({ slackId }, 'User auto-created via Slack')
         return { data: responseCreateUser.data }
       }
     } catch (error) {
+      log.error({ err: error, slackId }, 'getOrCreateUserBySlackId failed')
       return {
         error: 'Error al recuperar el usuario',
       }

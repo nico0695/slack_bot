@@ -75,6 +75,8 @@ export default class ImagesServices {
       // Notify user that generation started
       say('Generando imagen...')
 
+      const startTime = Date.now()
+
       // Call repository - it handles all the polling logic now
       const response = await this.#imageRepository.generateImage(prompt, {
         size: '1024x1024',
@@ -100,6 +102,10 @@ export default class ImagesServices {
           await this.#storeUserImages(imageData)
         })
       )
+
+      const durationMs = Date.now() - startTime
+
+      log.info({ durationMs, provider: response.provider, imageCount: response.images.length }, 'Image generation completed')
 
       // Format response with provider info
       const imageUrls = response.images

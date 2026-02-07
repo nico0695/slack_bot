@@ -4,6 +4,9 @@ import { GenericResponse } from '../../../shared/interfaces/services'
 import NotesDataSource from '../repositories/database/notes.dataSource'
 
 import { INote } from '../shared/interfaces/notes.interfaces'
+import { createModuleLogger } from '../../../config/logger'
+
+const log = createModuleLogger('notes.service')
 
 export default class NotesServices {
   static #instance: NotesServices
@@ -55,10 +58,13 @@ export default class NotesServices {
 
       const response = await this.#notesDataSource.createNote(payload)
 
+      log.info({ userId, noteId: response.id }, 'Note created')
+
       return {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId }, 'createAssistantNote failed')
       return {
         error: 'Error al crear la tarea',
       }
@@ -74,10 +80,13 @@ export default class NotesServices {
     try {
       const response = await this.#notesDataSource.createNote(data)
 
+      log.info({ userId: data.userId, noteId: response.id }, 'Note created')
+
       return {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId: data.userId }, 'createNote failed')
       return {
         error: 'Error al crear la tarea',
       }
@@ -103,6 +112,7 @@ export default class NotesServices {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId }, 'getNotesByUserId failed')
       return {
         error: 'Error al obtener las tareas',
       }
@@ -120,6 +130,7 @@ export default class NotesServices {
         data: true,
       }
     } catch (error) {
+      log.error({ err: error, noteId }, 'updateNote failed')
       return {
         error: 'Error al actualizar la tarea',
       }
@@ -130,10 +141,13 @@ export default class NotesServices {
     try {
       const res = await this.#notesDataSource.deleteNote(noteId, userId)
 
+      log.info({ noteId, userId }, 'Note deleted')
+
       return {
         data: res > 0,
       }
     } catch (error) {
+      log.error({ err: error, noteId, userId }, 'deleteNote failed')
       return {
         error: 'Error al eliminar la tarea',
       }
