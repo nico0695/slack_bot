@@ -4,6 +4,9 @@ import { GenericResponse } from '../../../shared/interfaces/services'
 import TextToSpeechDataSources from '../repositories/database/textToSpeech.dataSource'
 import { IPaginationOptions, IPaginationResponse } from '../../../shared/interfaces/pagination'
 import { TextToSpeech } from '../../../entities/textToSpeech'
+import { createModuleLogger } from '../../../config/logger'
+
+const log = createModuleLogger('textToSpeech.service')
 
 export default class TextToSpeechServices {
   static #instance: TextToSpeechServices
@@ -47,6 +50,7 @@ export default class TextToSpeechServices {
       res.data = speechGenerated?.fileName
       return res
     } catch (error) {
+      log.error({ err: error }, 'generateSpeech failed')
       res.error = 'Error generating speech'
       return res
     }
@@ -66,6 +70,7 @@ export default class TextToSpeechServices {
 
       return { data }
     } catch (error) {
+      log.error({ err: error }, 'getTextToSpeechList failed')
       return { error: 'Error al obtener las imagenes' }
     }
   }
@@ -81,6 +86,7 @@ export default class TextToSpeechServices {
 
       return res
     } catch (error) {
+      log.error({ err: error, id }, 'getAudio failed')
       res.error = 'Error generating speech'
       return res
     }

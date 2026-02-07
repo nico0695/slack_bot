@@ -44,6 +44,7 @@ export const verifyToken = async (
 
     next()
   } catch (error) {
+    log.error({ err: error }, 'verifyToken failed')
     return res.status(401).json({ message: 'No estas autorizado' })
   }
 }
@@ -107,6 +108,7 @@ export function SlackAuth(target: any, propertyKey: string, descriptor: Property
 
       return originalMethod.apply(this, args)
     } catch (error) {
+      log.error({ err: error, slackUserId: payload?.user }, 'SlackAuth failed')
       return say('Ups! No se pudo obtener tu información 🤷‍♂️')
     }
   }
@@ -139,6 +141,7 @@ export function SlackAuthActions(
 
       return originalMethod.apply(this, args)
     } catch (error) {
+      log.error({ err: error, slackUserId: body?.user?.id }, 'SlackAuthActions failed')
       await ack()
       return say('Ups! No se pudo obtener tu información 🤷‍♂️')
     }
@@ -159,6 +162,7 @@ export function Permission(profile: Profiles[] = []): any {
 
         return originalMethod.apply(this, args)
       } catch (error) {
+        log.error({ err: error }, 'Permission check failed')
         return res.status(403).json({ message: 'You dont have permissions' })
       }
     }

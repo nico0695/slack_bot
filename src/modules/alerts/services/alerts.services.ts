@@ -6,6 +6,9 @@ import AlertsDataSource from '../repositories/database/alerts.dataSource'
 import { UsersRedis } from '../../users/repositories/redis/users.redis'
 
 import { formatTextToDate } from '../../../shared/utils/dates.utils'
+import { createModuleLogger } from '../../../config/logger'
+
+const log = createModuleLogger('alerts.service')
 
 export default class AlertsServices {
   static #instance: AlertsServices
@@ -50,10 +53,13 @@ export default class AlertsServices {
         channelId,
       })
 
+      log.info({ userId, alertId: response.id }, 'Alert created')
+
       return {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId }, 'createAssistantAlert failed')
       return {
         error: 'Error al crear la alerta',
       }
@@ -69,10 +75,13 @@ export default class AlertsServices {
     try {
       const response = await this.#alertsDataSource.createAlert(data)
 
+      log.info({ userId: data.userId, alertId: response.id }, 'Alert created')
+
       return {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId: data.userId }, 'createAlert failed')
       return {
         error: 'Error al crear la alerta',
       }
@@ -95,6 +104,7 @@ export default class AlertsServices {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId }, 'getAlertsByUserId failed')
       return {
         error: 'Error al obtener las alertas',
       }
@@ -113,6 +123,7 @@ export default class AlertsServices {
 
       return { data: response }
     } catch (error) {
+      log.error({ err: error, alertId, userId }, 'getAlertById failed')
       return {
         error: 'Error al obtener la alerta solicitada',
       }
@@ -147,6 +158,7 @@ export default class AlertsServices {
         data: updated,
       }
     } catch (error) {
+      log.error({ err: error, alertId, userId }, 'rescheduleAlert failed')
       return {
         error: 'Error al reagendar la alerta',
       }
@@ -170,6 +182,7 @@ export default class AlertsServices {
 
       return { data: updated }
     } catch (error) {
+      log.error({ err: error, alertId, userId }, 'markAlertResolved failed')
       return {
         error: 'Error al marcar la alerta como resuelta',
       }
@@ -203,6 +216,7 @@ export default class AlertsServices {
         data: created,
       }
     } catch (error) {
+      log.error({ err: error, alertId, userId }, 'createFollowUpAlert failed')
       return {
         error: 'Error al crear la alerta recurrente',
       }
@@ -231,6 +245,7 @@ export default class AlertsServices {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error }, 'getAlertsToNotify failed')
       return {
         error: 'Error al obtener las alertas',
       }
@@ -245,6 +260,7 @@ export default class AlertsServices {
         data: true,
       }
     } catch (error) {
+      log.error({ err: error, alertId }, 'updateAlertAsNotified failed')
       return {
         error: 'Error al actualizar la alerta',
       }
@@ -255,10 +271,13 @@ export default class AlertsServices {
     try {
       const res = await this.#alertsDataSource.deleteAlerts(alertId, userId)
 
+      log.info({ alertId, userId }, 'Alert deleted')
+
       return {
         data: res > 0,
       }
     } catch (error) {
+      log.error({ err: error, alertId, userId }, 'deleteAlert failed')
       return {
         error: 'Error al eliminar la alerta',
       }

@@ -399,6 +399,8 @@ export default class ConversationsServices {
         return 'No se pudo iniciar la conversación 🤷‍♂️'
       }
 
+      log.info({ channelId, channelType }, 'Conversation flow started')
+
       return 'Conversación iniciada correctamente.'
     } catch (error) {
       log.error({ err: error }, 'startConversationFlow failed')
@@ -419,6 +421,8 @@ export default class ConversationsServices {
       if (!response) {
         return 'No se pudo finalizar la conversación 🤷‍♂️'
       }
+
+      log.info({ channelId }, 'Conversation flow ended')
 
       return 'Conversación finalizada correctamente.'
     } catch (error) {

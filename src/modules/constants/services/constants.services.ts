@@ -3,6 +3,9 @@ import ConstantsDataSources from '../repositories/database/constants.dataSource'
 
 import { setGlobalConfigValue } from '../../../config/globalConfig'
 import { GlobalConfigKey } from '../shared/constants/constants.interfaces'
+import { createModuleLogger } from '../../../config/logger'
+
+const log = createModuleLogger('constants.service')
 
 export default class ConstantsServices {
   static #instance: ConstantsServices
@@ -35,18 +38,28 @@ export default class ConstantsServices {
   }
 
   updateConstantByKey = async (key: GlobalConfigKey, value: string): Promise<Constants> => {
-    const constant = await this.#constantsDataSources.updateConstantByKey(key, value)
+    try {
+      const constant = await this.#constantsDataSources.updateConstantByKey(key, value)
 
-    setGlobalConfigValue(key, value)
+      setGlobalConfigValue(key, value)
 
-    return constant
+      return constant
+    } catch (error) {
+      log.error({ err: error, key }, 'updateConstantByKey failed')
+      throw error
+    }
   }
 
   createConstant = async (key: GlobalConfigKey, value: string): Promise<Constants> => {
-    const constant = await this.#constantsDataSources.createConstant(key, value)
+    try {
+      const constant = await this.#constantsDataSources.createConstant(key, value)
 
-    setGlobalConfigValue(key, value)
+      setGlobalConfigValue(key, value)
 
-    return constant
+      return constant
+    } catch (error) {
+      log.error({ err: error, key }, 'createConstant failed')
+      throw error
+    }
   }
 }

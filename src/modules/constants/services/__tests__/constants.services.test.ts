@@ -2,6 +2,16 @@ import ConstantsServices from '../constants.services'
 import { GlobalConfigKey } from '../../shared/constants/constants.interfaces'
 import { setGlobalConfigValue } from '../../../../config/globalConfig'
 
+jest.mock('../../../../config/logger', () => ({
+  createModuleLogger: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+  }),
+}))
+
 const getAllConstantsMock = jest.fn()
 const getConstantByKeyMock = jest.fn()
 const updateConstantByKeyMock = jest.fn()
