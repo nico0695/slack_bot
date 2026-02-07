@@ -12,18 +12,22 @@ jest.mock('../../../../../config/redisConfig', () => ({
   },
 }))
 
+jest.mock('../../../../../config/logger', () => ({
+  createModuleLogger: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+  }),
+}))
+
 describe('UsersRedis', () => {
   let usersRedis: UsersRedis
-  let consoleSpy: jest.SpyInstance
 
   beforeEach(() => {
     jest.clearAllMocks()
     usersRedis = UsersRedis.getInstance()
-    consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
-  })
-
-  afterEach(() => {
-    consoleSpy.mockRestore()
   })
 
   it('adds or updates subscription', async () => {

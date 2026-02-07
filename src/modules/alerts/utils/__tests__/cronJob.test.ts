@@ -36,16 +36,19 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgAlertDetail: (...args: any[]) => msgAlertDetailMock(...args),
 }))
 
-describe('alertCronJob', () => {
-  let consoleLogSpy: jest.SpyInstance
+jest.mock('../../../../config/logger', () => ({
+  createModuleLogger: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+  }),
+}))
 
+describe('alertCronJob', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
-  })
-
-  afterEach(() => {
-    consoleLogSpy.mockRestore()
   })
 
   it('returns early when alert service responds with error', async () => {

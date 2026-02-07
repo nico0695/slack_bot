@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import morgan from 'morgan'
+import pinoHttp from 'pino-http'
 
 import dotenv from 'dotenv'
 
@@ -12,6 +12,8 @@ import 'express-async-errors'
 import { errorHandler } from './shared/middleware/errors'
 
 import { IoServer } from './config/socketConfig'
+import logger, { createModuleLogger } from './config/logger'
+import { helmetMiddleware } from './config/helmetConfig'
 
 import connectionSource from './config/ormconfig'
 
@@ -36,6 +38,8 @@ import { slackHelperMessage } from './shared/constants/slack.constants'
 dotenv.config()
 
 const slackPort = 3001
+const log = createModuleLogger('app')
+const socketLog = createModuleLogger('socket')
 
 export default class App {
   #app: express.Application
@@ -89,7 +93,8 @@ export default class App {
   #config(): void {
     this.#app.set('port', 4000)
 
-    this.#app.use(morgan('dev'))
+    this.#app.use(helmetMiddleware)
+    this.#app.use(pinoHttp({ logger }))
     this.#app.use(cors())
     this.#app.use(express.json())
 
@@ -118,7 +123,7 @@ export default class App {
 
     // Start slack bot
     void this.#slackApp.start(process.env.PORT ?? slackPort).then(() => {
-      console.log(`~ Slack Bot is running on port ${slackPort}!`)
+      log.info({ port: slackPort }, 'Slack Bot started')
     })
 
     // Actions slack bot
@@ -164,7 +169,7 @@ export default class App {
     }
 
     io.on('connection', (socket) => {
-      console.log('a user connected: ', socket.id)
+      socketLog.debug({ socketId: socket.id }, 'User connected')
 
       socket.on('join_room', async (data) => {
         const { username, channel }: IJoinRoomData = data
@@ -176,7 +181,7 @@ export default class App {
           username,
         })
 
-        console.log(`user ${username} joined channel ${channel}`)
+        socketLog.debug({ username, channel }, 'User joined channel')
 
         socket.emit('join_response', joinResponse) // Send message to user that joined
       })
@@ -203,7 +208,7 @@ export default class App {
       })
 
       socket.on('disconnect', (reason) => {
-        console.log('user disconnected= ', reason)
+        socketLog.debug({ reason }, 'User disconnected')
       })
 
       // Assistant
@@ -211,7 +216,7 @@ export default class App {
         const { username, channel: channelId }: IJoinRoomData = data
 
         if (!channelId) {
-          console.log('join_assistant_room: No channelId provided')
+          socketLog.warn('join_assistant_room: No channelId provided')
           return
         }
 
@@ -244,7 +249,7 @@ export default class App {
         const { channel: channelId }: IJoinRoomData = data
 
         if (!channelId) {
-          console.log('leave_assistant_room: No channelId provided')
+          socketLog.warn('leave_assistant_room: No channelId provided')
           return
         }
 
@@ -259,12 +264,12 @@ export default class App {
     try {
       const cronJob = cron.schedule('* * * * *', alertCronJob)
 
-      console.log('~ Cron Job is running')
+      log.info('Cron job started')
 
       // Iniciar el cron
       cronJob.start()
     } catch (error) {
-      console.log('Error cron job init', error)
+      log.error({ err: error }, 'Cron job init failed')
     }
   }
 
@@ -273,23 +278,18 @@ export default class App {
       publicKey: process.env.VAPID_PUBLIC_KEY,
       privateKey: process.env.VAPID_PRIVATE_KEY,
     }
-    console.log('~ Web Push Configured!')
+    log.info('Web Push configured')
     webpush.setVapidDetails('mailto: test@gmail.com', vapidKeys.publicKey, vapidKeys.privateKey)
   }
 
   // Start server
   public async start(): Promise<void> {
     process.on('uncaughtException', (err) => {
-      console.error(`[${new Date().toISOString()}] Uncaught Exception:`, err.stack || err)
+      logger.fatal({ err }, 'Uncaught exception')
     })
 
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error(
-        `[${new Date().toISOString()}] Unhandled Rejection at:`,
-        promise,
-        'reason:',
-        reason
-      )
+    process.on('unhandledRejection', (reason) => {
+      logger.fatal({ err: reason }, 'Unhandled rejection')
     })
 
     const server = http.createServer(this.#app)
@@ -299,7 +299,7 @@ export default class App {
 
     // Start express
     server.listen(this.#app.get('port'), () => {
-      console.log('~ Socket Server listening in port 4000!')
+      log.info({ port: 4000 }, 'Socket Server started')
     })
 
     // Slack

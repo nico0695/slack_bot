@@ -1,11 +1,14 @@
 import { Router } from 'express'
 
+import { createModuleLogger } from '../../../config/logger'
 import ConversationsServices from '../services/conversations.services'
 
 import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
 import { roleTypes } from '../shared/constants/openai'
 import UsersServices from '../../users/services/users.services'
+
+const log = createModuleLogger('conversations.webController')
 
 export default class ConversationsWebController {
   static #instance: ConversationsWebController
@@ -76,7 +79,7 @@ export default class ConversationsWebController {
         conversation: conversationFlow?.conversation ?? [],
       }
     } catch (error) {
-      console.log('joinAssistantChannel - error= ', error)
+      log.error({ err: error }, 'joinAssistantChannel failed')
     }
   }
 
@@ -111,7 +114,7 @@ export default class ConversationsWebController {
 
       return null
     } catch (error) {
-      console.log('err= ', error)
+      log.error({ err: error }, 'generateConversation failed')
       return null
     }
   }
@@ -145,7 +148,7 @@ export default class ConversationsWebController {
       // Return response (null if skipped with "+")
       return result.response
     } catch (error) {
-      console.log('conversationAssistantFlow controller - error= ', error)
+      log.error({ err: error }, 'conversationAssistantFlow failed')
       return null
     }
   }

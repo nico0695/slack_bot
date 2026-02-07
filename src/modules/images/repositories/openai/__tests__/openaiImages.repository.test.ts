@@ -6,6 +6,24 @@ import axios from 'axios'
 jest.mock('axios')
 const mockedAxios = axios as jest.Mocked<typeof axios>
 
+const mockLogFns = {
+  info: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
+  fatal: jest.fn(),
+}
+
+jest.mock('../../../../../config/logger', () => ({
+  createModuleLogger: jest.fn().mockReturnValue({
+    info: (...args: any[]) => mockLogFns.info(...args),
+    error: (...args: any[]) => mockLogFns.error(...args),
+    warn: (...args: any[]) => mockLogFns.warn(...args),
+    debug: (...args: any[]) => mockLogFns.debug(...args),
+    fatal: (...args: any[]) => mockLogFns.fatal(...args),
+  }),
+}))
+
 describe('OpenaiImagesRepository', () => {
   let repository: OpenaiImagesRepository
 
@@ -161,21 +179,18 @@ describe('OpenaiImagesRepository', () => {
     })
 
     it('should return null on API error', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
-
       mockedAxios.post.mockRejectedValue(new Error('API Error'))
 
       const result = await repository.generateImage('test prompt')
 
       expect(result).toBeNull()
-      expect(consoleErrorSpy).toHaveBeenCalledWith('OpenAI Images API error:', 'API Error')
-
-      consoleErrorSpy.mockRestore()
+      expect(mockLogFns.error).toHaveBeenCalledWith(
+        { err: expect.any(Error) },
+        'OpenAI Images API generateImage failed'
+      )
     })
 
     it('should handle rate limit error (429)', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
-
       const rateLimitError: any = new Error('Rate limit exceeded')
       rateLimitError.response = { status: 429 }
 
@@ -184,16 +199,10 @@ describe('OpenaiImagesRepository', () => {
       const result = await repository.generateImage('test prompt')
 
       expect(result).toBeNull()
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'OpenAI API rate limit exceeded. Please try again later.'
-      )
-
-      consoleErrorSpy.mockRestore()
+      expect(mockLogFns.warn).toHaveBeenCalledWith('OpenAI Images API rate limit exceeded')
     })
 
     it('should handle API error with detailed message', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
-
       const apiError: any = new Error('API Error')
       apiError.response = {
         data: {
@@ -208,12 +217,10 @@ describe('OpenaiImagesRepository', () => {
       const result = await repository.generateImage('test prompt')
 
       expect(result).toBeNull()
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'OpenAI Images API error:',
-        'Invalid prompt content'
+      expect(mockLogFns.error).toHaveBeenCalledWith(
+        { err: expect.any(Error) },
+        'OpenAI Images API generateImage failed'
       )
-
-      consoleErrorSpy.mockRestore()
     })
   })
 })

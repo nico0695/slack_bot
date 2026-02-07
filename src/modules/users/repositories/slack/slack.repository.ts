@@ -1,6 +1,9 @@
 import { App as SlackApp } from '@slack/bolt'
 import { UsersListResponse } from '@slack/web-api'
+import { createModuleLogger } from '../../../../config/logger'
 import { connectionSlackApp } from '../../../../config/slackConfig'
+
+const log = createModuleLogger('users.slack')
 
 export default class SlackRepository {
   static #instance: SlackRepository
@@ -29,7 +32,7 @@ export default class SlackRepository {
       })
       return response.members
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'Slack API call failed')
       return null
     }
   }
@@ -42,7 +45,7 @@ export default class SlackRepository {
 
       return response.user
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'Slack API call failed')
       return null
     }
   }

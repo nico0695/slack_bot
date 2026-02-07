@@ -81,6 +81,11 @@ VAPID_PRIVATE_KEY=
 # Search (optional)
 SEARCH_API_KEY=
 SEARCH_API_KEY_CX=
+
+# Logging (optional)
+# Overrides default level (test=silent, production=info, development=debug)
+# One of: fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=
 ```
 
 ## Usage
@@ -190,6 +195,20 @@ npm test                 # Run tests
 npm run test:watch       # Watch mode
 npm run test:coverage    # Coverage report
 ```
+
+### Logging
+- The app uses Pino for structured logs. In development, logs are pretty-printed; in production, JSON is emitted to stdout.
+- Default levels by environment:
+  - test: `silent`
+  - production: `info`
+  - development: `debug`
+- Override with `LOG_LEVEL`.
+
+Examples:
+- `LOG_LEVEL=warn npm run dev` runs dev server logging only warnings and errors.
+- `NODE_ENV=production npm start` emits JSON logs (no pretty printing).
+
+Pretty logging is enabled automatically in development (when `NODE_ENV` is not `production` or `test`).
 
 ### Project Structure
 ```

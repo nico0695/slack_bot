@@ -1,4 +1,7 @@
+import { createModuleLogger } from '../../../../config/logger'
 import { transformerApi } from '../../../../config/xenovaImport'
+
+const log = createModuleLogger('summary.transformers')
 
 export default class TransformersRepository {
   static #instance: TransformersRepository
@@ -26,7 +29,7 @@ export default class TransformersRepository {
 
       return output
     } catch (error) {
-      console.log('repository error= ', error)
+      log.error({ err: error }, 'generateSummary failed')
       return null
     }
   }

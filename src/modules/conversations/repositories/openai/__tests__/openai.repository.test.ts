@@ -19,6 +19,16 @@ jest.mock('openai', () => ({
   }),
 }))
 
+jest.mock('../../../../../config/logger', () => ({
+  createModuleLogger: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+  }),
+}))
+
 describe('OpenaiRepository', () => {
   let repository: OpenaiRepository
 
@@ -29,15 +39,10 @@ describe('OpenaiRepository', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    jest.spyOn(console, 'error').mockImplementation(() => {})
     const fn = openaiMocks.createChatCompletion
     if (fn) {
       fn.mockReset()
     }
-  })
-
-  afterEach(() => {
-    ;(console.error as jest.Mock).mockRestore()
   })
 
   it('returns null when API call throws', async () => {

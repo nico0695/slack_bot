@@ -1,6 +1,9 @@
+import { createModuleLogger } from '../../../config/logger'
 import { RedisRepository } from '../repositories/redis/conversations.redis'
 import { IConversationFlow } from '../shared/interfaces/converstions'
 import { ChannelType } from '../shared/constants/conversationFlow'
+
+const log = createModuleLogger('conversations.flowManager')
 
 export default class ConversationFlowManager {
   static #instance: ConversationFlowManager
@@ -55,7 +58,7 @@ export default class ConversationFlowManager {
 
       return 'Conversación iniciada correctamente.'
     } catch (error) {
-      console.log('startFlow - error=', error.message)
+      log.error({ err: error }, 'startFlow failed')
       return null
     }
   }
@@ -79,7 +82,7 @@ export default class ConversationFlowManager {
 
       return 'Conversación finalizada correctamente.'
     } catch (error) {
-      console.log('endFlow - error=', error.message)
+      log.error({ err: error }, 'endFlow failed')
       return null
     }
   }
@@ -91,7 +94,7 @@ export default class ConversationFlowManager {
     try {
       return await this.#redisRepository.getConversationFlow(channelId)
     } catch (error) {
-      console.log('getFlowContext - error=', error.message)
+      log.error({ err: error }, 'getFlowContext failed')
       return null
     }
   }
