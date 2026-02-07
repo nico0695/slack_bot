@@ -1,3 +1,4 @@
+import { createModuleLogger } from '../../../config/logger'
 import ImagesDataSources from '../repositories/database/images.dataSource'
 import {
   IImage,
@@ -17,6 +18,8 @@ import {
   getDefaultImageRepositoryType,
 } from '../shared/constants/imageRepository'
 import UsersServices from '../../users/services/users.services'
+
+const log = createModuleLogger('images.service')
 
 /**
  * Images Service
@@ -105,7 +108,7 @@ export default class ImagesServices {
 
       return `Imágenes generadas con ${response.provider}:\n${imageUrls}`
     } catch (error) {
-      console.error('ImagesServices generateImages error:', error.message)
+      log.error({ err: error }, 'generateImages failed')
       return 'No se pudo generar la imagen'
     }
   }
@@ -136,7 +139,7 @@ export default class ImagesServices {
       const user = await userService.getUserById(userId)
 
       if (!user?.data) {
-        console.error('ImagesServices: User not found for ID:', userId)
+        log.warn({ userId }, 'User not found for image storage')
         return response // Return images but don't store
       }
 
@@ -157,7 +160,7 @@ export default class ImagesServices {
 
       return response
     } catch (error) {
-      console.error('ImagesServices generateImageForAssistant error:', error.message)
+      log.error({ err: error }, 'generateImageForAssistant failed')
       return null
     }
   }
@@ -176,7 +179,7 @@ export default class ImagesServices {
 
       return { data: images }
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'getImages failed')
       return { error: 'Error al obtener las imagenes' }
     }
   }

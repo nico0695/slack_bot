@@ -1,4 +1,7 @@
 import * as redis from 'redis'
+import { createModuleLogger } from './logger'
+
+const log = createModuleLogger('redis')
 
 export class RedisConfig {
   static #instance: RedisConfig
@@ -20,9 +23,9 @@ export class RedisConfig {
   #connect = async (): Promise<void> => {
     try {
       await this.#redisClient.connect()
-      console.log('~ Redis connected!')
+      log.info('Redis connected')
     } catch (error) {
-      console.error('x Redis - connect erro= ', error.message)
+      log.error({ err: error }, 'Redis connection failed')
     }
   }
 
@@ -30,10 +33,10 @@ export class RedisConfig {
     try {
       if (this.#redisClient.isReady) {
         await this.#redisClient.disconnect()
-        console.log('~ Redis disconnected!')
+        log.info('Redis disconnected')
       }
     } catch (error) {
-      console.error('x Redis - disconnect error= ', error.message)
+      log.error({ err: error }, 'Redis disconnect failed')
     }
   }
 

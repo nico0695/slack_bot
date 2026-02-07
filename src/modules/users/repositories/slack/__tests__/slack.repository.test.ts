@@ -14,18 +14,22 @@ jest.mock('../../../../../config/slackConfig', () => ({
   },
 }))
 
+jest.mock('../../../../../config/logger', () => ({
+  createModuleLogger: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+  }),
+}))
+
 describe('SlackRepository', () => {
   let slackRepository: SlackRepository
-  let consoleSpy: jest.SpyInstance
 
   beforeEach(() => {
     jest.clearAllMocks()
     slackRepository = SlackRepository.getInstance()
-    consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
-  })
-
-  afterEach(() => {
-    consoleSpy.mockRestore()
   })
 
   it('fetches team members', async () => {

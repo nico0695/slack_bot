@@ -1,6 +1,9 @@
 import fs from 'fs'
+import { createModuleLogger } from '../../../../config/logger'
 import { transformerApi } from '../../../../config/xenovaImport'
 import { generateRandomFileName } from '../../../../shared/utils/generators.utils'
+
+const log = createModuleLogger('tts.transformers')
 
 const EMBED =
   'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin'
@@ -50,7 +53,7 @@ export default class TransformersRepository {
         path,
       }
     } catch (error) {
-      console.log('repository error= ', error)
+      log.error({ err: error }, 'generateSpeech failed')
       return null
     }
   }

@@ -1,6 +1,9 @@
 import { Router } from 'express'
 
+import { createModuleLogger } from '../../../config/logger'
 import ImagesServices from '../services/images.services'
+
+const log = createModuleLogger('images.controller')
 
 export default class ImagessController {
   static #instance: ImagessController
@@ -46,7 +49,7 @@ export default class ImagessController {
 
       say(newResponse)
     } catch (error) {
-      console.log('err= ', error)
+      log.error({ err: error }, 'generateImages failed')
     }
   }
 }
