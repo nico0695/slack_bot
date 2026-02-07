@@ -29,8 +29,9 @@ jobs:
           script: |
             set -e
             cd /app/slack_bot/
-            git pull
-            npm run build
+              git pull
+              npm ci
+              npm run build
             ./build-docker.sh
             docker stop slack_bot
             docker rm slack_bot
