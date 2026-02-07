@@ -13,6 +13,7 @@ import { errorHandler } from './shared/middleware/errors'
 
 import { IoServer } from './config/socketConfig'
 import logger, { createModuleLogger } from './config/logger'
+import { helmetMiddleware } from './config/helmetConfig'
 
 import connectionSource from './config/ormconfig'
 
@@ -92,6 +93,7 @@ export default class App {
   #config(): void {
     this.#app.set('port', 4000)
 
+    this.#app.use(helmetMiddleware)
     this.#app.use(pinoHttp({ logger }))
     this.#app.use(cors())
     this.#app.use(express.json())
