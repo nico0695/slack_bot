@@ -1,8 +1,11 @@
 import { ChatCompletionRequestMessage } from 'openai'
 import { GoogleGenAI } from '@google/genai'
+import { createModuleLogger } from '../../../../config/logger'
 import { IConversation } from '../../shared/interfaces/converstions'
 import { roleTypes } from '../../shared/constants/openai'
 import { ConversationProviders } from '../../shared/constants/conversationFlow'
+
+const log = createModuleLogger('gemini.conversations')
 
 export default class GeminiRepository {
   static #instance: GeminiRepository
@@ -57,9 +60,9 @@ export default class GeminiRepository {
       return response
     } catch (error) {
       if (error.message.includes('429')) {
-        console.error('Gemini API rate limit exceeded. Please try again later.')
+        log.warn('Gemini API rate limit exceeded')
       } else {
-        console.error('Error in Gemini API:', error)
+        log.error({ err: error }, 'Gemini API chatCompletion failed')
       }
       return null
     }

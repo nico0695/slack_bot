@@ -4,17 +4,16 @@ import UnauthorizedError from '../utils/errors/UnauthorizedError'
 import { createClient } from '@supabase/supabase-js'
 import UsersServices from '../../modules/users/services/users.services'
 import { Profiles } from '../constants/auth.constants'
+import { createModuleLogger } from '../../config/logger'
+
+const log = createModuleLogger('middleware.auth')
 
 // Create a single supabase client for interacting with your database
 const supabase = (() => {
   try {
     return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_TOKEN)
   } catch (error) {
-    console.log(
-      `Supabase error: ${String(error)} - ${process.env.SUPABASE_URL} - ${
-        process.env.SUPABASE_TOKEN
-      }`
-    )
+    log.error({ err: error }, 'Supabase client initialization failed')
   }
 })()
 

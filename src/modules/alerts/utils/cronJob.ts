@@ -1,8 +1,11 @@
 import webpush from 'web-push'
 
+import { createModuleLogger } from '../../../config/logger'
 import { connectionSlackApp } from '../../../config/slackConfig'
 import AlertsServices from '../services/alerts.services'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
+
+const log = createModuleLogger('alerts.cron')
 
 /**
  * Get alerts to notify and send message to slack
@@ -15,7 +18,7 @@ export const alertCronJob = async (): Promise<void> => {
     const alerts = await alertsServices.getAlertsToNotify()
 
     if (alerts.error) {
-      console.log('Error getting alerts to notify')
+      log.error('Failed to get alerts to notify')
       return
     }
 
@@ -50,7 +53,7 @@ export const alertCronJob = async (): Promise<void> => {
               })
             )
           } catch (error) {
-            console.log('Error sending web notification= ', error)
+            log.error({ err: error }, 'Failed to send web notification')
           }
         }
       }
@@ -58,8 +61,8 @@ export const alertCronJob = async (): Promise<void> => {
 
     await alertsServices.updateAlertAsNotified(alerts?.data.map((alert) => alert.id))
 
-    console.log(`${alerts?.data.length} alert/s notified successfully 🚀`)
+    log.info({ count: alerts?.data.length }, 'Alerts notified successfully')
   } catch (error) {
-    console.log('Error in alertCronJob= ', error)
+    log.error({ err: error }, 'alertCronJob failed')
   }
 }

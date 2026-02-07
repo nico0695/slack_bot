@@ -1,10 +1,13 @@
 import axios from 'axios'
+import { createModuleLogger } from '../../../../config/logger'
 import {
   IImageRepository,
   IImageGenerationOptions,
   IImageGenerationResponse,
   ImageProvider,
 } from '../../shared/interfaces/images.interfaces'
+
+const log = createModuleLogger('openai.images')
 
 /**
  * OpenAI DALL-E 3 Image Generation Repository
@@ -88,11 +91,9 @@ export default class OpenaiImagesRepository implements IImageRepository {
       }
     } catch (error: any) {
       if (error.response?.status === 429) {
-        console.error('OpenAI API rate limit exceeded. Please try again later.')
-      } else if (error.response?.data?.error) {
-        console.error('OpenAI Images API error:', error.response.data.error.message)
+        log.warn('OpenAI Images API rate limit exceeded')
       } else {
-        console.error('OpenAI Images API error:', error.message)
+        log.error({ err: error }, 'OpenAI Images API generateImage failed')
       }
       return null
     }

@@ -1,6 +1,9 @@
 import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from 'openai'
 
+import { createModuleLogger } from '../../../../config/logger'
 import { IConversation } from '../../shared/interfaces/converstions'
+
+const log = createModuleLogger('openai.conversations')
 
 export default class OpenaiRepository {
   static #instance: OpenaiRepository
@@ -51,9 +54,9 @@ export default class OpenaiRepository {
       return completion.data.choices[0].message as IConversation
     } catch (error) {
       if (error.message.includes('429')) {
-        console.error('OpenAI API rate limit exceeded. Please try again later.')
+        log.warn('OpenAI API rate limit exceeded')
       } else {
-        console.error('Error in OpenAI API:', error.message)
+        log.error({ err: error }, 'OpenAI API chatCompletion failed')
       }
       return null
     }

@@ -1,5 +1,6 @@
 import { Router } from 'express'
 
+import { createModuleLogger } from '../../../config/logger'
 import GenericController from '../../../shared/modules/genericController'
 
 import ConversationsServices from '../services/conversations.services'
@@ -11,6 +12,8 @@ import { IConversation } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders, FlowKeys } from '../shared/constants/conversationFlow'
 import { SlackAuth, SlackAuthActions } from '../../../shared/middleware/auth'
 import { rPersonalConversationFlow } from '../repositories/redis/redis.constants'
+
+const log = createModuleLogger('conversations.controller')
 
 export default class ConversationsController extends GenericController {
   static #instance: ConversationsController
@@ -95,7 +98,7 @@ export default class ConversationsController extends GenericController {
         say('Se borro la conversación con éxito 🎉')
       }
     } catch (error) {
-      console.log('err= ', error)
+      log.error({ err: error }, 'Slack conversation action failed')
     }
   }
 
@@ -116,7 +119,7 @@ export default class ConversationsController extends GenericController {
 
       say(conversation ?? 'No hay ninguna conversación guardada 🤷‍♂️')
     } catch (error) {
-      console.log('err= ', error)
+      log.error({ err: error }, 'Slack conversation action failed')
     }
   }
 
@@ -198,7 +201,7 @@ export default class ConversationsController extends GenericController {
         await this.#handleAssistantMessage(incomingMessage, userData.id, isPersonal, channelId, say)
       }
     } catch (error) {
-      console.log('conversationFlow - error=', error)
+      log.error({ err: error }, 'conversationFlow failed')
       say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
     }
   }

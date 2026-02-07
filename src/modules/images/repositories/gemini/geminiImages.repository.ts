@@ -1,10 +1,13 @@
 import { GoogleGenAI } from '@google/genai'
+import { createModuleLogger } from '../../../../config/logger'
 import {
   IImageRepository,
   IImageGenerationOptions,
   IImageGenerationResponse,
   ImageProvider,
 } from '../../shared/interfaces/images.interfaces'
+
+const log = createModuleLogger('gemini.images')
 
 /**
  * Google Gemini Imagen 3 Image Generation Repository
@@ -71,7 +74,7 @@ export default class GeminiImagesRepository implements IImageRepository {
 
       // Validate response
       if (!response?.images || response.images.length === 0) {
-        console.error('Gemini Images API returned no images')
+        log.warn('Gemini Images API returned no images')
         return null
       }
 
@@ -86,11 +89,9 @@ export default class GeminiImagesRepository implements IImageRepository {
       }
     } catch (error: any) {
       if (error.message?.includes('429') || error.status === 429) {
-        console.error('Gemini API rate limit exceeded. Please try again later.')
-      } else if (error.response?.data?.error) {
-        console.error('Gemini Images API error:', error.response.data.error.message)
+        log.warn('Gemini Images API rate limit exceeded')
       } else {
-        console.error('Gemini Images API error:', error.message)
+        log.error({ err: error }, 'Gemini Images API generateImage failed')
       }
       return null
     }

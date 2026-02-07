@@ -1,3 +1,4 @@
+import { createModuleLogger } from '../../../config/logger'
 import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
 import { roleTypes } from '../shared/constants/openai'
 import { ConversationProviders } from '../shared/constants/conversationFlow'
@@ -23,6 +24,8 @@ import { buildUserDataContext, formatConversationHistory } from '../shared/utils
 
 import { formatDateToText } from '../../../shared/utils/dates.utils'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
+
+const log = createModuleLogger('conversations.messageProcessor')
 
 export enum AIRepositoryType {
   OPENAI = 'OPENAI',
@@ -186,7 +189,7 @@ export default class MessageProcessor {
         { maxItems: options.maxItems ?? 5 }
       )
     } catch (error) {
-      console.error('Error fetching user data context:', error)
+      log.error({ err: error }, 'fetchUserDataContext failed')
       return ''
     }
   }
@@ -1077,7 +1080,7 @@ export default class MessageProcessor {
               style: imageOptions.style,
             })
           } catch (error) {
-            console.error('Intent fallback router - image.create error:', error)
+            log.error({ err: error }, 'Intent fallback router - image.create failed')
             return null
           }
         }

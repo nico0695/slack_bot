@@ -1,7 +1,10 @@
 import { PushSubscription } from 'web-push'
 
+import { createModuleLogger } from '../../../../config/logger'
 import { usersPushSubscriptionsKey } from './redis.constants'
 import { RedisConfig } from '../../../../config/redisConfig'
+
+const log = createModuleLogger('users.redis')
 
 export class UsersRedis {
   static #instance: UsersRedis
@@ -39,7 +42,7 @@ export class UsersRedis {
 
       return true
     } catch (error) {
-      console.log('errorr= ', error.message)
+      log.error({ err: error }, 'addOrUpdateUserSubscription failed')
       return false
     }
   }
@@ -52,7 +55,7 @@ export class UsersRedis {
 
       return responseFormated
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'getUsersSubscriptions failed')
       return null
     }
   }

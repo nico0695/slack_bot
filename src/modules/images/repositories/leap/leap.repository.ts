@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { createModuleLogger } from '../../../../config/logger'
 import {
   IGenerateImageResponse,
   IInferaceJobResponse,
@@ -8,6 +9,8 @@ import {
   ImageProvider,
 } from '../../shared/interfaces/images.interfaces'
 import { LeapStatus } from '../../shared/constants/leap'
+
+const log = createModuleLogger('leap.images')
 
 /**
  * Leap API Image Generation Repository
@@ -75,7 +78,7 @@ export default class LeapRepository implements IImageRepository {
         inferenceId: initialResponse.inferenceId,
       }
     } catch (error) {
-      console.error('LeapRepository generateImage error:', error.message)
+      log.error({ err: error }, 'generateImage failed')
       return null
     }
   }
@@ -118,7 +121,7 @@ export default class LeapRepository implements IImageRepository {
         status: response.data.status,
       }
     } catch (error) {
-      console.error('LeapRepository #callGenerateImage error:', error.message)
+      log.error({ err: error }, 'callGenerateImage failed')
       return null
     }
   }
@@ -153,7 +156,7 @@ export default class LeapRepository implements IImageRepository {
 
       return result
     } catch (error) {
-      console.error('LeapRepository #pollUntilComplete error:', error.message)
+      log.error({ err: error }, 'pollUntilComplete failed')
       return null
     }
   }
@@ -174,7 +177,7 @@ export default class LeapRepository implements IImageRepository {
         images: response.data.images ?? undefined,
       }
     } catch (error) {
-      console.error('LeapRepository #getInferenceJob error:', error.message)
+      log.error({ err: error }, 'getInferenceJob failed')
       return null
     }
   }

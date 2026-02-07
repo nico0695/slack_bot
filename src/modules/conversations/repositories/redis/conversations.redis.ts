@@ -1,6 +1,9 @@
+import { createModuleLogger } from '../../../../config/logger'
 import { IConversation, IConversationFlow } from '../../shared/interfaces/converstions'
 import { rConversationFlow, rAlertSnoozeConfig } from './redis.constants'
 import { RedisConfig } from '../../../../config/redisConfig'
+
+const log = createModuleLogger('conversations.redis')
 
 export interface AlertSnoozeConfig {
   defaultSnoozeMinutes: number
@@ -35,7 +38,7 @@ export class RedisRepository {
 
       return true
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'Redis operation failed')
       return false
     }
   }
@@ -50,7 +53,7 @@ export class RedisRepository {
 
       return responseFormated.filter((item) => item !== null)
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'Redis operation failed')
       return null
     }
   }
@@ -79,7 +82,7 @@ export class RedisRepository {
 
       return responseFormated
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'Redis operation failed')
       return null
     }
   }
@@ -90,7 +93,7 @@ export class RedisRepository {
 
       return true
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'Redis operation failed')
       return false
     }
   }
@@ -101,7 +104,7 @@ export class RedisRepository {
 
       return response
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'Redis operation failed')
       return null
     }
   }
@@ -117,7 +120,7 @@ export class RedisRepository {
       })
       return true
     } catch (error) {
-      console.log('saveAlertSnoozeConfig - error=', error.message)
+      log.error({ err: error }, 'saveAlertSnoozeConfig failed')
       return false
     }
   }
@@ -130,7 +133,7 @@ export class RedisRepository {
       }
       return JSON.parse(response) as AlertSnoozeConfig
     } catch (error) {
-      console.log('getAlertSnoozeConfig - error=', error.message)
+      log.error({ err: error }, 'getAlertSnoozeConfig failed')
       return null
     }
   }

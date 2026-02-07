@@ -1,3 +1,4 @@
+import { createModuleLogger } from '../../../config/logger'
 import { GlobalConstants } from '../../../shared/constants/global'
 import { IoServer } from '../../../config/socketConfig'
 
@@ -28,6 +29,8 @@ import { formatDateToText } from '../../../shared/utils/dates.utils'
 import { assistantPromptLite } from '../shared/constants/prompt.constants'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 import MessageProcessor from './messageProcessor.service'
+
+const log = createModuleLogger('conversations.service')
 
 type TMembersNames = Record<string, string>
 
@@ -179,7 +182,7 @@ export default class ConversationsServices {
 
       return messageResponse.content
     } catch (error) {
-      console.log('- generateConversation service error= ', error.message)
+      log.error({ err: error }, 'generateConversation failed')
       return null
     }
   }
@@ -321,7 +324,7 @@ export default class ConversationsServices {
 
       return true
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'cleanConversation failed')
       return false
     }
   }
@@ -353,7 +356,7 @@ export default class ConversationsServices {
         })
         .join('\n')
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'showConversation failed')
       return null
     }
   }
@@ -397,7 +400,7 @@ export default class ConversationsServices {
 
       return 'Conversación iniciada correctamente.'
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'startConversationFlow failed')
       return null
     }
   }
@@ -418,7 +421,7 @@ export default class ConversationsServices {
 
       return 'Conversación finalizada correctamente.'
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'endConversationFlow failed')
       return null
     }
   }
@@ -525,7 +528,7 @@ export default class ConversationsServices {
 
       return newConversation
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'sendMessageToConversationFlow failed')
       return null
     }
   }
@@ -551,7 +554,7 @@ export default class ConversationsServices {
         }: ${message.content}`
       })
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'showConversationFlow failed')
       return null
     }
   }
@@ -567,7 +570,7 @@ export default class ConversationsServices {
 
       return conversationFlow
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'showConversationFlowWeb failed')
       return null
     }
   }
@@ -579,7 +582,7 @@ export default class ConversationsServices {
 
       return channels.map((channel) => channel.replace(conversationFlowPrefix, ''))
     } catch (error) {
-      console.log('error= ', error.message)
+      log.error({ err: error }, 'showChannelsConversationFlow failed')
       return null
     }
   }
@@ -1022,7 +1025,7 @@ export default class ConversationsServices {
         defaultSnoozeMinutes,
       })
     } catch (error) {
-      console.log('getAssistantQuickHelp - error=', error)
+      log.error({ err: error }, 'getAssistantQuickHelp failed')
       return 'No pude obtener tu resumen en este momento. 😅'
     }
   }
