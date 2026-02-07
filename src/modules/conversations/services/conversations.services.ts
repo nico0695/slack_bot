@@ -305,6 +305,7 @@ export default class ConversationsServices {
 
       return { response: responseMessage, skipped: false }
     } catch (error) {
+      log.error({ err: error }, 'generateAssistantConversation failed')
       return {
         response: {
           role: roleTypes.assistant,
@@ -491,6 +492,7 @@ export default class ConversationsServices {
 
       return messageResponse
     } catch (error) {
+      log.error({ err: error }, 'generateConversationFlow failed')
       throw new Error('No se pudo generar la respuesta')
     }
   }
@@ -622,6 +624,7 @@ export default class ConversationsServices {
           return 'Acción no reconocida.'
       }
     } catch (error) {
+      log.error({ err: error }, 'handleAction failed')
       return 'Error al ejecutar la accion. 😅'
     }
   }

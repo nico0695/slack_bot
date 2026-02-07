@@ -767,6 +767,7 @@ export default class MessageProcessor {
             }
           )
         } catch (error: any) {
+          log.error({ err: error }, '#manageAssistantVariables IMAGE generation failed')
           responseMessage = {
             role: roleTypes.assistant,
             content: `❌ ${
@@ -1140,6 +1141,7 @@ export default class MessageProcessor {
           }
       }
     } catch (e) {
+      log.error({ err: e }, '#intentFallbackRouter failed')
       return null
     }
   }

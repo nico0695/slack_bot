@@ -78,6 +78,7 @@ export default class ConversationsController extends GenericController {
         throw new Error('No se pudo generar la conversación')
       }
     } catch (error) {
+      log.error({ err: error }, 'generateConversation failed')
       say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
     }
   }
