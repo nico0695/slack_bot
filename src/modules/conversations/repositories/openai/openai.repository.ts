@@ -5,7 +5,7 @@ import { IConversation } from '../../shared/interfaces/converstions'
 export default class OpenaiRepository {
   static #instance: OpenaiRepository
 
-  #openai
+  #openai: OpenAIApi
 
   private constructor() {
     const configuration = new Configuration({
@@ -37,7 +37,7 @@ export default class OpenaiRepository {
       const isClassification = mode === 'classification'
 
       const apiRequestBot = {
-        model: isClassification ? 'gpt-4.1-nano' : 'gpt-3.5-turbo',
+        model: isClassification ? 'gpt-4o-mini' : 'gpt-4o-mini',
         messages: messages.map((message: any) => ({
           role: message.role,
           content: message.content,
