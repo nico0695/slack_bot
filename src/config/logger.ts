@@ -21,6 +21,17 @@ const logger = pino({
   transport,
   timestamp: pino.stdTimeFunctions.isoTime,
   base: { service: 'slack-bot' },
+  redact: {
+    paths: [
+      'req.headers.authorization',
+      'req.headers["x-slack-signature"]',
+      'req.headers["x-slack-request-timestamp"]',
+      'req.body.token',
+      'req.body.client_secret',
+      'req.body.api_app_id',
+    ],
+    remove: true,
+  },
   serializers: {
     err: (err: any) => {
       const serialized: Record<string, any> = {

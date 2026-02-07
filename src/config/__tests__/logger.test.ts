@@ -39,4 +39,45 @@ describe('logger', () => {
 
     expect(logger.level).toBe('silent')
   })
+
+  it('redacts sensitive fields from logged objects', () => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.LOG_LEVEL
+
+    const logger = require('../logger').default
+
+    const output: string[] = []
+    const dest = {
+      write: (msg: string) => { output.push(msg) },
+    }
+
+    const testLogger = require('pino')({
+      ...logger,
+      level: 'info',
+      redact: {
+        paths: [
+          'req.headers.authorization',
+          'req.headers["x-slack-signature"]',
+          'req.headers["x-slack-request-timestamp"]',
+          'req.body.token',
+          'req.body.client_secret',
+          'req.body.api_app_id',
+        ],
+        remove: true,
+      },
+    }, dest)
+
+    testLogger.info({
+      req: {
+        headers: { authorization: 'Bearer secret-token', 'x-slack-signature': 'v0=abc123' },
+        body: { token: 'xoxb-secret', message: 'hello' },
+      },
+    }, 'test redaction')
+
+    const logged = JSON.parse(output[0])
+    expect(logged.req.headers.authorization).toBeUndefined()
+    expect(logged.req.headers['x-slack-signature']).toBeUndefined()
+    expect(logged.req.body.token).toBeUndefined()
+    expect(logged.req.body.message).toBe('hello')
+  })
 })
