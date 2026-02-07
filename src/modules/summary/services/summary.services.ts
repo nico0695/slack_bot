@@ -1,6 +1,9 @@
 import TransformersRepository from '../repositories/transformers/transformers.repository'
 
 import { GenericResponse } from '../../../shared/interfaces/services'
+import { createModuleLogger } from '../../../config/logger'
+
+const log = createModuleLogger('summary.service')
 
 export default class SummaryServices {
   static #instance: SummaryServices
@@ -28,6 +31,7 @@ export default class SummaryServices {
       res.data = summarization
       return res
     } catch (error) {
+      log.error({ err: error }, 'generateSummary failed')
       res.error = 'Error generating summary'
       return res
     }

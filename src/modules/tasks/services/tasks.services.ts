@@ -6,6 +6,9 @@ import TasksDataSource from '../repositories/database/tasks.dataSource'
 import { formatTextToDate } from '../../../shared/utils/dates.utils'
 import { TaskStatus } from '../shared/constants/tasks.constants'
 import { ITask } from '../shared/interfaces/tasks.interfaces'
+import { createModuleLogger } from '../../../config/logger'
+
+const log = createModuleLogger('tasks.service')
 
 export default class TasksServices {
   static #instance: TasksServices
@@ -63,10 +66,13 @@ export default class TasksServices {
 
       const response = await this.#tasksDataSource.createTask(payload)
 
+      log.info({ userId, taskId: response.id }, 'Task created')
+
       return {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId }, 'createAssistantTask failed')
       return {
         error: 'Error al crear la tarea',
       }
@@ -82,10 +88,13 @@ export default class TasksServices {
     try {
       const response = await this.#tasksDataSource.createTask(data)
 
+      log.info({ userId: data.userId, taskId: response.id }, 'Task created')
+
       return {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId: data.userId }, 'createTask failed')
       return {
         error: 'Error al crear la tarea',
       }
@@ -111,6 +120,7 @@ export default class TasksServices {
         data: response,
       }
     } catch (error) {
+      log.error({ err: error, userId }, 'getTasksByUserId failed')
       return {
         error: 'Error al obtener las tareas',
       }
@@ -128,6 +138,7 @@ export default class TasksServices {
         data: true,
       }
     } catch (error) {
+      log.error({ err: error, taskId }, 'updateTask failed')
       return {
         error: 'Error al actualizar la tarea',
       }
@@ -138,10 +149,13 @@ export default class TasksServices {
     try {
       const res = await this.#tasksDataSource.deleteTask(taskId, userId)
 
+      log.info({ taskId, userId }, 'Task deleted')
+
       return {
         data: res > 0,
       }
     } catch (error) {
+      log.error({ err: error, taskId, userId }, 'deleteTask failed')
       return {
         error: 'Error al eliminar la tarea',
       }

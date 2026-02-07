@@ -12,6 +12,7 @@ const log = createModuleLogger('alerts.cron')
  */
 export const alertCronJob = async (): Promise<void> => {
   try {
+    const startTime = Date.now()
     const alertsServices = AlertsServices.getInstance()
     const slackApp = connectionSlackApp
 
@@ -61,7 +62,8 @@ export const alertCronJob = async (): Promise<void> => {
 
     await alertsServices.updateAlertAsNotified(alerts?.data.map((alert) => alert.id))
 
-    log.info({ count: alerts?.data.length }, 'Alerts notified successfully')
+    const durationMs = Date.now() - startTime
+    log.info({ count: alerts?.data.length, durationMs }, 'Alerts notified successfully')
   } catch (error) {
     log.error({ err: error }, 'alertCronJob failed')
   }

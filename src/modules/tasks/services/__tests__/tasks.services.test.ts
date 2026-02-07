@@ -1,6 +1,16 @@
 import TasksServices from '../tasks.services'
 import { TaskStatus } from '../../shared/constants/tasks.constants'
 
+jest.mock('../../../../config/logger', () => ({
+  createModuleLogger: jest.fn().mockReturnValue({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+  }),
+}))
+
 const createTaskMock = jest.fn()
 const getTasksByUserIdMock = jest.fn()
 const updateTaskMock = jest.fn()
