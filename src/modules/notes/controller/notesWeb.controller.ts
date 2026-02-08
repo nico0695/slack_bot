@@ -2,10 +2,12 @@ import { Router } from 'express'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
+import { validateBody, validateParams, idParamSchema } from '../../../shared/utils/validation'
 
 import NotesServices from '../services/notes.services'
 
 import { INote } from '../shared/interfaces/notes.interfaces'
+import { createNoteSchema, updateNoteSchema } from '../shared/schemas/notes.schemas'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
@@ -53,16 +55,13 @@ export default class NotesWebController extends GenericController {
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async createNote(req: any, res: any): Promise<void> {
     const user = this.userData
+    const parsed = validateBody(createNoteSchema, req.body)
 
     const dataNote: INote = {
-      title: req.body.title,
-      description: req.body.description ?? '',
-      tag: req.body.tag,
+      title: parsed.title,
+      description: parsed.description,
+      tag: parsed.tag,
       userId: user.id,
-    }
-
-    if (!dataNote.title) {
-      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
     const response = await this.notesServices.createNote(dataNote)
@@ -91,23 +90,19 @@ export default class NotesWebController extends GenericController {
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async updateNote(req: any, res: any): Promise<void> {
-    const taskId = req.params.id
-
+    const { id: noteId } = validateParams(idParamSchema, req.params)
     const user = this.userData
+    const parsed = validateBody(updateNoteSchema, req.body)
 
     const dataNote: INote = {
-      id: req.params.id,
-      title: req.body.title,
-      description: req.body.description,
-      tag: req.body.tag,
+      id: noteId,
+      title: parsed.title,
+      description: parsed.description,
+      tag: parsed.tag,
       userId: user.id,
     }
 
-    if (!dataNote.id || !dataNote.title) {
-      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
-    }
-
-    const response = await this.notesServices.updateNote(taskId, dataNote)
+    const response = await this.notesServices.updateNote(noteId, dataNote)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -119,9 +114,10 @@ export default class NotesWebController extends GenericController {
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async deleteNote(req: any, res: any): Promise<void> {
+    const { id: noteId } = validateParams(idParamSchema, req.params)
     const user = this.userData
 
-    const response = await this.notesServices.deleteNote(req.params.id, user.id)
+    const response = await this.notesServices.deleteNote(noteId, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

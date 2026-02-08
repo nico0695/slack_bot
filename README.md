@@ -5,6 +5,7 @@ Multi-functional Slack bot integrating AI services (OpenAI, Gemini) for conversa
 ## Features
 
 ### Core Capabilities
+
 - **AI Conversations** - OpenAI and Gemini integration with conversation history
 - **Image Generation** - AI-powered image creation (OpenAI DALL-E 3, Gemini Imagen 3, Leap)
 - **Task Management** - Create, view, and manage tasks
@@ -17,6 +18,7 @@ Multi-functional Slack bot integrating AI services (OpenAI, Gemini) for conversa
 - **Web Interface** - Real-time web dashboard with Socket.io
 
 ### Technical Features
+
 - Slack Socket Mode (no webhook required)
 - Redis conversation caching
 - TypeORM with SQLite (Supabase compatible)
@@ -28,6 +30,7 @@ Multi-functional Slack bot integrating AI services (OpenAI, Gemini) for conversa
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js (LTS)
 - Redis Server
 - Slack workspace with bot configured
@@ -99,6 +102,7 @@ LOG_LEVEL=
 ### Slack Commands
 
 **Conversations:**
+
 ```
 cb <message>          - Send message to AI
 cb_show               - Show conversation history
@@ -109,12 +113,14 @@ end conversation      - Exit flow mode
 ```
 
 **Utilities:**
+
 ```
 img <prompt>          - Generate image
 /help                 - Show command list
 ```
 
 **Task/Alert/Note Creation:**
+
 ```
 .alert/.a <time> <message>  - Create alert (e.g., ".alert 1d14h12m Reminder")
 .task/.t <time> <message>   - Create task
@@ -141,6 +147,7 @@ img <prompt>          - Generate image
 ### Socket.io Events
 
 **Public Channels:**
+
 ```javascript
 socket.emit('join_room', { username, channel })
 socket.emit('send_message', { message, username, channel, iaEnabled })
@@ -148,6 +155,7 @@ socket.on('receive_message', (data) => {})
 ```
 
 **Assistant (Private):**
+
 ```javascript
 socket.emit('join_assistant_room', { username, channel: userId })
 socket.emit('send_assistant_message', { message, userId, iaEnabled })
@@ -157,6 +165,7 @@ socket.on('receive_assistant_message', (data) => {})
 ## Architecture
 
 ### Module Structure
+
 ```
 src/modules/{feature}/
 ├── controller/
@@ -170,10 +179,12 @@ src/modules/{feature}/
 │   └── {api}/                        # External API clients
 └── shared/
     ├── constants/
-    └── interfaces/
+    ├── interfaces/
+    └── schemas/                      # Zod validation schemas
 ```
 
 ### Available Modules
+
 - `conversations` - AI chat management
 - `alerts` - Time-based reminders
 - `tasks` - Task tracking
@@ -188,11 +199,13 @@ src/modules/{feature}/
 - `system` - Infrastructure endpoints (health check)
 
 ### Key Technologies
+
 - **Backend:** Node.js, Express, TypeScript
 - **Slack:** Bolt SDK (Socket Mode)
 - **Real-time:** Socket.io
 - **Database:** TypeORM, SQLite/Supabase
 - **Cache:** Redis
+- **Validation:** Zod (schema-based input validation in web controllers)
 - **AI:** OpenAI, Gemini, Leap API, Transformers.js
 - **Testing:** Jest
 - **Linting:** ESLint
@@ -201,6 +214,7 @@ src/modules/{feature}/
 ## Development
 
 ### Commands
+
 ```bash
 npm run dev              # Development with hot reload
 npm run build            # Compile TypeScript
@@ -212,6 +226,7 @@ npm run test:coverage    # Coverage report
 ```
 
 ### Logging
+
 - The app uses Pino for structured logs. In development, logs are pretty-printed; in production, JSON is emitted to stdout.
 - Default levels by environment:
   - test: `silent`
@@ -220,12 +235,14 @@ npm run test:coverage    # Coverage report
 - Override with `LOG_LEVEL`.
 
 Examples:
+
 - `LOG_LEVEL=warn npm run dev` runs dev server logging only warnings and errors.
 - `NODE_ENV=production npm start` emits JSON logs (no pretty printing).
 
 Pretty logging is enabled automatically in development (when `NODE_ENV` is not `production` or `test`).
 
 ### Project Structure
+
 ```
 src/
 ├── app.ts              # Application setup
@@ -238,10 +255,12 @@ src/
 ```
 
 ### Redis Keys
+
 - Conversations: `${conversationFlowPrefix}:${channelId}`
 - User conversations: `rConvo:${userId}`
 
 ### Database
+
 Default: SQLite at `src/database/database.sqlite`
 Override: Set `DB_URL` for Supabase/Postgres
 
@@ -271,21 +290,12 @@ Tests located in `__tests__/` directories within each module layer.
 ## Documentation
 
 Detailed documentation available in `/doc`:
+
 - [Architecture](doc/ARCHITECTURE.md) - System design and patterns
 - [API Reference](doc/API_REFERENCE.md) - Complete API documentation
 - [Development Guide](doc/DEVELOPMENT.md) - Development workflows
 - [Deployment Guide](doc/DEPLOYMENT.md) - Docker and production setup
 - [Troubleshooting](doc/TROUBLESHOOTING.md) - Common issues and solutions
-
-## Recent Updates
-
-- Added `links` module for saving URLs/links to read later (Wallabag-style), with Slack commands (`.link/.lk`), REST API, assistant intent fallback, and overflow menu actions (detail, mark read, delete)
-- Added `externalStorage` module for persistent file storage via api-storage (Backblaze B2)
-- Fixed Redis digest and assistant preference handling
-- Improved Docker configuration
-- Enhanced CI/CD with error handling
-- Husky production build optimization
-- Task datasource linting improvements
 
 ## License
 
