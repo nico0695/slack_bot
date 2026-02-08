@@ -9,3 +9,8 @@ export interface ILink {
   userId: number
   channelId?: string | null
 }
+
+export interface ILinkMetadata {
+  title?: string
+  description?: string
+}
