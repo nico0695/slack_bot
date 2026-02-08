@@ -18,6 +18,8 @@ import {
   getDefaultImageRepositoryType,
 } from '../shared/constants/imageRepository'
 import UsersServices from '../../users/services/users.services'
+import ExternalStorageServices from '../../externalStorage/services/externalStorage.services'
+import { StorageSourceModule } from '../../externalStorage/shared/constants/externalStorage.constants'
 
 const log = createModuleLogger('images.service')
 
@@ -31,11 +33,13 @@ export default class ImagesServices {
 
   #imageRepository: IImageRepository // Interface, not concrete class
   #imagesDataSources: ImagesDataSources
+  #externalStorageServices: ExternalStorageServices
 
   private constructor(repositoryType: ImageRepositoryType = getDefaultImageRepositoryType()) {
     // Factory pattern: select repository based on type
     this.#imageRepository = ImageRepositoryByType[repositoryType].getInstance()
     this.#imagesDataSources = ImagesDataSources.getInstance()
+    this.#externalStorageServices = ExternalStorageServices.getInstance()
 
     this.generateImages = this.generateImages.bind(this)
   }
@@ -55,6 +59,52 @@ export default class ImagesServices {
    */
   #storeUserImages = async (imageData: IImage): Promise<void> => {
     await this.#imagesDataSources.createImages(imageData)
+  }
+
+  /**
+   * Upload a generated image to external storage (api-storage / Backblaze B2)
+   * Downloads the temporary provider URL and re-uploads for persistent storage
+   */
+  #uploadImageToStorage = async (
+    imageUrl: string,
+    prompt: string,
+    provider: string,
+    userData: { slackId: string },
+    options?: { size?: string; quality?: string; style?: string }
+  ): Promise<{ storageUrl: string; storageFileId: string }> => {
+    const fileName = `img_${Date.now()}.png`
+
+    const metadata: Record<string, string> = {
+      prompt,
+      provider,
+      slackId: userData.slackId,
+    }
+    if (options?.size) metadata.size = options.size
+    if (options?.quality) metadata.quality = options.quality
+    if (options?.style) metadata.style = options.style
+
+    const result = await this.#externalStorageServices.uploadFromUrl({
+      sourceUrl: imageUrl,
+      fileName,
+      sourceModule: StorageSourceModule.IMAGES,
+      mimeType: 'image/png',
+      metadata,
+    })
+
+    if (result.error) {
+      throw new Error(result.error)
+    }
+
+    const detailsResult = await this.#externalStorageServices.getFileDetails(result.data.localId)
+
+    if (detailsResult.error) {
+      throw new Error(detailsResult.error)
+    }
+
+    return {
+      storageUrl: detailsResult.data.downloadUrl,
+      storageFileId: result.data.storageFileId,
+    }
   }
 
   /**
@@ -88,11 +138,22 @@ export default class ImagesServices {
         return 'No se pudo generar la imagen'
       }
 
-      // Save all generated images to database
+      // Upload images to persistent storage and save to database
+      const storageUrls: string[] = []
       await Promise.all(
         response.images.map(async (image) => {
+          const uploaded = await this.#uploadImageToStorage(
+            image.url,
+            prompt,
+            response.provider,
+            { slackId: userData.slackId },
+            { size: '1024x1024', quality: 'standard' }
+          )
+
+          storageUrls.push(uploaded.storageUrl)
+
           const imageData: IImage = {
-            imageUrl: image.url,
+            imageUrl: uploaded.storageUrl,
             inferenceId: response.inferenceId || image.id || 'unknown',
             slackId: userData.slackId,
             slackTeamId: userData.slackTeamId,
@@ -107,12 +168,12 @@ export default class ImagesServices {
 
       log.info({ durationMs, provider: response.provider, imageCount: response.images.length }, 'Image generation completed')
 
-      // Format response with provider info
-      const imageUrls = response.images
-        .map((image, index) => `Imagen #${index + 1}: ${image.url}`)
+      // Format response with persistent storage URLs
+      const imageUrlsText = storageUrls
+        .map((url, index) => `Imagen #${index + 1}: ${url}`)
         .join('\n')
 
-      return `Imágenes generadas con ${response.provider}:\n${imageUrls}`
+      return `Imágenes generadas con ${response.provider}:\n${imageUrlsText}`
     } catch (error) {
       log.error({ err: error }, 'generateImages failed')
       return 'No se pudo generar la imagen'
@@ -149,11 +210,21 @@ export default class ImagesServices {
         return response // Return images but don't store
       }
 
-      // Save all generated images to database
+      // Upload images to persistent storage and save to database
       await Promise.all(
         response.images.map(async (image) => {
+          const uploaded = await this.#uploadImageToStorage(
+            image.url,
+            prompt,
+            response.provider,
+            { slackId: user.data.slackId },
+            options
+          )
+
+          image.url = uploaded.storageUrl
+
           const imageData: IImage = {
-            imageUrl: image.url,
+            imageUrl: uploaded.storageUrl,
             inferenceId: response.inferenceId || image.id || 'unknown',
             slackId: user.data.slackId,
             slackTeamId: user.data.slackTeamId,

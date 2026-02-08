@@ -1,5 +1,9 @@
 import { createModuleLogger } from '../../../config/logger'
-import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
+import {
+  IConversation,
+  IUserConversation,
+  ProgressCallback,
+} from '../shared/interfaces/converstions'
 import { roleTypes } from '../shared/constants/openai'
 import { ConversationProviders } from '../shared/constants/conversationFlow'
 import { AssistantMessage } from '../shared/utils/asistantMessage.utils'
@@ -76,7 +80,8 @@ export default class MessageProcessor {
     userId: number,
     channelId?: string,
     isChannelContext = false,
-    conversationHistory?: IUserConversation[]
+    conversationHistory?: IUserConversation[],
+    onProgress?: ProgressCallback
   ): Promise<IProcessMessageResult> => {
     const shouldSkipAI = this.shouldSkipAI(message)
 
@@ -99,7 +104,8 @@ export default class MessageProcessor {
       message,
       channelId,
       isChannelContext,
-      conversationHistory
+      conversationHistory,
+      onProgress
     )
     if (variableResponse) {
       return { response: variableResponse, shouldSkipAI: false }
@@ -416,7 +422,8 @@ export default class MessageProcessor {
     message: string,
     channelId: string | undefined,
     isChannelContext: boolean,
-    conversationHistory?: IUserConversation[]
+    conversationHistory?: IUserConversation[],
+    onProgress?: ProgressCallback
   ): Promise<IConversation | null> => {
     const assistantMessage = new AssistantMessage(message)
     const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
@@ -427,7 +434,8 @@ export default class MessageProcessor {
         assistantMessage.cleanMessage,
         channelId,
         isChannelContext,
-        conversationHistory
+        conversationHistory,
+        onProgress
       )
     }
 
@@ -744,6 +752,7 @@ export default class MessageProcessor {
         }
 
         // Generate image
+        onProgress?.('Generando imagen...')
         try {
           const response = await this.#imagesServices.generateImageForAssistant(
             imagePrompt,
@@ -820,7 +829,8 @@ export default class MessageProcessor {
     cleanMessage: string,
     channelId: string | undefined,
     isChannelContext: boolean,
-    conversationHistory?: IUserConversation[]
+    conversationHistory?: IUserConversation[],
+    onProgress?: ProgressCallback
   ): Promise<IConversation | null> => {
     try {
       if (!cleanMessage) return null
@@ -1063,6 +1073,7 @@ export default class MessageProcessor {
           }
 
           // Generate image
+          onProgress?.('Generando imagen...')
           try {
             const response = await this.#imagesServices.generateImageForAssistant(
               imagePrompt,
@@ -1108,14 +1119,13 @@ export default class MessageProcessor {
 
           return {
             role: roleTypes.assistant,
-            content:
-              parsed.successMessage ||
-              `Tus últimas imágenes (${images.data.data.length}):\n${imagesList}`,
+            content: `Tus últimas imágenes (${images.data.data.length}):\n${imagesList}`,
             provider: ConversationProviders.ASSISTANT,
           }
         }
         case 'search': {
           if (!parsed.query) return null
+          onProgress?.('Buscando información...')
           return await this.#searchAndSummarize(cleanMessage, parsed.query)
         }
         case 'question': {

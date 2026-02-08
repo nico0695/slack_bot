@@ -8,7 +8,7 @@ import MessageProcessor from '../services/messageProcessor.service'
 import ConversationFlowManager from '../services/conversationFlowManager.service'
 
 import { roleTypes } from '../shared/constants/openai'
-import { IConversation } from '../shared/interfaces/converstions'
+import { IConversation, ProgressCallback } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders, FlowKeys } from '../shared/constants/conversationFlow'
 import { SlackAuth, SlackAuthActions } from '../../../shared/middleware/auth'
 import { rPersonalConversationFlow } from '../repositories/redis/redis.constants'
@@ -256,11 +256,14 @@ export default class ConversationsController extends GenericController {
     const isChannelContext = !isPersonal
     const scopedChannelId =
       typeof channelId === 'string' && channelId.trim().length > 0 ? channelId.trim() : undefined
+    const onProgress: ProgressCallback = (msg) => say(msg)
     const result = await this.#messageProcessor.processAssistantMessage(
       message,
       userId,
       scopedChannelId,
-      isChannelContext
+      isChannelContext,
+      undefined,
+      onProgress
     )
 
     if (result.response) {

@@ -26,3 +26,5 @@ export interface IAssistantResponse {
   response: IConversation | null
   skipped: boolean
 }
+
+export type ProgressCallback = (message: string) => void

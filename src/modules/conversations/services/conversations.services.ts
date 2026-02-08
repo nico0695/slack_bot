@@ -22,6 +22,7 @@ import {
   IConversation,
   IConversationFlow,
   IUserConversation,
+  ProgressCallback,
 } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
 
@@ -230,7 +231,8 @@ export default class ConversationsServices {
     userId: number,
     channelId: string,
     provider: ConversationProviders,
-    isChannelContext = false
+    isChannelContext = false,
+    onProgress?: ProgressCallback
   ): Promise<IAssistantResponse> => {
     try {
       // Check skip FIRST (message starts with "+")
@@ -280,7 +282,8 @@ export default class ConversationsServices {
         userId,
         trimmedChannelId,
         isChannelContext,
-        conversationStored
+        conversationStored,
+        onProgress
       )
       const responseMessage = result.response
 
