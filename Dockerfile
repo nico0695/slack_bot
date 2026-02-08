@@ -60,5 +60,8 @@ RUN cd app && NODE_ENV=$NODE_ENV npm install
 EXPOSE 4000
 EXPOSE 3001
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://localhost:4000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+
 # Define the command to run your Node.js application
 CMD [ "node", "app/build/index.js" ]

@@ -125,6 +125,7 @@ img <prompt>          - Generate image
 
 ### Web API Endpoints
 
+- `GET /health` - Health check (no auth — returns service status for DB and Redis)
 - `POST /conversations` - Create conversation
 - `GET /alerts` - List alerts
 - `POST /tasks` - Create task
@@ -184,6 +185,7 @@ src/modules/{feature}/
 - `externalStorage` - File persistence via external storage API
 - `users` - User management
 - `constants` - System constants
+- `system` - Infrastructure endpoints (health check)
 
 ### Key Technologies
 - **Backend:** Node.js, Express, TypeScript
