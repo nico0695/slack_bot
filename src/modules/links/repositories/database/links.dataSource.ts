@@ -4,6 +4,7 @@ import { Links } from '../../../../entities/links'
 import { Users } from '../../../../entities/users'
 
 import { ILink } from '../../shared/interfaces/links.interfaces'
+import { LinkStatus } from '../../shared/constants/links.constants'
 
 export default class LinksDataSource {
   static #instance: LinksDataSource
@@ -35,7 +36,7 @@ export default class LinksDataSource {
       newLink.title = data.title ?? ''
       newLink.description = data.description ?? ''
       newLink.tag = data.tag?.trim() ?? ''
-      newLink.status = data.status ?? 'unread'
+      newLink.status = data.status ?? LinkStatus.UNREAD
       newLink.user = user
       if (data.channelId) {
         newLink.channelId = data.channelId
@@ -94,13 +95,17 @@ export default class LinksDataSource {
     }
   }
 
-  async updateLink(linkId: number, dataUpdate: Partial<ILink>): Promise<void> {
+  async updateLink(linkId: number, dataUpdate: Partial<ILink>, userId?: number): Promise<void> {
     try {
       const data = { ...dataUpdate }
       delete data.userId
       delete data.id
 
-      await Links.update(linkId, data)
+      if (userId) {
+        await Links.getRepository().update({ id: linkId, user: { id: userId } }, data)
+      } else {
+        await Links.update(linkId, data)
+      }
     } catch (error) {
       throw new Error('Error al actualizar el link')
     }

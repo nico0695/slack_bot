@@ -182,7 +182,7 @@ const alertOverflowAccessory = (id: number): any => ({
 })
 
 const quickActionOverflow = (
-  entity: 'alert' | 'note' | 'task',
+  entity: 'alert' | 'note' | 'task' | 'link',
   extraOptions: Array<{ label: string; value: string }> = []
 ): any => ({
   type: 'overflow',
@@ -256,7 +256,7 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
             data.linksUnread ?? 0
           }*\n> Usa \`.link <url>\` para guardar o \`.link -l\` para listar.`,
         },
-        accessory: quickActionOverflow('link' as any),
+        accessory: quickActionOverflow('link'),
       },
       {
         type: 'section',

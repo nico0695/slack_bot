@@ -1020,7 +1020,7 @@ export default class ConversationsServices {
       case 'read': {
         const updateRes = await this.#linksServices.updateLink(targetId, {
           status: LinkStatus.READ,
-        })
+        }, userId)
 
         if (updateRes.error || !updateRes.data) {
           return `Error al actualizar el link con Id: ${targetId}`

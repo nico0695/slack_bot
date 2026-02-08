@@ -126,10 +126,11 @@ export default class LinksServices {
 
   public async updateLink(
     linkId: number,
-    dataUpdate: Partial<ILink>
+    dataUpdate: Partial<ILink>,
+    userId?: number
   ): Promise<GenericResponse<boolean>> {
     try {
-      await this.#linksDataSource.updateLink(linkId, dataUpdate)
+      await this.#linksDataSource.updateLink(linkId, dataUpdate, userId)
 
       return {
         data: true,

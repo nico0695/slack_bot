@@ -6,6 +6,7 @@ import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 import LinksServices from '../services/links.services'
 
 import { ILink } from '../shared/interfaces/links.interfaces'
+import { LinkStatus } from '../shared/constants/links.constants'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
@@ -100,6 +101,7 @@ export default class LinksWebController extends GenericController {
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async updateLink(req: any, res: any): Promise<void> {
+    const user = this.userData
     const linkId = req.params.id
 
     const dataLink: Partial<ILink> = {}
@@ -108,9 +110,15 @@ export default class LinksWebController extends GenericController {
     if (req.body.title !== undefined) dataLink.title = req.body.title
     if (req.body.description !== undefined) dataLink.description = req.body.description
     if (req.body.tag !== undefined) dataLink.tag = req.body.tag
-    if (req.body.status !== undefined) dataLink.status = req.body.status
+    if (req.body.status !== undefined) {
+      const validStatuses = Object.values(LinkStatus)
+      if (!validStatuses.includes(req.body.status)) {
+        throw new BadRequestError({ message: 'Estado no válido' })
+      }
+      dataLink.status = req.body.status
+    }
 
-    const response = await this.#linksServices.updateLink(linkId, dataLink)
+    const response = await this.#linksServices.updateLink(linkId, dataLink, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
