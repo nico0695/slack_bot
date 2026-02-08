@@ -15,6 +15,39 @@ Complete reference for all interfaces: REST API, Socket.io events, Slack command
 
 Base URL: `http://localhost:4000`
 
+### System
+
+#### GET /health
+Health check endpoint — no authentication required. Used by load balancers, Docker HEALTHCHECK, and monitoring tools.
+
+**Response (200 — all services up):**
+```json
+{
+  "status": "ok",
+  "version": "1.2.0",
+  "uptime": 12345,
+  "timestamp": "2026-02-08T12:00:00.000Z",
+  "services": {
+    "database": { "status": "up" },
+    "redis": { "status": "up" }
+  }
+}
+```
+
+**Response (503 — one or more services down):**
+```json
+{
+  "status": "degraded",
+  "version": "1.2.0",
+  "uptime": 12345,
+  "timestamp": "2026-02-08T12:00:00.000Z",
+  "services": {
+    "database": { "status": "up" },
+    "redis": { "status": "down" }
+  }
+}
+```
+
 ### Authentication
 
 Most endpoints require authentication via decorators:

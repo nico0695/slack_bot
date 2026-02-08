@@ -331,6 +331,7 @@ Extensive use of TypeScript private fields:
 
 ```
 app.ts
+  ├─→ system.controller (health check — no auth, no services layer)
   ├─→ users.controller
   ├─→ conversations.controller
   │     ├─→ conversations.services
