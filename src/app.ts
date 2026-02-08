@@ -35,6 +35,7 @@ import AlertsWebController from './modules/alerts/controller/alersWeb.controller
 import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
 import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
+import SystemWebController from './modules/system/controller/systemWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
 dotenv.config()
@@ -62,6 +63,7 @@ export default class App {
 
   #textToSpeechWebController: TextToSpeechWebController
   #summaryWebController: SummaryWebController
+  #systemWebController: SystemWebController
 
   constructor() {
     // Controllers Instances
@@ -80,6 +82,7 @@ export default class App {
 
     this.#textToSpeechWebController = TextToSpeechWebController.getInstance()
     this.#summaryWebController = SummaryWebController.getInstance()
+    this.#systemWebController = SystemWebController.getInstance()
 
     // Express
     this.#app = express()
@@ -107,6 +110,8 @@ export default class App {
   }
 
   #router(): void {
+    this.#app.use('/', [this.#systemWebController.router])
+
     this.#app.use('/users', [this.#usersController.router])
     this.#app.use('/conversations', [this.#conversationWebController.router])
     this.#app.use('/alerts', [this.#alertsWebController.router])
@@ -247,7 +252,11 @@ export default class App {
         }
 
         const conversationResponse =
-          await this.#conversationWebController.conversationAssistantFlow(userId, message, onProgress)
+          await this.#conversationWebController.conversationAssistantFlow(
+            userId,
+            message,
+            onProgress
+          )
 
         if (conversationResponse) {
           io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender
