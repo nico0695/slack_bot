@@ -11,28 +11,28 @@ import UsersServices from '../../users/services/users.services'
 const log = createModuleLogger('conversations.webController')
 
 export default class ConversationsWebController {
-  static #instance: ConversationsWebController
+  private static instance: ConversationsWebController
 
   public router: Router
 
-  #conversationServices: ConversationsServices
-  #usersServices: UsersServices
+  private conversationServices: ConversationsServices
+  private usersServices: UsersServices
 
   private constructor() {
-    this.#conversationServices = ConversationsServices.getInstance()
-    this.#usersServices = UsersServices.getInstance()
+    this.conversationServices = ConversationsServices.getInstance()
+    this.usersServices = UsersServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): ConversationsWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ConversationsWebController()
-    return this.#instance
+    this.instance = new ConversationsWebController()
+    return this.instance
   }
 
   protected registerRoutes(): void {
@@ -49,12 +49,12 @@ export default class ConversationsWebController {
     message: string
     conversation: IUserConversation[]
   }> => {
-    const response = await this.#conversationServices.startConversationFlow(
+    const response = await this.conversationServices.startConversationFlow(
       data.channel,
       ChannelType.WEB
     )
 
-    const conversationFlow = await this.#conversationServices.showConversationFlowWeb(data.channel)
+    const conversationFlow = await this.conversationServices.showConversationFlowWeb(data.channel)
 
     return {
       message: response ?? 'No se pudo iniciar la conversación 🤷‍♂️',
@@ -70,7 +70,7 @@ export default class ConversationsWebController {
     conversation: IUserConversation[]
   }> => {
     try {
-      const conversationFlow = await this.#conversationServices.showConversationFlowWeb(
+      const conversationFlow = await this.conversationServices.showConversationFlowWeb(
         data.channel
       )
 
@@ -97,7 +97,7 @@ export default class ConversationsWebController {
       const newMessage: string = data.message
 
       if (data.iaEnabled) {
-        const newResponse = await this.#conversationServices.generateConversationFlow(
+        const newResponse = await this.conversationServices.generateConversationFlow(
           newMessage,
           data.username,
           data.channel
@@ -106,7 +106,7 @@ export default class ConversationsWebController {
         return newResponse
       }
 
-      await this.#conversationServices.sendMessageToConversationFlow(
+      await this.conversationServices.sendMessageToConversationFlow(
         newMessage,
         data.username,
         data.channel
@@ -129,7 +129,7 @@ export default class ConversationsWebController {
     onProgress?: ProgressCallback
   ): Promise<IConversation | null> => {
     try {
-      const userData = await this.#usersServices.getUserById(userId)
+      const userData = await this.usersServices.getUserById(userId)
 
       if (!userData.data) {
         return {
@@ -139,7 +139,7 @@ export default class ConversationsWebController {
         }
       }
 
-      const result = await this.#conversationServices.generateAssistantConversation(
+      const result = await this.conversationServices.generateAssistantConversation(
         message,
         userId,
         userId.toString().padStart(8, '9'),
@@ -159,7 +159,7 @@ export default class ConversationsWebController {
   // ROUTES
 
   public showChannels = async (req: any, res: any): Promise<void> => {
-    const response = await this.#conversationServices.showChannelsConversationFlow()
+    const response = await this.conversationServices.showChannelsConversationFlow()
 
     res.send(response)
   }
@@ -167,7 +167,7 @@ export default class ConversationsWebController {
   public closeChannel = async (req: any, res: any): Promise<void> => {
     const { channelId } = req.body
 
-    const response = await this.#conversationServices.endConversationFlow(channelId)
+    const response = await this.conversationServices.endConversationFlow(channelId)
 
     res.send(response)
   }

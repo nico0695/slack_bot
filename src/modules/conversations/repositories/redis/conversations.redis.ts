@@ -10,31 +10,31 @@ export interface AlertSnoozeConfig {
 }
 
 export class RedisRepository {
-  static #instance: RedisRepository
+  private static instance: RedisRepository
 
-  #redisClient
+  private redisClient
 
   // TTL constants (in seconds)
   private readonly TTL_SNOOZE_CONFIG = 365 * 24 * 60 * 60 // 1 year
 
   private constructor() {
-    this.#redisClient = RedisConfig.getClient()
+    this.redisClient = RedisConfig.getClient()
   }
 
   static getInstance(): RedisRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new RedisRepository()
-    return this.#instance
+    this.instance = new RedisRepository()
+    return this.instance
   }
 
   saveConversationMessages = async (key: string, value: IConversation[]): Promise<boolean> => {
     try {
       const valueFormated = JSON.stringify(value)
 
-      await this.#redisClient.set(key, valueFormated)
+      await this.redisClient.set(key, valueFormated)
 
       return true
     } catch (error) {
@@ -45,7 +45,7 @@ export class RedisRepository {
 
   getConversationMessages = async (key: string): Promise<IConversation[]> => {
     try {
-      const response = await this.#redisClient.get(key)
+      const response = await this.redisClient.get(key)
 
       const responseFormated: IConversation[] = JSON.parse(response).filter(
         (item: any) => item !== null
@@ -64,7 +64,7 @@ export class RedisRepository {
     try {
       const valueFormated = JSON.stringify(value)
 
-      await this.#redisClient.set(rConversationFlow(chanelId), valueFormated)
+      await this.redisClient.set(rConversationFlow(chanelId), valueFormated)
 
       return true
     } catch (error) {
@@ -74,7 +74,7 @@ export class RedisRepository {
 
   getConversationFlow = async (chanelId: string): Promise<IConversationFlow> => {
     try {
-      const response = await this.#redisClient.get(rConversationFlow(chanelId))
+      const response = await this.redisClient.get(rConversationFlow(chanelId))
 
       const responseFormated: IConversationFlow = JSON.parse(response)
 
@@ -89,7 +89,7 @@ export class RedisRepository {
 
   deleteConversationFlow = async (chanelId: string): Promise<boolean> => {
     try {
-      await this.#redisClient.del(rConversationFlow(chanelId))
+      await this.redisClient.del(rConversationFlow(chanelId))
 
       return true
     } catch (error) {
@@ -100,7 +100,7 @@ export class RedisRepository {
 
   getChannelsConversationFlow = async (): Promise<string[]> => {
     try {
-      const response = await this.#redisClient.keys(rConversationFlow('*'))
+      const response = await this.redisClient.keys(rConversationFlow('*'))
 
       return response
     } catch (error) {
@@ -115,7 +115,7 @@ export class RedisRepository {
   ): Promise<boolean> => {
     try {
       const key = rAlertSnoozeConfig(userId)
-      await this.#redisClient.set(key, JSON.stringify(config), {
+      await this.redisClient.set(key, JSON.stringify(config), {
         EX: this.TTL_SNOOZE_CONFIG,
       })
       return true
@@ -127,7 +127,7 @@ export class RedisRepository {
 
   getAlertSnoozeConfig = async (userId: number): Promise<AlertSnoozeConfig | null> => {
     try {
-      const response = await this.#redisClient.get(rAlertSnoozeConfig(userId))
+      const response = await this.redisClient.get(rAlertSnoozeConfig(userId))
       if (!response) {
         return null
       }

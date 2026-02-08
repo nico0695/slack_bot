@@ -11,23 +11,23 @@ import { createModuleLogger } from '../../../config/logger'
 const log = createModuleLogger('alerts.service')
 
 export default class AlertsServices {
-  static #instance: AlertsServices
+  private static instance: AlertsServices
 
-  #alertsDataSource: AlertsDataSource
-  #usersRedis: UsersRedis
+  private alertsDataSource: AlertsDataSource
+  private usersRedis: UsersRedis
 
   private constructor() {
-    this.#alertsDataSource = AlertsDataSource.getInstance()
-    this.#usersRedis = UsersRedis.getInstance()
+    this.alertsDataSource = AlertsDataSource.getInstance()
+    this.usersRedis = UsersRedis.getInstance()
   }
 
   static getInstance(): AlertsServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new AlertsServices()
-    return this.#instance
+    this.instance = new AlertsServices()
+    return this.instance
   }
 
   /**
@@ -46,7 +46,7 @@ export default class AlertsServices {
     try {
       const date = formatTextToDate(dateText)
 
-      const response = await this.#alertsDataSource.createAlert({
+      const response = await this.alertsDataSource.createAlert({
         userId,
         date,
         message,
@@ -73,7 +73,7 @@ export default class AlertsServices {
    */
   public async createAlert(data: IAlert): Promise<GenericResponse<Alerts>> {
     try {
-      const response = await this.#alertsDataSource.createAlert(data)
+      const response = await this.alertsDataSource.createAlert(data)
 
       log.info({ userId: data.userId, alertId: response.id }, 'Alert created')
 
@@ -98,7 +98,7 @@ export default class AlertsServices {
     options: Partial<IAlert> = { sent: false }
   ): Promise<GenericResponse<Alerts[]>> {
     try {
-      const response = await this.#alertsDataSource.getAlertsByUserId(userId, options)
+      const response = await this.alertsDataSource.getAlertsByUserId(userId, options)
 
       return {
         data: response,
@@ -113,7 +113,7 @@ export default class AlertsServices {
 
   public async getAlertById(alertId: number, userId: number): Promise<GenericResponse<Alerts>> {
     try {
-      const response = await this.#alertsDataSource.getAlertById(alertId, userId)
+      const response = await this.alertsDataSource.getAlertById(alertId, userId)
 
       if (!response) {
         return {
@@ -136,7 +136,7 @@ export default class AlertsServices {
     minutesToAdd: number
   ): Promise<GenericResponse<Alerts>> {
     try {
-      const alertResponse = await this.#alertsDataSource.getAlertById(alertId, userId)
+      const alertResponse = await this.alertsDataSource.getAlertById(alertId, userId)
 
       if (!alertResponse) {
         return {
@@ -149,7 +149,7 @@ export default class AlertsServices {
       const baseDate = alertDate > now ? alertDate : now
       const newDate = new Date(baseDate.getTime() + minutesToAdd * 60 * 1000)
 
-      const updated = await this.#alertsDataSource.updateAlert(alertId, userId, {
+      const updated = await this.alertsDataSource.updateAlert(alertId, userId, {
         date: newDate,
         sent: false,
       })
@@ -170,7 +170,7 @@ export default class AlertsServices {
     userId: number
   ): Promise<GenericResponse<Alerts>> {
     try {
-      const updated = await this.#alertsDataSource.updateAlert(alertId, userId, {
+      const updated = await this.alertsDataSource.updateAlert(alertId, userId, {
         sent: true,
       })
 
@@ -195,7 +195,7 @@ export default class AlertsServices {
     minutesToAdd: number
   ): Promise<GenericResponse<Alerts>> {
     try {
-      const alert = await this.#alertsDataSource.getAlertById(alertId, userId)
+      const alert = await this.alertsDataSource.getAlertById(alertId, userId)
 
       if (!alert) {
         return {
@@ -206,7 +206,7 @@ export default class AlertsServices {
       const currentDate = new Date(alert.date)
       const newDate = new Date(currentDate.getTime() + minutesToAdd * 60 * 1000)
 
-      const created = await this.#alertsDataSource.createAlert({
+      const created = await this.alertsDataSource.createAlert({
         userId,
         message: alert.message,
         date: newDate,
@@ -227,9 +227,9 @@ export default class AlertsServices {
     try {
       const date = new Date()
 
-      let response = await this.#alertsDataSource.getAlertsByDate(date)
+      let response = await this.alertsDataSource.getAlertsByDate(date)
 
-      const usersSubscriptions = await this.#usersRedis.getUsersSubscriptions()
+      const usersSubscriptions = await this.usersRedis.getUsersSubscriptions()
 
       if (usersSubscriptions) {
         response = response.map((alert) => ({
@@ -254,7 +254,7 @@ export default class AlertsServices {
 
   public async updateAlertAsNotified(alertId: number[]): Promise<GenericResponse<boolean>> {
     try {
-      await this.#alertsDataSource.updateAlertAsNotified(alertId)
+      await this.alertsDataSource.updateAlertAsNotified(alertId)
 
       return {
         data: true,
@@ -269,7 +269,7 @@ export default class AlertsServices {
 
   public async deleteAlert(alertId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
-      const res = await this.#alertsDataSource.deleteAlerts(alertId, userId)
+      const res = await this.alertsDataSource.deleteAlerts(alertId, userId)
 
       log.info({ alertId, userId }, 'Alert deleted')
 

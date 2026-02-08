@@ -9,21 +9,21 @@ import { createModuleLogger } from '../../../config/logger'
 const log = createModuleLogger('notes.service')
 
 export default class NotesServices {
-  static #instance: NotesServices
+  private static instance: NotesServices
 
-  #notesDataSource: NotesDataSource
+  private notesDataSource: NotesDataSource
 
   private constructor() {
-    this.#notesDataSource = NotesDataSource.getInstance()
+    this.notesDataSource = NotesDataSource.getInstance()
   }
 
   static getInstance(): NotesServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new NotesServices()
-    return this.#instance
+    this.instance = new NotesServices()
+    return this.instance
   }
 
   /**
@@ -56,7 +56,7 @@ export default class NotesServices {
         payload.channelId = channelId
       }
 
-      const response = await this.#notesDataSource.createNote(payload)
+      const response = await this.notesDataSource.createNote(payload)
 
       log.info({ userId, noteId: response.id }, 'Note created')
 
@@ -78,7 +78,7 @@ export default class NotesServices {
    */
   public async createNote(data: INote): Promise<GenericResponse<Notes>> {
     try {
-      const response = await this.#notesDataSource.createNote(data)
+      const response = await this.notesDataSource.createNote(data)
 
       log.info({ userId: data.userId, noteId: response.id }, 'Note created')
 
@@ -106,7 +106,7 @@ export default class NotesServices {
     }
   ): Promise<GenericResponse<Notes[]>> {
     try {
-      const response = await this.#notesDataSource.getNotesByUserId(userId, options)
+      const response = await this.notesDataSource.getNotesByUserId(userId, options)
 
       return {
         data: response,
@@ -124,7 +124,7 @@ export default class NotesServices {
     dataUpdate: Partial<INote>
   ): Promise<GenericResponse<boolean>> {
     try {
-      await this.#notesDataSource.updateNote(noteId, dataUpdate)
+      await this.notesDataSource.updateNote(noteId, dataUpdate)
 
       return {
         data: true,
@@ -139,7 +139,7 @@ export default class NotesServices {
 
   public async deleteNote(noteId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
-      const res = await this.#notesDataSource.deleteNote(noteId, userId)
+      const res = await this.notesDataSource.deleteNote(noteId, userId)
 
       log.info({ noteId, userId }, 'Note deleted')
 

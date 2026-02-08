@@ -12,27 +12,27 @@ import { createModuleLogger } from '../../../config/logger'
 const log = createModuleLogger('users.service')
 
 export default class UsersServices {
-  static #instance: UsersServices
+  private static instance: UsersServices
 
-  #usersDataSource: UsersDataSource
-  #slackRepository: SlackRepository
-  #userRedis: UsersRedis
+  private usersDataSource: UsersDataSource
+  private slackRepository: SlackRepository
+  private userRedis: UsersRedis
 
   private constructor() {
-    this.#usersDataSource = UsersDataSource.getInstance()
-    this.#slackRepository = SlackRepository.getInstance()
-    this.#userRedis = UsersRedis.getInstance()
+    this.usersDataSource = UsersDataSource.getInstance()
+    this.slackRepository = SlackRepository.getInstance()
+    this.userRedis = UsersRedis.getInstance()
 
     this.createUser = this.createUser.bind(this)
   }
 
   static getInstance(): UsersServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new UsersServices()
-    return this.#instance
+    this.instance = new UsersServices()
+    return this.instance
   }
 
   /**
@@ -41,7 +41,7 @@ export default class UsersServices {
    */
   public async createUser(dataUser: IUsers): Promise<GenericResponse<IUsers>> {
     try {
-      const existEmail = await this.#usersDataSource.existEmail(dataUser.email)
+      const existEmail = await this.usersDataSource.existEmail(dataUser.email)
 
       if (existEmail) {
         return {
@@ -49,7 +49,7 @@ export default class UsersServices {
         }
       }
 
-      const response = await this.#usersDataSource.createUser(dataUser)
+      const response = await this.usersDataSource.createUser(dataUser)
 
       log.info({ userId: response.id }, 'User created')
 
@@ -66,7 +66,7 @@ export default class UsersServices {
 
   public async getUserByEmail(email: string): Promise<GenericResponse<IUsers>> {
     try {
-      const userDb = await this.#usersDataSource.getUserByEmail(email)
+      const userDb = await this.usersDataSource.getUserByEmail(email)
 
       if (userDb !== undefined) {
         return { data: userDb }
@@ -85,7 +85,7 @@ export default class UsersServices {
 
   public async getUserById(id: number): Promise<GenericResponse<IUsers>> {
     try {
-      const userDb = await this.#usersDataSource.getUserById(id)
+      const userDb = await this.usersDataSource.getUserById(id)
 
       if (userDb !== undefined) {
         return { data: userDb }
@@ -110,11 +110,11 @@ export default class UsersServices {
     supabaseId: string
   }): Promise<GenericResponse<IUsers>> {
     try {
-      const userDb = await this.#usersDataSource.getUserByEmail(email)
+      const userDb = await this.usersDataSource.getUserByEmail(email)
 
       if (userDb !== undefined) {
         if (userDb.supabaseId === null || userDb.supabaseId !== supabaseId) {
-          const responseUpdateUser = await this.#usersDataSource.updateUserById(userDb.id, {
+          const responseUpdateUser = await this.usersDataSource.updateUserById(userDb.id, {
             supabaseId,
           })
 
@@ -134,7 +134,7 @@ export default class UsersServices {
         enabled: false,
       }
 
-      const responseCreateUser = await this.#usersDataSource.createUser(newUser)
+      const responseCreateUser = await this.usersDataSource.createUser(newUser)
 
       if (!responseCreateUser) {
         throw new Error()
@@ -158,7 +158,7 @@ export default class UsersServices {
     data: Partial<IUsers>
   ): Promise<GenericResponse<IUsers | undefined>> {
     try {
-      const userDb = await this.#usersDataSource.getUserById(id)
+      const userDb = await this.usersDataSource.getUserById(id)
 
       if (userDb === undefined) {
         return {
@@ -166,7 +166,7 @@ export default class UsersServices {
         }
       }
 
-      const response = await this.#usersDataSource.updateUserById(id, data)
+      const response = await this.usersDataSource.updateUserById(id, data)
 
       return {
         data: response,
@@ -182,20 +182,20 @@ export default class UsersServices {
   public async getUsersByTeamId(teamId: string): Promise<GenericResponse<IUsers[]>> {
     try {
       /** Get User from database */
-      const usersDb = await this.#usersDataSource.getUsersBySlackTeamId(teamId)
+      const usersDb = await this.usersDataSource.getUsersBySlackTeamId(teamId)
 
       if (usersDb.length > 0) {
         return { data: usersDb }
       }
 
       /** if users team is empty get users team from Slack */
-      const teamMembers = await this.#slackRepository.getTeamMembers(teamId)
+      const teamMembers = await this.slackRepository.getTeamMembers(teamId)
 
       /** save and return new users */
       const members: IUsers[] = []
 
       for await (const member of teamMembers) {
-        const userDb = await this.#usersDataSource.getUserBySlackId(member.id)
+        const userDb = await this.usersDataSource.getUserBySlackId(member.id)
         if (userDb === undefined) {
           const newUser: IUsers = {
             username: member.name,
@@ -230,7 +230,7 @@ export default class UsersServices {
     subscription: any
   ): Promise<GenericResponse<boolean>> {
     try {
-      const userDb = await this.#usersDataSource.getUserById(userId)
+      const userDb = await this.usersDataSource.getUserById(userId)
 
       if (userDb === undefined) {
         return {
@@ -238,7 +238,7 @@ export default class UsersServices {
         }
       }
 
-      const response = await this.#userRedis.addOrUpdateUserSubscription(userId, subscription)
+      const response = await this.userRedis.addOrUpdateUserSubscription(userId, subscription)
 
       if (!response) {
         throw new Error('Error al suscribir al usuario')
@@ -266,7 +266,7 @@ export default class UsersServices {
         pageSize,
       }
 
-      const usersDb = await this.#usersDataSource.getAllUsers(options)
+      const usersDb = await this.usersDataSource.getAllUsers(options)
 
       return { data: usersDb }
     } catch (error) {
@@ -283,12 +283,12 @@ export default class UsersServices {
     channelId?: string
   ): Promise<GenericResponse<IUsers>> {
     try {
-      const userDb = await this.#usersDataSource.getUserBySlackId(slackId)
+      const userDb = await this.usersDataSource.getUserBySlackId(slackId)
 
       if (userDb) {
         // If user exist in database without channel id update channel id
         if (channelId && userDb.slackChannelId !== channelId) {
-          const responseUpdateUser = await this.#usersDataSource.updateUserById(userDb.id, {
+          const responseUpdateUser = await this.usersDataSource.updateUserById(userDb.id, {
             slackChannelId: channelId,
           })
 
@@ -299,7 +299,7 @@ export default class UsersServices {
       }
 
       // If user not exist in database get user from slack and create user
-      const userSlack = await this.#slackRepository.getUserInfo(slackId)
+      const userSlack = await this.slackRepository.getUserInfo(slackId)
 
       if (!userSlack) {
         return {
@@ -308,10 +308,10 @@ export default class UsersServices {
       }
 
       // Check if user exist in database by email
-      const user = await this.#usersDataSource.getUserByEmail(userSlack.profile.email)
+      const user = await this.usersDataSource.getUserByEmail(userSlack.profile.email)
 
       if (user) {
-        const responseUpdateUser = await this.#usersDataSource.updateUserById(user.id, {
+        const responseUpdateUser = await this.usersDataSource.updateUserById(user.id, {
           slackId,
           slackTeamId: userSlack.team_id,
           image: userSlack.profile.image_original,

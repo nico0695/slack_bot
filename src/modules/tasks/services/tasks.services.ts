@@ -11,21 +11,21 @@ import { createModuleLogger } from '../../../config/logger'
 const log = createModuleLogger('tasks.service')
 
 export default class TasksServices {
-  static #instance: TasksServices
+  private static instance: TasksServices
 
-  #tasksDataSource: TasksDataSource
+  private tasksDataSource: TasksDataSource
 
   private constructor() {
-    this.#tasksDataSource = TasksDataSource.getInstance()
+    this.tasksDataSource = TasksDataSource.getInstance()
   }
 
   static getInstance(): TasksServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new TasksServices()
-    return this.#instance
+    this.instance = new TasksServices()
+    return this.instance
   }
 
   /**
@@ -64,7 +64,7 @@ export default class TasksServices {
         payload.channelId = options.channelId
       }
 
-      const response = await this.#tasksDataSource.createTask(payload)
+      const response = await this.tasksDataSource.createTask(payload)
 
       log.info({ userId, taskId: response.id }, 'Task created')
 
@@ -86,7 +86,7 @@ export default class TasksServices {
    */
   public async createTask(data: ITask): Promise<GenericResponse<Tasks>> {
     try {
-      const response = await this.#tasksDataSource.createTask(data)
+      const response = await this.tasksDataSource.createTask(data)
 
       log.info({ userId: data.userId, taskId: response.id }, 'Task created')
 
@@ -114,7 +114,7 @@ export default class TasksServices {
     }
   ): Promise<GenericResponse<Tasks[]>> {
     try {
-      const response = await this.#tasksDataSource.getTasksByUserId(userId, options)
+      const response = await this.tasksDataSource.getTasksByUserId(userId, options)
 
       return {
         data: response,
@@ -132,7 +132,7 @@ export default class TasksServices {
     dataUpdate: Partial<ITask>
   ): Promise<GenericResponse<boolean>> {
     try {
-      await this.#tasksDataSource.updateTask(taskId, dataUpdate)
+      await this.tasksDataSource.updateTask(taskId, dataUpdate)
 
       return {
         data: true,
@@ -147,7 +147,7 @@ export default class TasksServices {
 
   public async deleteTask(taskId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
-      const res = await this.#tasksDataSource.deleteTask(taskId, userId)
+      const res = await this.tasksDataSource.deleteTask(taskId, userId)
 
       log.info({ taskId, userId }, 'Task deleted')
 

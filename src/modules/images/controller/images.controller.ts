@@ -6,25 +6,25 @@ import ImagesServices from '../services/images.services'
 const log = createModuleLogger('images.controller')
 
 export default class ImagessController {
-  static #instance: ImagessController
+  private static instance: ImagessController
 
   public router: Router
 
-  #imagesServices: ImagesServices
+  private imagesServices: ImagesServices
 
   private constructor() {
-    this.#imagesServices = ImagesServices.getInstance()
+    this.imagesServices = ImagesServices.getInstance()
 
     this.generateImages = this.generateImages.bind(this)
   }
 
   static getInstance(): ImagessController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ImagessController()
-    return this.#instance
+    this.instance = new ImagessController()
+    return this.instance
   }
 
   /** Images Controllers Methods */
@@ -45,7 +45,7 @@ export default class ImagessController {
         username: '',
       }
 
-      const newResponse = await this.#imagesServices.generateImages(prompt, userData, say)
+      const newResponse = await this.imagesServices.generateImages(prompt, userData, say)
 
       say(newResponse)
     } catch (error) {

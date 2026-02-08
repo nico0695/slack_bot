@@ -6,17 +6,17 @@ import { Users } from '../../../../entities/users'
 import { ITask } from '../../shared/interfaces/tasks.interfaces'
 
 export default class TasksDataSource {
-  static #instance: TasksDataSource
+  private static instance: TasksDataSource
 
   private constructor() {}
 
   static getInstance(): TasksDataSource {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new TasksDataSource()
-    return this.#instance
+    this.instance = new TasksDataSource()
+    return this.instance
   }
 
   /**

@@ -283,9 +283,10 @@ Automatically catches async errors in Express routes.
 - No hardcoded credentials
 
 **Private Fields:**
-Extensive use of TypeScript private fields:
+Use TypeScript access modifiers for encapsulation:
 ```typescript
-#privateField: Type
+private privateField: Type
+protected protectedField: Type
 ```
 
 ## Testing Architecture

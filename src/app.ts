@@ -45,85 +45,85 @@ const log = createModuleLogger('app')
 const socketLog = createModuleLogger('socket')
 
 export default class App {
-  #app: express.Application
-  #slackApp: SlackApp
+  private app: express.Application
+  private slackApp: SlackApp
 
-  #usersController: UsersController
+  private usersController: UsersController
 
-  #conversationController: ConversationController
-  #conversationWebController: ConversationsWebController
+  private conversationController: ConversationController
+  private conversationWebController: ConversationsWebController
 
-  #alertsWebController: AlertsWebController
-  #tasksWebController: TasksWebController
-  #notesWebController: NotesWebController
-  #linksWebController: LinksWebController
+  private alertsWebController: AlertsWebController
+  private tasksWebController: TasksWebController
+  private notesWebController: NotesWebController
+  private linksWebController: LinksWebController
 
-  #imagesController: ImagesController
-  #imagesWebController: ImagesWebController
+  private imagesController: ImagesController
+  private imagesWebController: ImagesWebController
 
-  #textToSpeechWebController: TextToSpeechWebController
-  #summaryWebController: SummaryWebController
-  #systemWebController: SystemWebController
+  private textToSpeechWebController: TextToSpeechWebController
+  private summaryWebController: SummaryWebController
+  private systemWebController: SystemWebController
 
   constructor() {
     // Controllers Instances
-    this.#usersController = UsersController.getInstance()
+    this.usersController = UsersController.getInstance()
 
-    this.#conversationController = ConversationController.getInstance()
-    this.#conversationWebController = ConversationsWebController.getInstance()
+    this.conversationController = ConversationController.getInstance()
+    this.conversationWebController = ConversationsWebController.getInstance()
 
-    this.#alertsWebController = AlertsWebController.getInstance()
-    this.#tasksWebController = TasksWebController.getInstance()
-    this.#notesWebController = NotesWebController.getInstance()
-    this.#linksWebController = LinksWebController.getInstance()
+    this.alertsWebController = AlertsWebController.getInstance()
+    this.tasksWebController = TasksWebController.getInstance()
+    this.notesWebController = NotesWebController.getInstance()
+    this.linksWebController = LinksWebController.getInstance()
 
-    this.#imagesController = ImagesController.getInstance()
-    this.#imagesWebController = ImagesWebController.getInstance()
+    this.imagesController = ImagesController.getInstance()
+    this.imagesWebController = ImagesWebController.getInstance()
 
-    this.#textToSpeechWebController = TextToSpeechWebController.getInstance()
-    this.#summaryWebController = SummaryWebController.getInstance()
-    this.#systemWebController = SystemWebController.getInstance()
+    this.textToSpeechWebController = TextToSpeechWebController.getInstance()
+    this.summaryWebController = SummaryWebController.getInstance()
+    this.systemWebController = SystemWebController.getInstance()
 
     // Express
-    this.#app = express()
-    this.#config()
+    this.app = express()
+    this.config()
 
     // Slack
-    this.#slackApp = connectionSlackApp
+    this.slackApp = connectionSlackApp
 
-    this.#router()
+    this.router()
 
     // Error handling
-    this.#app.use(errorHandler)
+    this.app.use(errorHandler)
   }
 
-  #config(): void {
-    this.#app.set('port', 4000)
+  private config(): void {
+    this.app.set('port', 4000)
 
-    this.#app.use(helmetMiddleware)
-    this.#app.use(pinoHttp({ logger }))
-    this.#app.use(cors())
-    this.#app.use(express.json())
+    this.app.use(helmetMiddleware)
+    this.app.use(pinoHttp({ logger }))
+    this.app.use(cors())
+    this.app.use(express.json())
 
     // Database Conection
     void connectionSource.initialize()
   }
 
-  #router(): void {
-    this.#app.use('/', [this.#systemWebController.router])
+  private router(): void {
+    this.app.use('/', [this.systemWebController.router])
 
-    this.#app.use('/users', [this.#usersController.router])
-    this.#app.use('/conversations', [this.#conversationWebController.router])
-    this.#app.use('/alerts', [this.#alertsWebController.router])
-    this.#app.use('/tasks', [this.#tasksWebController.router])
-    this.#app.use('/notes', [this.#notesWebController.router])
-    this.#app.use('/links', [this.#linksWebController.router])
-    this.#app.use('/images', [this.#imagesWebController.router])
-    this.#app.use('/text-to-speech', [this.#textToSpeechWebController.router])
-    this.#app.use('/summary', [this.#summaryWebController.router])
+    this.app.use('/users', [this.usersController.router])
+    this.app.use('/conversations', [this.conversationWebController.router])
+    this.app.use('/alerts', [this.alertsWebController.router])
+    this.app.use('/tasks', [this.tasksWebController.router])
+    this.app.use('/notes', [this.notesWebController.router])
+    this.app.use('/links', [this.linksWebController.router])
+    this.app.use('/images', [this.imagesWebController.router])
+    this.app.use('/text-to-speech', [this.textToSpeechWebController.router])
+    this.app.use('/summary', [this.summaryWebController.router])
   }
 
-  #slackListeners(): void {
+  private slackListeners(): void {
     // Helper to wrap handlers with defensive checks and restart on undefined event
     const safeHandler = (handler: any) => {
       return async (args: any) => {
@@ -132,46 +132,46 @@ export default class App {
     }
 
     // Start slack bot
-    void this.#slackApp.start(process.env.PORT ?? slackPort).then(() => {
+    void this.slackApp.start(process.env.PORT ?? slackPort).then(() => {
       log.info({ port: slackPort }, 'Slack Bot started')
     })
 
     // Actions slack bot
-    this.#slackApp.action(
+    this.slackApp.action(
       /^(?:alert|note|task|link)_actions.*$|^(?:delete|view)_(?:alert|note|task|link)(?:_details)?$/,
-      safeHandler(this.#conversationController.handleActions)
+      safeHandler(this.conversationController.handleActions)
     )
 
     // Listener slack bot
-    this.#slackApp.message(
+    this.slackApp.message(
       slackListenersKey.generateConversation,
-      safeHandler(this.#conversationController.generateConversation)
+      safeHandler(this.conversationController.generateConversation)
     )
-    this.#slackApp.message(
+    this.slackApp.message(
       slackListenersKey.cleanConversation,
-      safeHandler(this.#conversationController.cleanConversation)
+      safeHandler(this.conversationController.cleanConversation)
     )
-    this.#slackApp.message(
+    this.slackApp.message(
       slackListenersKey.showConversation,
-      safeHandler(this.#conversationController.showConversation)
+      safeHandler(this.conversationController.showConversation)
     )
 
-    this.#slackApp.message(
+    this.slackApp.message(
       slackListenersKey.generateImages,
-      safeHandler(this.#imagesController.generateImages)
+      safeHandler(this.imagesController.generateImages)
     )
 
-    this.#slackApp.message(
+    this.slackApp.message(
       slackListenersKey.conversationFlow,
-      safeHandler(this.#conversationController.conversationFlow)
+      safeHandler(this.conversationController.conversationFlow)
     )
 
-    this.#slackApp.command('/help', async ({ ack, body, client }: any): Promise<void> => {
+    this.slackApp.command('/help', async ({ ack, body, client }: any): Promise<void> => {
       ack(slackHelperMessage)
     })
   }
 
-  #socketListeners(server: http.Server): void {
+  private socketListeners(server: http.Server): void {
     let io = IoServer.io
 
     if (!io) {
@@ -186,7 +186,7 @@ export default class App {
 
         void socket.join(channel) // Join the user to a socket room
 
-        const joinResponse = await this.#conversationWebController.joinChannel({
+        const joinResponse = await this.conversationWebController.joinChannel({
           channel,
           username,
         })
@@ -205,7 +205,7 @@ export default class App {
           role: 'user',
         })
 
-        const conversationResponse = await this.#conversationWebController.generateConversation({
+        const conversationResponse = await this.conversationWebController.generateConversation({
           username,
           channel,
           message,
@@ -234,7 +234,7 @@ export default class App {
 
         void socket.join(channel) // Join the user to a socket room
 
-        const joinResponse = await this.#conversationWebController.joinAssistantChannel({
+        const joinResponse = await this.conversationWebController.joinAssistantChannel({
           username,
           channel,
         })
@@ -252,7 +252,7 @@ export default class App {
         }
 
         const conversationResponse =
-          await this.#conversationWebController.conversationAssistantFlow(
+          await this.conversationWebController.conversationAssistantFlow(
             userId,
             message,
             onProgress
@@ -278,7 +278,7 @@ export default class App {
     })
   }
 
-  #cronJobs(): void {
+  private cronJobs(): void {
     try {
       const cronJob = cron.schedule('* * * * *', alertCronJob)
 
@@ -291,7 +291,7 @@ export default class App {
     }
   }
 
-  #webPushConfig(): void {
+  private webPushConfig(): void {
     const vapidKeys = {
       publicKey: process.env.VAPID_PUBLIC_KEY,
       privateKey: process.env.VAPID_PRIVATE_KEY,
@@ -310,21 +310,21 @@ export default class App {
       logger.fatal({ err: reason }, 'Unhandled rejection')
     })
 
-    const server = http.createServer(this.#app)
+    const server = http.createServer(this.app)
 
     // Socket io
-    this.#socketListeners(server)
+    this.socketListeners(server)
 
     // Start express
-    server.listen(this.#app.get('port'), () => {
+    server.listen(this.app.get('port'), () => {
       log.info({ port: 4000 }, 'Socket Server started')
     })
 
     // Slack
-    this.#slackListeners()
+    this.slackListeners()
 
     // Notifications
-    this.#cronJobs()
-    this.#webPushConfig()
+    this.cronJobs()
+    this.webPushConfig()
   }
 }

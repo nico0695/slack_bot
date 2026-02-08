@@ -8,23 +8,23 @@ import { ConversationProviders } from '../../shared/constants/conversationFlow'
 const log = createModuleLogger('gemini.conversations')
 
 export default class GeminiRepository {
-  static #instance: GeminiRepository
+  private static instance: GeminiRepository
 
-  #geminiApi
+  private geminiApi
 
   private constructor() {
-    this.#geminiApi = this.initializeGeminiApi()
+    this.geminiApi = this.initializeGeminiApi()
 
     this.chatCompletion = this.chatCompletion.bind(this)
   }
 
   static getInstance(): GeminiRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new GeminiRepository()
-    return this.#instance
+    this.instance = new GeminiRepository()
+    return this.instance
   }
 
   private initializeGeminiApi(): any {
@@ -46,7 +46,7 @@ export default class GeminiRepository {
       const mode = options?.mode || 'default'
       const isClassification = mode === 'classification'
 
-      const apiRequestBot = await this.#geminiApi.models.generateContent({
+      const apiRequestBot = await this.geminiApi.models.generateContent({
         model: isClassification ? 'gemini-2.5-flash-lite' : 'gemini-2.0-flash',
         contents: messages.map((message: any) => message.content).join(' '),
       })

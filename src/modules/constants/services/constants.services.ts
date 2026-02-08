@@ -8,38 +8,38 @@ import { createModuleLogger } from '../../../config/logger'
 const log = createModuleLogger('constants.service')
 
 export default class ConstantsServices {
-  static #instance: ConstantsServices
+  private static instance: ConstantsServices
 
-  #constantsDataSources: ConstantsDataSources
+  private constantsDataSources: ConstantsDataSources
 
   private constructor() {
-    this.#constantsDataSources = ConstantsDataSources.getInstance()
+    this.constantsDataSources = ConstantsDataSources.getInstance()
   }
 
   static getInstance(): ConstantsServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ConstantsServices()
-    return this.#instance
+    this.instance = new ConstantsServices()
+    return this.instance
   }
 
   getAllConstants = async (): Promise<Constants[]> => {
-    const constants = await this.#constantsDataSources.getAllConstants()
+    const constants = await this.constantsDataSources.getAllConstants()
 
     return constants
   }
 
   getConstantByKey = async (key: GlobalConfigKey): Promise<Constants> => {
-    const constant = await this.#constantsDataSources.getConstantByKey(key)
+    const constant = await this.constantsDataSources.getConstantByKey(key)
 
     return constant
   }
 
   updateConstantByKey = async (key: GlobalConfigKey, value: string): Promise<Constants> => {
     try {
-      const constant = await this.#constantsDataSources.updateConstantByKey(key, value)
+      const constant = await this.constantsDataSources.updateConstantByKey(key, value)
 
       setGlobalConfigValue(key, value)
 
@@ -52,7 +52,7 @@ export default class ConstantsServices {
 
   createConstant = async (key: GlobalConfigKey, value: string): Promise<Constants> => {
     try {
-      const constant = await this.#constantsDataSources.createConstant(key, value)
+      const constant = await this.constantsDataSources.createConstant(key, value)
 
       setGlobalConfigValue(key, value)
 
