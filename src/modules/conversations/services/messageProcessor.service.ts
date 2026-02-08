@@ -1108,9 +1108,7 @@ export default class MessageProcessor {
 
           return {
             role: roleTypes.assistant,
-            content:
-              parsed.successMessage ||
-              `Tus últimas imágenes (${images.data.data.length}):\n${imagesList}`,
+            content: `Tus últimas imágenes (${images.data.data.length}):\n${imagesList}`,
             provider: ConversationProviders.ASSISTANT,
           }
         }

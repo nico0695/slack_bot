@@ -57,7 +57,7 @@ export default class ExternalStorageServices {
         fileName: apiResult.name,
         path: apiResult.path,
         fullPath: apiResult.key,
-        mimeType: apiResult.mimeType,
+        mimeType: apiResult.mimeType || options.mimeType,
         size: apiResult.size,
         downloadUrl: apiResult.downloadUrl,
         metadata: options.metadata,

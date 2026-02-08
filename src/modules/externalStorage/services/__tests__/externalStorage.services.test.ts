@@ -145,6 +145,29 @@ describe('ExternalStorageServices', () => {
       )
     })
 
+    it('should fallback to options.mimeType when api does not return mimeType', async () => {
+      const apiResult = {
+        id: 'storage-123',
+        name: 'test.png',
+        key: 'images/generated/test.png',
+        path: 'images/generated',
+        mimeType: null,
+        size: 1024,
+        downloadUrl: 'https://storage.example.com/test.png',
+      }
+
+      mockApiStorageRepo.uploadFile.mockResolvedValue(apiResult)
+      mockDataSource.createStoredFile.mockResolvedValue({ id: 1, ...apiResult, mimeType: 'image/png' })
+
+      await service.uploadFile(uploadOptions)
+
+      expect(mockDataSource.createStoredFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mimeType: 'image/png',
+        })
+      )
+    })
+
     it('should return error when api upload fails', async () => {
       mockApiStorageRepo.uploadFile.mockResolvedValue(null)
 
