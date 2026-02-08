@@ -6,12 +6,13 @@ Multi-functional Slack bot integrating AI services (OpenAI, Gemini) for conversa
 
 ### Core Capabilities
 - **AI Conversations** - OpenAI and Gemini integration with conversation history
-- **Image Generation** - AI-powered image creation via Leap API
+- **Image Generation** - AI-powered image creation (OpenAI DALL-E 3, Gemini Imagen 3, Leap)
 - **Task Management** - Create, view, and manage tasks
 - **Alert System** - Time-based notifications with cron scheduling
 - **Notes** - Simple note-taking system
 - **Text-to-Speech** - TTS functionality using Transformers.js
 - **Summarization** - Text summarization capabilities
+- **External Storage** - File persistence via external storage service (Backblaze B2)
 - **Web Interface** - Real-time web dashboard with Socket.io
 
 ### Technical Features
@@ -81,6 +82,10 @@ VAPID_PRIVATE_KEY=
 # Search (optional)
 SEARCH_API_KEY=
 SEARCH_API_KEY_CX=
+
+# External Storage (optional, api-storage service)
+STORAGE_API_URL=
+STORAGE_API_KEY=
 
 # Logging (optional)
 # Overrides default level (test=silent, production=info, development=debug)
@@ -166,9 +171,10 @@ src/modules/{feature}/
 - `alerts` - Time-based reminders
 - `tasks` - Task tracking
 - `notes` - Note storage
-- `images` - Image generation
+- `images` - Image generation (multi-provider)
 - `textToSpeech` - TTS
 - `summary` - Text summarization
+- `externalStorage` - File persistence via external storage API
 - `users` - User management
 - `constants` - System constants
 
@@ -264,6 +270,7 @@ Detailed documentation available in `/doc`:
 
 ## Recent Updates
 
+- Added `externalStorage` module for persistent file storage via api-storage (Backblaze B2)
 - Fixed Redis digest and assistant preference handling
 - Improved Docker configuration
 - Enhanced CI/CD with error handling
