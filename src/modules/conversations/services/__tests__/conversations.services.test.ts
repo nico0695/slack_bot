@@ -42,6 +42,10 @@ const notesServicesMock = {
   getNotesByUserId: jest.fn(),
 }
 
+const linksServicesMock = {
+  getLinksByUserId: jest.fn(),
+}
+
 const imagesServicesMock = {
   generateImageForAssistant: jest.fn(),
   getImages: jest.fn(),
@@ -99,6 +103,13 @@ jest.mock('../../../notes/services/notes.services', () => ({
   },
 }))
 
+jest.mock('../../../links/services/links.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => linksServicesMock,
+  },
+}))
+
 jest.mock('../../../images/services/images.services', () => ({
   __esModule: true,
   default: {
@@ -121,9 +132,11 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgAlertDetail: jest.fn(() => buildBlocksMock()),
   msgAlertCreated: jest.fn(() => buildBlocksMock()),
   msgNoteCreated: jest.fn(() => buildBlocksMock()),
+  msgLinkCreated: jest.fn(() => buildBlocksMock()),
   msgAlertsList: jest.fn(() => buildBlocksMock()),
   msgTasksList: jest.fn(() => buildBlocksMock()),
   msgNotesList: jest.fn(() => buildBlocksMock()),
+  msgLinksList: jest.fn(() => buildBlocksMock()),
   msgAssistantQuickHelp: jest.fn(() => buildBlocksMock()),
 }))
 
@@ -307,6 +320,7 @@ describe('ConversationsServices', () => {
       tasksServicesMock.getTasksByUserId.mockResolvedValue({
         data: [{ id: 5, status: 'pending' } as any],
       })
+      linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
 
       await service.getAssistantQuickHelp(42, { channelId: 'C123', isChannelContext: true })
 
@@ -326,6 +340,7 @@ describe('ConversationsServices', () => {
       alertsServicesMock.getAlertsByUserId.mockResolvedValue({ data: [] })
       notesServicesMock.getNotesByUserId.mockResolvedValue({ data: [] })
       tasksServicesMock.getTasksByUserId.mockResolvedValue({ data: [] })
+      linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
 
       await service.getAssistantQuickHelp(7, { channelId: 'D555', isChannelContext: false })
 

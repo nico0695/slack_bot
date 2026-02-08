@@ -10,6 +10,7 @@ Multi-functional Slack bot integrating AI services (OpenAI, Gemini) for conversa
 - **Task Management** - Create, view, and manage tasks
 - **Alert System** - Time-based notifications with cron scheduling
 - **Notes** - Simple note-taking system
+- **Links** - Save URLs/links for later reading (read-later / Wallabag-style)
 - **Text-to-Speech** - TTS functionality using Transformers.js
 - **Summarization** - Text summarization capabilities
 - **External Storage** - File persistence via external storage service (Backblaze B2)
@@ -118,6 +119,7 @@ img <prompt>          - Generate image
 .alert/.a <time> <message>  - Create alert (e.g., ".alert 1d14h12m Reminder")
 .task/.t <time> <message>   - Create task
 .note/.n <message>          - Create note
+.link/.lk <url>             - Save link (e.g., ".link https://example.com -tt Title -d Desc -t tag")
 -list/-l                    - List all items
 ```
 
@@ -127,6 +129,10 @@ img <prompt>          - Generate image
 - `GET /alerts` - List alerts
 - `POST /tasks` - Create task
 - `GET /notes` - List notes
+- `GET /links` - List links
+- `POST /links` - Save link
+- `PUT /links/:id` - Update link
+- `DELETE /links/:id` - Delete link
 - `POST /images` - Generate image
 - `POST /text-to-speech` - Generate TTS
 - `POST /summary` - Summarize text
@@ -171,6 +177,7 @@ src/modules/{feature}/
 - `alerts` - Time-based reminders
 - `tasks` - Task tracking
 - `notes` - Note storage
+- `links` - URL/link storage (read-later)
 - `images` - Image generation (multi-provider)
 - `textToSpeech` - TTS
 - `summary` - Text summarization
@@ -270,6 +277,7 @@ Detailed documentation available in `/doc`:
 
 ## Recent Updates
 
+- Added `links` module for saving URLs/links to read later (Wallabag-style), with Slack commands (`.link/.lk`), REST API, assistant intent fallback, and overflow menu actions (detail, mark read, delete)
 - Added `externalStorage` module for persistent file storage via api-storage (Backblaze B2)
 - Fixed Redis digest and assistant preference handling
 - Improved Docker configuration

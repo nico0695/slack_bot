@@ -1,6 +1,7 @@
 import { Alerts } from '../../../../entities/alerts'
 import { Tasks } from '../../../../entities/tasks'
 import { Notes } from '../../../../entities/notes'
+import { Links } from '../../../../entities/links'
 import { truncateText } from '../../../../shared/utils/string.utils'
 import { getRelativeTimeCompact } from '../../../../shared/utils/dates.utils'
 import { IUserConversation } from '../interfaces/converstions'
@@ -9,6 +10,7 @@ export interface IUserContextData {
   alerts?: Alerts[]
   tasks?: Tasks[]
   notes?: Notes[]
+  links?: Links[]
 }
 
 export interface IUserContextOptions {
@@ -38,6 +40,10 @@ export const buildUserDataContext = (
 
   if (data.notes && data.notes.length > 0) {
     lines.push(formatCompactNotes(data.notes, maxItems))
+  }
+
+  if (data.links && data.links.length > 0) {
+    lines.push(formatCompactLinks(data.links, maxItems))
   }
 
   if (lines.length === 0) {
@@ -80,6 +86,18 @@ export const formatCompactNotes = (notes: Notes[], maxItems: number): string => 
     return `#${String(note.id)}"${title}"${tag}`
   })
   return `[N:${String(notes.length)}] ${items.join(' ')}`
+}
+
+export const formatCompactLinks = (links: Links[], maxItems: number): string => {
+  const sorted = [...links].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
+  const items = sorted.slice(0, maxItems).map((link) => {
+    const title = truncateText(link.title || link.url, 20)
+    const tag = link.tag ? `[${link.tag}]` : ''
+    return `#${String(link.id)}"${title}"${tag}`
+  })
+  return `[L:${String(links.length)}] ${items.join(' ')}`
 }
 
 // Output: "U:mensaje usuario\nA:respuesta asistente\nU:otro mensaje"

@@ -26,6 +26,11 @@ const notesServicesMock = {
   createAssistantNote: jest.fn(),
 }
 
+const linksServicesMock = {
+  getLinksByUserId: jest.fn(),
+  createAssistantLink: jest.fn(),
+}
+
 const imagesServicesMock = {
   getImages: jest.fn(),
   generateImageForAssistant: jest.fn(),
@@ -72,6 +77,13 @@ jest.mock('../../../notes/services/notes.services', () => ({
   },
 }))
 
+jest.mock('../../../links/services/links.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => linksServicesMock,
+  },
+}))
+
 jest.mock('../../../images/services/images.services', () => ({
   __esModule: true,
   default: {
@@ -98,6 +110,8 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgTaskCreated: jest.fn(() => buildBlocksMock()),
   msgNotesList: jest.fn(() => buildBlocksMock()),
   msgNoteCreated: jest.fn(() => buildBlocksMock()),
+  msgLinksList: jest.fn(() => buildBlocksMock()),
+  msgLinkCreated: jest.fn(() => buildBlocksMock()),
 }))
 
 describe('MessageProcessor - channel scoped lookups', () => {

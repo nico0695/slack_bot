@@ -1,6 +1,7 @@
 import { Tasks } from '../../entities/tasks'
 import { Alerts } from '../../entities/alerts'
 import { Notes } from '../../entities/notes'
+import { Links } from '../../entities/links'
 import { formatDateToText, formatTimeLeft } from './dates.utils'
 
 interface AlertStatusTokens {
@@ -213,6 +214,8 @@ interface IQuickHelpPayload {
   notes: number
   tasks: number
   tasksPending: number
+  links?: number
+  linksUnread?: number
   defaultSnoozeMinutes?: number
 }
 
@@ -248,6 +251,14 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
           text: `*Tareas* (${data.tasks})\n> Pendientes: *${data.tasksPending}*\n> Usa \`task done #{id}\` para completarlas rápido.`,
         },
         accessory: quickActionOverflow('task'),
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Links* (${data.links ?? 0})\n> Sin leer: *${data.linksUnread ?? 0}*\n> Usa \`.link <url>\` para guardar o \`.link -l\` para listar.`,
+        },
+        accessory: quickActionOverflow('link' as any),
       },
       {
         type: 'section',
@@ -439,6 +450,93 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
   return { blocks }
 }
 
+/** LINKS */
+
+const linkOverflowAccessory = (id: number): any => ({
+  type: 'overflow',
+  options: [
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Ver Detalles',
+      },
+      value: `link:detail:${id}`,
+    },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Marcar leído',
+      },
+      value: `link:read:${id}`,
+    },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Eliminar',
+      },
+      value: `link:delete:${id}`,
+    },
+  ],
+  action_id: `link_actions:${id}`,
+})
+
+export const msgLinkCreated = (data: Links): { blocks: any[] } => {
+  const tagLabel = data.tag ? ` · #${truncateText(data.tag, 20)}` : ''
+  const titleLabel = data.title ? ` ${truncateText(data.title, 60)}` : ''
+  const truncatedDescription = truncateText(data.description ?? '', 80)
+  return {
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `:link: *Link #${data.id}*${titleLabel}${tagLabel}\n> <${data.url}|${truncateText(data.url, 60)}>\n> ${
+            truncatedDescription || '_Sin descripción_'
+          }`,
+        },
+        accessory: linkOverflowAccessory(data.id),
+      },
+    ],
+  }
+}
+
+export const msgLinksList = (links: Links[]): { blocks: any[] } => {
+  const blocks: any[] = []
+
+  blocks.push(
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `Tus Links (${links.length})`,
+        emoji: true,
+      },
+    },
+    {
+      type: 'divider',
+    }
+  )
+
+  links.forEach((link) => {
+    const icon = link.status === 'read' ? ':white_check_mark:' : ':link:'
+    const titleLabel = link.title ? ` ${truncateText(link.title, 40)}` : ''
+    const tagLabel = link.tag ? ` · #${truncateText(link.tag, 15)}` : ''
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `${icon} *Link #${link.id}*${titleLabel}${tagLabel}\n> <${link.url}|${truncateText(link.url, 50)}>`,
+      },
+      accessory: linkOverflowAccessory(link.id),
+    })
+    blocks.push({
+      type: 'divider',
+    })
+  })
+
+  return { blocks }
+}
+
 // Tasks
 
 export const msgTaskCreated = (data: Tasks): { blocks: any[] } => {
@@ -509,11 +607,14 @@ export const msgAssistantDigest = (payload: {
     tasksPending: number
     tasksCompleted: number
     notes: number
+    links?: number
+    linksUnread?: number
   }
   highlights: {
     alerts: Alerts[]
     tasks: Tasks[]
     notes: Notes[]
+    links?: Links[]
   }
 }): { blocks: any[] } => {
   const blocks: any[] = [
@@ -538,7 +639,7 @@ export const msgAssistantDigest = (payload: {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Alertas*: Pendientes ${payload.stats.alertsPending} · Atrasadas ${payload.stats.alertsOverdue} · Resueltas ${payload.stats.alertsResolved}\n*Tareas*: Pendientes ${payload.stats.tasksPending} · Completadas ${payload.stats.tasksCompleted}\n*Notas*: ${payload.stats.notes}`,
+        text: `*Alertas*: Pendientes ${payload.stats.alertsPending} · Atrasadas ${payload.stats.alertsOverdue} · Resueltas ${payload.stats.alertsResolved}\n*Tareas*: Pendientes ${payload.stats.tasksPending} · Completadas ${payload.stats.tasksCompleted}\n*Notas*: ${payload.stats.notes}\n*Links*: ${payload.stats.links ?? 0} · Sin leer: ${payload.stats.linksUnread ?? 0}`,
       },
     },
     {
@@ -620,6 +721,32 @@ export const msgAssistantDigest = (payload: {
           }`,
         },
         accessory: overflowAccessory('note', note.id),
+      })
+    })
+
+    blocks.push({ type: 'divider' })
+  }
+
+  if (payload.highlights.links?.length) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '*Links recientes*',
+      },
+    })
+
+    payload.highlights.links.slice(0, 3).forEach((link) => {
+      const icon = link.status === 'read' ? ':white_check_mark:' : ':link:'
+      const titleLabel = link.title ? ` ${truncateText(link.title, 60)}` : ''
+      const tagLabel = link.tag ? ` · #${truncateText(link.tag, 20)}` : ''
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${icon} *#${link.id}*${titleLabel}${tagLabel}\n> <${link.url}|${truncateText(link.url, 60)}>`,
+        },
+        accessory: linkOverflowAccessory(link.id),
       })
     })
 
