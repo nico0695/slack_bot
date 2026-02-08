@@ -26,6 +26,11 @@ const notesServicesMock = {
   createAssistantNote: jest.fn(),
 }
 
+const linksServicesMock = {
+  getLinksByUserId: jest.fn(),
+  createAssistantLink: jest.fn(),
+}
+
 const imagesServicesMock = {
   getImages: jest.fn(),
   generateImageForAssistant: jest.fn(),
@@ -72,6 +77,13 @@ jest.mock('../../../notes/services/notes.services', () => ({
   },
 }))
 
+jest.mock('../../../links/services/links.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => linksServicesMock,
+  },
+}))
+
 jest.mock('../../../images/services/images.services', () => ({
   __esModule: true,
   default: {
@@ -98,6 +110,8 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgTaskCreated: jest.fn(() => buildBlocksMock()),
   msgNotesList: jest.fn(() => buildBlocksMock()),
   msgNoteCreated: jest.fn(() => buildBlocksMock()),
+  msgLinksList: jest.fn(() => buildBlocksMock()),
+  msgLinkCreated: jest.fn(() => buildBlocksMock()),
 }))
 
 describe('MessageProcessor - channel scoped lookups', () => {
@@ -259,6 +273,102 @@ describe('MessageProcessor - skip AI flag', () => {
   it('cleanSkipFlag removes the + prefix', () => {
     expect(processor.cleanSkipFlag('+ some message')).toBe('some message')
     expect(processor.cleanSkipFlag('+message')).toBe('message')
+  })
+})
+
+describe('MessageProcessor - link handling', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = MessageProcessor.getInstance()
+  })
+
+  it('creates a link with .link <url>', async () => {
+    linksServicesMock.createAssistantLink.mockResolvedValue({
+      data: { id: 1, url: 'https://example.com', title: '', tag: '', description: '' },
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.link https://example.com',
+      99,
+      undefined,
+      false
+    )
+
+    expect(linksServicesMock.createAssistantLink).toHaveBeenCalledWith(
+      99,
+      'https://example.com',
+      expect.objectContaining({ title: '', description: '' })
+    )
+    expect(result.response).toBeTruthy()
+    expect(result.response?.content).toContain('#1')
+  })
+
+  it('creates a link with flags -tt -d -t', async () => {
+    linksServicesMock.createAssistantLink.mockResolvedValue({
+      data: { id: 2, url: 'https://example.com', title: 'My Title', tag: 'dev', description: 'Desc' },
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.link https://example.com -tt My Title -d Desc -t dev',
+      99,
+      undefined,
+      false
+    )
+
+    expect(linksServicesMock.createAssistantLink).toHaveBeenCalledWith(
+      99,
+      'https://example.com',
+      expect.objectContaining({ title: 'My Title', description: 'Desc', tag: 'dev' })
+    )
+    expect(result.response).toBeTruthy()
+  })
+
+  it('lists links with .link -l', async () => {
+    linksServicesMock.getLinksByUserId.mockResolvedValue({
+      data: [
+        { id: 1, url: 'https://example.com', title: 'Test', tag: '', status: 'unread' },
+      ],
+    })
+
+    const result = await processor.processAssistantMessage('.link -l', 99, undefined, false)
+
+    expect(linksServicesMock.getLinksByUserId).toHaveBeenCalledWith(99, { channelId: null })
+    expect(result.response).toBeTruthy()
+  })
+
+  it('lists links by tag with .link -lt dev', async () => {
+    linksServicesMock.getLinksByUserId.mockResolvedValue({
+      data: [
+        { id: 1, url: 'https://example.com', title: 'Test', tag: 'dev', status: 'unread' },
+      ],
+    })
+
+    const result = await processor.processAssistantMessage('.link -lt dev', 99, undefined, false)
+
+    expect(linksServicesMock.getLinksByUserId).toHaveBeenCalledWith(99, {
+      tag: 'dev',
+      channelId: null,
+    })
+    expect(result.response).toBeTruthy()
+    expect(result.response?.content).toContain('dev')
+  })
+
+  it('throws when URL is missing in .link', async () => {
+    await expect(
+      processor.processAssistantMessage('.link', 99, undefined, false)
+    ).rejects.toThrow('debes ingresar una URL')
+  })
+
+  it('returns empty list message when no links exist', async () => {
+    linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
+
+    const result = await processor.processAssistantMessage('.link -l', 99, undefined, false)
+
+    expect(result.response).toBeTruthy()
+    expect(result.response?.content).toContain('No tienes links')
   })
 })
 

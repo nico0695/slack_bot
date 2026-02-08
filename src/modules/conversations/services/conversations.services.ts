@@ -6,8 +6,11 @@ import UsersServices from '../../users/services/users.services'
 import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
+import LinksServices from '../../links/services/links.services'
 import { Tasks } from '../../../entities/tasks'
 import { Notes } from '../../../entities/notes'
+import { Links } from '../../../entities/links'
+import { LinkStatus } from '../../links/shared/constants/links.constants'
 
 // AI
 import GeminiRepository from '../repositories/gemini/gemini.repository'
@@ -56,6 +59,7 @@ export default class ConversationsServices {
   #alertsServices: AlertsServices
   #tasksServices: TasksServices
   #notesServices: NotesServices
+  #linksServices: LinksServices
   #messageProcessor: MessageProcessor
   #defaultSnoozeMinutes = 10
   #maxContextMessages = 20
@@ -69,6 +73,7 @@ export default class ConversationsServices {
     this.#alertsServices = AlertsServices.getInstance()
     this.#tasksServices = TasksServices.getInstance()
     this.#notesServices = NotesServices.getInstance()
+    this.#linksServices = LinksServices.getInstance()
   }
 
   static getInstance(): ConversationsServices {
@@ -625,6 +630,8 @@ export default class ConversationsServices {
           return await this.#handleNoteAction(operation, targetId, userId, context)
         case 'task':
           return await this.#handleTaskAction(operation, targetId, userId, context)
+        case 'link':
+          return await this.#handleLinkAction(operation, targetId, userId, context)
         case 'assistant':
           return await this.#handleAssistantAction(operation, userId)
         default:
@@ -972,6 +979,82 @@ export default class ConversationsServices {
     }
   }
 
+  #handleLinkAction = async (
+    operation: string,
+    targetId: number,
+    userId: number,
+    context: { channelId?: string; isChannelContext?: boolean }
+  ): Promise<string | { blocks: any[] }> => {
+    const scopeChannelId = this.#getScopeChannelId(
+      context.channelId,
+      context.isChannelContext ?? false
+    )
+
+    switch (operation) {
+      case 'delete': {
+        const deleteRes = await this.#linksServices.deleteLink(targetId, userId)
+
+        if (deleteRes.error || !deleteRes.data) {
+          return `Error al eliminar el link, no se encontró el link con Id: ${targetId}`
+        }
+
+        return `Link #${targetId} eliminado correctamente.`
+      }
+
+      case 'detail': {
+        const linksRes = await this.#linksServices.getLinksByUserId(userId, {
+          channelId: scopeChannelId,
+        })
+        if (linksRes.error) {
+          return 'No se pudieron obtener los links. 😅'
+        }
+        const link = linksRes.data?.find((item) => item.id === targetId)
+
+        if (!link) {
+          return `No se encontró el link con Id: ${targetId}`
+        }
+
+        return this.#formatLinkDetail(link)
+      }
+
+      case 'read': {
+        const updateRes = await this.#linksServices.updateLink(targetId, {
+          status: LinkStatus.READ,
+        }, userId)
+
+        if (updateRes.error || !updateRes.data) {
+          return `Error al actualizar el link con Id: ${targetId}`
+        }
+
+        return `Link #${targetId} marcado como leído.`
+      }
+
+      case 'list': {
+        const linksRes = await this.#linksServices.getLinksByUserId(userId, {
+          channelId: scopeChannelId,
+        })
+        if (linksRes.error) {
+          return 'No se pudieron obtener los links. 😅'
+        }
+        const links = linksRes.data ?? []
+        if (!links.length) {
+          return 'No tienes links guardados.'
+        }
+        return slackMsgUtils.msgLinksList(links)
+      }
+
+      default:
+        return 'Acción no reconocida.'
+    }
+  }
+
+  #formatLinkDetail = (link: Links): string => {
+    const tagLabel = link.tag ? `\n• Etiqueta: ${link.tag}` : ''
+    const titleLabel = link.title ? `\n• Título: ${link.title}` : ''
+    const descLabel = link.description ? `\n• Descripción: ${link.description}` : ''
+    return `Link #${link.id}\n• URL: ${link.url}${titleLabel}${descLabel}\n• Estado: ${link.status}${tagLabel}`
+  }
+
   #formatNoteDetail = (note: Notes): string => {
     const tagLabel = note.tag ? `\n• Etiqueta: ${note.tag}` : ''
     return `Nota #${note.id}\n• Título: ${note.title}\n• Descripción: ${note.description}${tagLabel}`
@@ -1001,15 +1084,17 @@ export default class ConversationsServices {
         options.isChannelContext ?? false
       )
 
-      const [alertsRes, notesRes, tasksRes] = await Promise.all([
+      const [alertsRes, notesRes, tasksRes, linksRes] = await Promise.all([
         this.#alertsServices.getAlertsByUserId(userId, { channelId: scopeChannelId }),
         this.#notesServices.getNotesByUserId(userId, { channelId: scopeChannelId }),
         this.#tasksServices.getTasksByUserId(userId, { channelId: scopeChannelId }),
+        this.#linksServices.getLinksByUserId(userId, { channelId: scopeChannelId }),
       ])
 
       const alerts = alertsRes.data ?? []
       const notes = notesRes.data ?? []
       const tasks = tasksRes.data ?? []
+      const links = linksRes.data ?? []
 
       const now = new Date()
       const alertsPending = alerts.filter((alert) => !alert.sent)
@@ -1023,6 +1108,8 @@ export default class ConversationsServices {
 
       const defaultSnoozeMinutes = await this.#getSnoozeMinutes(userId)
 
+      const linksUnread = links.filter((link) => link.status === LinkStatus.UNREAD).length
+
       return slackMsgUtils.msgAssistantQuickHelp({
         alerts: alerts.length,
         alertsPending: alertsPending.length,
@@ -1032,6 +1119,8 @@ export default class ConversationsServices {
         notes: notes.length,
         tasks: tasks.length,
         tasksPending,
+        links: links.length,
+        linksUnread,
         defaultSnoozeMinutes,
       })
     } catch (error) {

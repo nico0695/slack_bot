@@ -42,6 +42,12 @@ const notesServicesMock = {
   getNotesByUserId: jest.fn(),
 }
 
+const linksServicesMock = {
+  getLinksByUserId: jest.fn(),
+  deleteLink: jest.fn(),
+  updateLink: jest.fn(),
+}
+
 const imagesServicesMock = {
   generateImageForAssistant: jest.fn(),
   getImages: jest.fn(),
@@ -99,6 +105,13 @@ jest.mock('../../../notes/services/notes.services', () => ({
   },
 }))
 
+jest.mock('../../../links/services/links.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => linksServicesMock,
+  },
+}))
+
 jest.mock('../../../images/services/images.services', () => ({
   __esModule: true,
   default: {
@@ -121,9 +134,11 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgAlertDetail: jest.fn(() => buildBlocksMock()),
   msgAlertCreated: jest.fn(() => buildBlocksMock()),
   msgNoteCreated: jest.fn(() => buildBlocksMock()),
+  msgLinkCreated: jest.fn(() => buildBlocksMock()),
   msgAlertsList: jest.fn(() => buildBlocksMock()),
   msgTasksList: jest.fn(() => buildBlocksMock()),
   msgNotesList: jest.fn(() => buildBlocksMock()),
+  msgLinksList: jest.fn(() => buildBlocksMock()),
   msgAssistantQuickHelp: jest.fn(() => buildBlocksMock()),
 }))
 
@@ -290,6 +305,115 @@ describe('ConversationsServices', () => {
     expect(result).toBe('bot: Hola\nNick: Que tal?')
   })
 
+  describe('handleAction - link entity', () => {
+    it('deletes a link', async () => {
+      linksServicesMock.deleteLink.mockResolvedValue({ data: true })
+
+      const result = await service.handleAction(
+        { entity: 'link', operation: 'delete', targetId: 5 },
+        42
+      )
+
+      expect(linksServicesMock.deleteLink).toHaveBeenCalledWith(5, 42)
+      expect(result).toBe('Link #5 eliminado correctamente.')
+    })
+
+    it('returns error when delete fails', async () => {
+      linksServicesMock.deleteLink.mockResolvedValue({ error: 'not found', data: false })
+
+      const result = await service.handleAction(
+        { entity: 'link', operation: 'delete', targetId: 99 },
+        42
+      )
+
+      expect(result).toContain('Error al eliminar el link')
+    })
+
+    it('shows link detail', async () => {
+      linksServicesMock.getLinksByUserId.mockResolvedValue({
+        data: [
+          { id: 5, url: 'https://example.com', title: 'Test', description: 'Desc', status: 'unread', tag: 'dev' },
+        ],
+      })
+
+      const result = await service.handleAction(
+        { entity: 'link', operation: 'detail', targetId: 5 },
+        42
+      )
+
+      expect(result).toContain('Link #5')
+      expect(result).toContain('https://example.com')
+    })
+
+    it('returns not found when detail link does not exist', async () => {
+      linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
+
+      const result = await service.handleAction(
+        { entity: 'link', operation: 'detail', targetId: 999 },
+        42
+      )
+
+      expect(result).toContain('No se encontró el link con Id: 999')
+    })
+
+    it('marks link as read', async () => {
+      linksServicesMock.updateLink.mockResolvedValue({ data: true })
+
+      const result = await service.handleAction(
+        { entity: 'link', operation: 'read', targetId: 5 },
+        42
+      )
+
+      expect(linksServicesMock.updateLink).toHaveBeenCalledWith(5, { status: 'read' }, 42)
+      expect(result).toBe('Link #5 marcado como leído.')
+    })
+
+    it('returns error when mark read fails', async () => {
+      linksServicesMock.updateLink.mockResolvedValue({ error: 'update failed', data: false })
+
+      const result = await service.handleAction(
+        { entity: 'link', operation: 'read', targetId: 5 },
+        42
+      )
+
+      expect(result).toContain('Error al actualizar el link')
+    })
+
+    it('lists links', async () => {
+      const slackMessagesUtils = jest.requireMock('../../../../shared/utils/slackMessages.utils')
+      linksServicesMock.getLinksByUserId.mockResolvedValue({
+        data: [{ id: 1, url: 'https://example.com', title: 'Test', status: 'unread' }],
+      })
+
+      await service.handleAction(
+        { entity: 'link', operation: 'list', targetId: 0 },
+        42
+      )
+
+      expect(slackMessagesUtils.msgLinksList).toHaveBeenCalled()
+    })
+
+    it('returns empty message when no links exist for list', async () => {
+      linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
+
+      const result = await service.handleAction(
+        { entity: 'link', operation: 'list', targetId: 0 },
+        42
+      )
+
+      expect(result).toBe('No tienes links guardados.')
+    })
+
+    it('returns unrecognized action for unknown operation', async () => {
+      const result = await service.handleAction(
+        { entity: 'link', operation: 'unknown', targetId: 1 },
+        42
+      )
+
+      expect(result).toBe('Acción no reconocida.')
+    })
+  })
+
   describe('getAssistantQuickHelp', () => {
     const slackMessagesUtils = jest.requireMock('../../../../shared/utils/slackMessages.utils')
 
@@ -307,6 +431,7 @@ describe('ConversationsServices', () => {
       tasksServicesMock.getTasksByUserId.mockResolvedValue({
         data: [{ id: 5, status: 'pending' } as any],
       })
+      linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
 
       await service.getAssistantQuickHelp(42, { channelId: 'C123', isChannelContext: true })
 
@@ -326,6 +451,7 @@ describe('ConversationsServices', () => {
       alertsServicesMock.getAlertsByUserId.mockResolvedValue({ data: [] })
       notesServicesMock.getNotesByUserId.mockResolvedValue({ data: [] })
       tasksServicesMock.getTasksByUserId.mockResolvedValue({ data: [] })
+      linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
 
       await service.getAssistantQuickHelp(7, { channelId: 'D555', isChannelContext: false })
 
