@@ -115,6 +115,7 @@ src/modules/{feature}/
 └── shared/
     ├── constants/                    # Module constants
     ├── interfaces/                   # TypeScript types
+    ├── schemas/                      # Zod validation schemas
     └── utils/                        # Helper functions
 ```
 
@@ -255,13 +256,33 @@ connectionSource.initialize()
 - Temporary user preferences
 - Session management
 
+## Input Validation
+
+Web controllers validate incoming data using **Zod** schemas at the controller boundary. Validation happens before any business logic, providing structured error responses with field-level detail.
+
+**Shared Utility:** `src/shared/utils/validation.ts`
+
+| Function | Purpose |
+|----------|---------|
+| `validateBody(schema, data)` | Validate request body |
+| `validateQuery(schema, data)` | Validate query parameters |
+| `validateParams(schema, data)` | Validate route params |
+
+**Reusable Schemas:**
+- `paginationSchema` — `page`/`pageSize` with coercion and defaults
+- `idParamSchema` — coerces `:id` to positive integer
+
+**Module Schemas:** Each module defines schemas in `shared/schemas/` (e.g., `tasks.schemas.ts`) using `z.string().min(1)`, `z.nativeEnum()`, `z.string().url()`, `z.coerce.date()`, etc.
+
+**Error Flow:** Zod validation errors are transformed into `BadRequestError` with field context `{ fields: [{ field, message }] }`, keeping the existing error response format unchanged.
+
 ## Error Handling
 
 **Global Handler:** `src/shared/middleware/errors.ts`
 
 **Error Types:**
 - `CustomError` - Base error class
-- `BadRequestError` - 400 errors
+- `BadRequestError` - 400 errors (also used by Zod validation)
 - `NotFoundError` - 404 errors
 - `UnauthorizedError` - 401 errors
 

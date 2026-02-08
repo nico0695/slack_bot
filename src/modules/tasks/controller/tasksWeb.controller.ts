@@ -3,10 +3,12 @@ import { Router } from 'express'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
+import { validateBody, validateParams, idParamSchema } from '../../../shared/utils/validation'
 
 import TasksServices from '../services/tasks.services'
 
 import { ITask } from '../shared/interfaces/tasks.interfaces'
+import { createTaskSchema, updateTaskSchema } from '../shared/schemas/tasks.schemas'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
@@ -54,17 +56,15 @@ export default class TasksWebController extends GenericController {
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async createTask(req: any, res: any): Promise<void> {
     const user = this.userData
+    const parsed = validateBody(createTaskSchema, req.body)
 
     const dataTask: ITask = {
-      title: req.body.title,
-      description: req.body.description ?? '',
-      status: req.body.status,
-      alertDate: req.body.alertDate,
+      title: parsed.title,
+      description: parsed.description,
+      status: parsed.status,
+      alertDate: parsed.alertDate,
+      tag: parsed.tag,
       userId: user.id,
-    }
-
-    if (!dataTask.title) {
-      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
     const response = await this.tasksServices.createTask(dataTask)
@@ -93,21 +93,18 @@ export default class TasksWebController extends GenericController {
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async updateTask(req: any, res: any): Promise<void> {
-    const taskId = req.params.id
-
+    const { id: taskId } = validateParams(idParamSchema, req.params)
     const user = this.userData
+    const parsed = validateBody(updateTaskSchema, req.body)
 
     const dataTask: ITask = {
-      id: req.params.id,
-      title: req.body.title,
-      description: req.body.description,
-      status: req.body.status,
-      alertDate: req.body.alertDate,
+      id: taskId,
+      title: parsed.title,
+      description: parsed.description,
+      status: parsed.status,
+      alertDate: parsed.alertDate,
+      tag: parsed.tag,
       userId: user.id,
-    }
-
-    if (!dataTask.id || !dataTask.title) {
-      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
     const response = await this.tasksServices.updateTask(taskId, dataTask)
@@ -122,9 +119,10 @@ export default class TasksWebController extends GenericController {
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async deleteTask(req: any, res: any): Promise<void> {
+    const { id: taskId } = validateParams(idParamSchema, req.params)
     const user = this.userData
 
-    const response = await this.tasksServices.deleteTask(req.params.id, user.id)
+    const response = await this.tasksServices.deleteTask(taskId, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

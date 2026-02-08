@@ -873,9 +873,27 @@ All APIs return consistent error format:
 
 ```json
 {
-  "error": "Error message",
-  "statusCode": 400,
-  "timestamp": "2025-10-12T10:00:00Z"
+  "errors": [{ "message": "Error description", "context": {} }]
+}
+```
+
+### Validation Errors
+
+Endpoints validate input with Zod schemas. When validation fails, the response includes field-level detail:
+
+```json
+{
+  "errors": [
+    {
+      "message": "Datos de entrada no válidos",
+      "context": {
+        "fields": [
+          { "field": "title", "message": "String must contain at least 1 character(s)" },
+          { "field": "url", "message": "Invalid url" }
+        ]
+      }
+    }
+  ]
 }
 ```
 

@@ -62,7 +62,7 @@ describe('TasksWebController', () => {
         title: 'Task',
         description: '',
         status: 'pending',
-        alertDate: '2024-01-01T00:00:00Z',
+        alertDate: new Date('2024-01-01T00:00:00Z'),
         userId: 15,
       })
       expect(res.send).toHaveBeenCalledWith({ id: 1 })
@@ -111,7 +111,7 @@ describe('TasksWebController', () => {
         body: {
           title: 'Updated',
           description: 'desc',
-          status: 'done',
+          status: 'completed',
           alertDate: '2024-01-01T00:00:00Z',
         },
       }
@@ -119,21 +119,32 @@ describe('TasksWebController', () => {
 
       await controller.updateTask(req, res)
 
-      expect(updateTaskMock).toHaveBeenCalledWith('7', {
-        id: '7',
+      expect(updateTaskMock).toHaveBeenCalledWith(7, {
+        id: 7,
         title: 'Updated',
         description: 'desc',
-        status: 'done',
-        alertDate: '2024-01-01T00:00:00Z',
+        status: 'completed',
+        alertDate: new Date('2024-01-01T00:00:00Z'),
         userId: 15,
       })
       expect(res.send).toHaveBeenCalledWith(true)
     })
 
-    it('throws BadRequestError when payload incomplete', async () => {
+    it('throws BadRequestError when params id is empty', async () => {
       const req: any = {
         params: { id: '' },
-        body: { title: '', status: '', description: '', alertDate: '' },
+        body: { title: 'Task' },
+      }
+
+      await expect(controller.updateTask(req, res)).rejects.toThrow(BadRequestError)
+
+      expect(updateTaskMock).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequestError when title is missing', async () => {
+      const req: any = {
+        params: { id: '7' },
+        body: { title: '', description: '' },
       }
 
       await expect(controller.updateTask(req, res)).rejects.toThrow(BadRequestError)
@@ -159,7 +170,7 @@ describe('TasksWebController', () => {
 
       await controller.deleteTask(req, res)
 
-      expect(deleteTaskMock).toHaveBeenCalledWith('5', 15)
+      expect(deleteTaskMock).toHaveBeenCalledWith(5, 15)
       expect(res.send).toHaveBeenCalledWith(true)
     })
 
