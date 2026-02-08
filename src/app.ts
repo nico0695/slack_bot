@@ -28,6 +28,7 @@ import ImagesWebController from './modules/images/controller/imagesWeb.controlle
 import TextToSpeechWebController from './modules/textToSpeech/controller/textToSpeechWeb.controller'
 
 import { IJoinRoomData } from './modules/conversations/shared/interfaces/conversationSocket'
+import { ProgressCallback } from './modules/conversations/shared/interfaces/converstions'
 import SummaryWebController from './modules/summary/controller/summary.controller'
 import { alertCronJob } from './modules/alerts/utils/cronJob'
 import AlertsWebController from './modules/alerts/controller/alersWeb.controller'
@@ -237,8 +238,12 @@ export default class App {
 
         const channel = userId?.toString().padStart(8, '9')
 
+        const onProgress: ProgressCallback = (progressMessage) => {
+          io.in(channel).emit('receive_assistant_progress', progressMessage)
+        }
+
         const conversationResponse =
-          await this.#conversationWebController.conversationAssistantFlow(userId, message)
+          await this.#conversationWebController.conversationAssistantFlow(userId, message, onProgress)
 
         if (conversationResponse) {
           io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender

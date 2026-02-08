@@ -132,7 +132,7 @@ describe('ConversationsWebController', () => {
 
       const result = await controller.conversationAssistantFlow(42, 'hola')
 
-      expect(generateAssistantConversationMock).toHaveBeenCalledWith('hola', 42, '99999942', 'web')
+      expect(generateAssistantConversationMock).toHaveBeenCalledWith('hola', 42, '99999942', 'web', false, undefined)
       expect(result).toBe(assistantResponse)
     })
 
@@ -149,7 +149,9 @@ describe('ConversationsWebController', () => {
         '+nota importante',
         42,
         '99999942',
-        'web'
+        'web',
+        false,
+        undefined
       )
       expect(result).toBeNull()
     })
