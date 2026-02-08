@@ -49,21 +49,21 @@ describe('AlertsWebController', () => {
 
   describe('createAlert', () => {
     it('creates alert when payload is valid', async () => {
-      const req: any = { body: { message: 'Reminder', date: new Date() } }
+      const req: any = { body: { message: 'Reminder', date: '2024-06-15T10:00:00Z' } }
       createAlertMock.mockResolvedValue({ data: { id: 1 } })
 
       await controller.createAlert(req, res)
 
       expect(createAlertMock).toHaveBeenCalledWith({
         message: 'Reminder',
-        date: req.body.date,
+        date: new Date('2024-06-15T10:00:00Z'),
         userId: 7,
       })
       expect(res.send).toHaveBeenCalledWith({ id: 1 })
     })
 
     it('throws BadRequestError when required fields are missing', async () => {
-      const req: any = { body: { message: '', date: null } }
+      const req: any = { body: { message: '', date: '' } }
 
       await expect(controller.createAlert(req, res)).rejects.toThrow(BadRequestError)
 
@@ -72,7 +72,7 @@ describe('AlertsWebController', () => {
     })
 
     it('throws BadRequestError when service returns an error', async () => {
-      const req: any = { body: { message: 'Ping', date: new Date() } }
+      const req: any = { body: { message: 'Ping', date: '2024-06-15T10:00:00Z' } }
       createAlertMock.mockResolvedValue({ error: 'nope' })
 
       await expect(controller.createAlert(req, res)).rejects.toThrow(BadRequestError)
@@ -110,7 +110,7 @@ describe('AlertsWebController', () => {
 
       await controller.deleteAlert(req, res)
 
-      expect(deleteAlertMock).toHaveBeenCalledWith('9', 7)
+      expect(deleteAlertMock).toHaveBeenCalledWith(9, 7)
       expect(res.send).toHaveBeenCalledWith(true)
     })
 

@@ -1,13 +1,19 @@
 import { Router } from 'express'
+import { z } from 'zod'
 
 import fs from 'fs'
 import path from 'path'
 
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
+import { validateBody, validateQuery, validateParams, paginationSchema, idParamSchema } from '../../../shared/utils/validation'
 
 import TextToSpeechServices from '../services/textToSpeech.services'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
+
+const generateSpeechSchema = z.object({
+  phrase: z.string().min(1),
+})
 
 export default class TextToSpeechWebController {
   private static instance: TextToSpeechWebController
@@ -47,11 +53,7 @@ export default class TextToSpeechWebController {
   @HttpAuth
   @Permission([Profiles.ADMIN, Profiles.USER_PREMIUM])
   public async generateTextoToSpeech(req: any, res: any): Promise<void> {
-    const { body } = req
-    const { phrase } = body
-    if (!phrase) {
-      throw new BadRequestError({ message: 'La frase es requerida' })
-    }
+    const { phrase } = validateBody(generateSpeechSchema, req.body)
 
     const response = await this.textToSpeechServices.generateSpeech(phrase)
 
@@ -65,14 +67,9 @@ export default class TextToSpeechWebController {
   @HttpAuth
   @Permission()
   public async getTextToSpeechList(req: any, res: any): Promise<void> {
-    const {
-      query: { page = 1, pageSize = 6 },
-    } = req
+    const { page, pageSize } = validateQuery(paginationSchema, req.query)
 
-    const pageInt = parseInt(page, 10)
-    const sizeInt = parseInt(pageSize, 10)
-
-    const response = await this.textToSpeechServices.getTextToSpeechList(pageInt, sizeInt)
+    const response = await this.textToSpeechServices.getTextToSpeechList(page, pageSize)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -84,9 +81,7 @@ export default class TextToSpeechWebController {
   @HttpAuth
   @Permission()
   public async getAudio(req: any, res: any): Promise<void> {
-    const {
-      params: { id },
-    } = req
+    const { id } = validateParams(idParamSchema, req.params)
 
     const response = await this.textToSpeechServices.getAudio(id)
 

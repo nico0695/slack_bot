@@ -3,12 +3,14 @@ import { Router } from 'express'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
+import { validateBody, validateParams, idParamSchema } from '../../../shared/utils/validation'
 
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
 import AlertsServices from '../services/alerts.services'
 import { IAlert } from '../shared/interfaces/alerts.interfaces'
+import { createAlertSchema } from '../shared/schemas/alerts.schemas'
 
 export default class AlertsWebController extends GenericController {
   private static instance: AlertsWebController
@@ -52,15 +54,12 @@ export default class AlertsWebController extends GenericController {
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async createAlert(req: any, res: any): Promise<void> {
     const user = this.userData
+    const parsed = validateBody(createAlertSchema, req.body)
 
     const dataAlert: IAlert = {
-      message: req.body.message,
-      date: req.body.date,
+      message: parsed.message,
+      date: parsed.date,
       userId: user.id,
-    }
-
-    if (!dataAlert.message || !dataAlert.date) {
-      throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
     const response = await this.alertsServices.createAlert(dataAlert)
@@ -89,9 +88,10 @@ export default class AlertsWebController extends GenericController {
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async deleteAlert(req: any, res: any): Promise<void> {
+    const { id: alertId } = validateParams(idParamSchema, req.params)
     const user = this.userData
 
-    const response = await this.alertsServices.deleteAlert(req.params.id, user.id)
+    const response = await this.alertsServices.deleteAlert(alertId, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

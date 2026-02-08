@@ -111,8 +111,8 @@ describe('NotesWebController', () => {
 
       await controller.updateNote(req, res)
 
-      expect(updateNoteMock).toHaveBeenCalledWith('9', {
-        id: '9',
+      expect(updateNoteMock).toHaveBeenCalledWith(9, {
+        id: 9,
         title: 'New',
         description: 'desc',
         tag: 'tag',
@@ -121,10 +121,21 @@ describe('NotesWebController', () => {
       expect(res.send).toHaveBeenCalledWith(true)
     })
 
-    it('throws BadRequestError when payload incomplete', async () => {
+    it('throws BadRequestError when params id is empty', async () => {
       const req: any = {
         params: { id: '' },
-        body: { title: '', description: '', tag: '' },
+        body: { title: 'Note' },
+      }
+
+      await expect(controller.updateNote(req, res)).rejects.toThrow(BadRequestError)
+
+      expect(updateNoteMock).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequestError when title is missing', async () => {
+      const req: any = {
+        params: { id: '9' },
+        body: { title: '', description: '' },
       }
 
       await expect(controller.updateNote(req, res)).rejects.toThrow(BadRequestError)
@@ -150,7 +161,7 @@ describe('NotesWebController', () => {
 
       await controller.deleteNote(req, res)
 
-      expect(deleteNoteMock).toHaveBeenCalledWith('99', 11)
+      expect(deleteNoteMock).toHaveBeenCalledWith(99, 11)
       expect(res.send).toHaveBeenCalledWith(true)
     })
 

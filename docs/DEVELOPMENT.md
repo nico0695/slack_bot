@@ -149,6 +149,8 @@ src/modules/{feature}/
 │   │   └── {feature}.constants.ts    # Module constants
 │   ├── interfaces/
 │   │   └── {feature}.interfaces.ts   # TypeScript types
+│   ├── schemas/
+│   │   └── {feature}.schemas.ts      # Zod validation schemas
 │   └── utils/
 │       └── {feature}.utils.ts        # Helper functions
 └── __tests__/
@@ -162,7 +164,7 @@ src/modules/{feature}/
 - Handle HTTP requests
 - Process Slack events
 - Manage Socket.io events
-- Validate input
+- Validate input using Zod schemas (via `validateBody`/`validateQuery`/`validateParams` from `src/shared/utils/validation.ts`)
 - Return responses
 
 **Services:**
@@ -286,7 +288,34 @@ export default class RemindersWebController {
 }
 ```
 
-**5. Register in app.ts:**
+**5. Create Zod validation schemas:**
+
+```typescript
+// src/modules/reminders/shared/schemas/reminders.schemas.ts
+import { z } from 'zod'
+
+export const createReminderSchema = z.object({
+  message: z.string().min(1),
+  date: z.coerce.date(),
+})
+```
+
+Then use in the web controller:
+
+```typescript
+import { validateBody } from '../../../shared/utils/validation'
+import { createReminderSchema } from '../shared/schemas/reminders.schemas'
+
+private async createReminder(req: any, res: any) {
+  const parsed = validateBody(createReminderSchema, req.body)
+  const reminder = await this.service.createReminder({ ...parsed, userId: req.user.id })
+  res.json(reminder)
+}
+```
+
+For pagination, use the shared `paginationSchema`. For route `:id` params, use `idParamSchema`.
+
+**6. Register in app.ts:**
 
 ```typescript
 // src/app.ts
@@ -664,13 +693,24 @@ DEBUG=@slack/bolt:* npm run dev
 ### Add new REST endpoint
 
 ```typescript
-// In Web controller
+// 1. Define schema in shared/schemas/
+import { z } from 'zod'
+export const createItemSchema = z.object({
+  name: z.string().min(1),
+  type: z.nativeEnum(ItemType).optional(),
+})
+
+// 2. Use in Web controller
+import { validateBody } from '../../../shared/utils/validation'
+import { createItemSchema } from '../shared/schemas/items.schemas'
+
 protected registerRoutes(): void {
   this.router.post('/new-endpoint', this.newHandler.bind(this))
 }
 
 private async newHandler(req: any, res: any) {
-  const result = await this.service.doSomething(req.body)
+  const parsed = validateBody(createItemSchema, req.body)
+  const result = await this.service.doSomething(parsed)
   res.json(result)
 }
 ```
