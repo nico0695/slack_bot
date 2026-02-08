@@ -7,6 +7,7 @@ export enum AssistantsVariables {
   ALERT = 'alert',
   TASK = 'task',
   NOTE = 'note',
+  LINK = 'link',
   QUESTION = 'question',
   IMAGE = 'image',
 }
@@ -23,6 +24,9 @@ export const assistantsVariablesKey: {
   note: AssistantsVariables.NOTE,
   n: AssistantsVariables.NOTE,
 
+  link: AssistantsVariables.LINK,
+  lk: AssistantsVariables.LINK,
+
   question: AssistantsVariables.QUESTION,
   q: AssistantsVariables.QUESTION,
 
@@ -36,6 +40,7 @@ export enum AssistantsFlags {
   LIST = 'list',
   LIST_TAG = 'list_tag',
   TAG = 'tag',
+  TITLE = 'title',
   SIZE = 'size',
   QUALITY = 'quality',
   STYLE = 'style',
@@ -56,6 +61,9 @@ export const assistantFlagsKey: {
 
   listTag: AssistantsFlags.LIST_TAG,
   lt: AssistantsFlags.LIST_TAG,
+
+  title: AssistantsFlags.TITLE,
+  tt: AssistantsFlags.TITLE,
 
   size: AssistantsFlags.SIZE,
   s: AssistantsFlags.SIZE,
@@ -124,6 +132,27 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
         defaultValue: true,
       },
       [AssistantsFlags.LIST_TAG]: {
+        defaultValue: null,
+      },
+    },
+  },
+  [AssistantsVariables.LINK]: {
+    defaultValue: null,
+    manyWords: true,
+    flags: {
+      [AssistantsFlags.DESCRIPTION]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.TAG]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.LIST]: {
+        defaultValue: true,
+      },
+      [AssistantsFlags.LIST_TAG]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.TITLE]: {
         defaultValue: null,
       },
     },

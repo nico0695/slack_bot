@@ -17,6 +17,7 @@ import {
 import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
+import LinksServices from '../../links/services/links.services'
 import ImagesServices from '../../images/services/images.services'
 import SearchRepository from '../repositories/search/search.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
@@ -54,6 +55,7 @@ export default class MessageProcessor {
   #alertsServices: AlertsServices
   #tasksServices: TasksServices
   #notesServices: NotesServices
+  #linksServices: LinksServices
   #imagesServices: ImagesServices
   #defaultSnoozeMinutes = 10
 
@@ -63,6 +65,7 @@ export default class MessageProcessor {
     this.#alertsServices = AlertsServices.getInstance()
     this.#tasksServices = TasksServices.getInstance()
     this.#notesServices = NotesServices.getInstance()
+    this.#linksServices = LinksServices.getInstance()
     this.#imagesServices = ImagesServices.getInstance()
   }
 
@@ -177,13 +180,14 @@ export default class MessageProcessor {
     options: { maxItems?: number } = {}
   ): Promise<string> => {
     try {
-      const [alertsRes, tasksRes, notesRes] = await Promise.all([
+      const [alertsRes, tasksRes, notesRes, linksRes] = await Promise.all([
         this.#alertsServices.getAlertsByUserId(userId, {
           sent: false,
           channelId: channelId ?? undefined,
         }),
         this.#tasksServices.getTasksByUserId(userId, { channelId: channelId ?? undefined }),
         this.#notesServices.getNotesByUserId(userId, { channelId: channelId ?? undefined }),
+        this.#linksServices.getLinksByUserId(userId, { channelId: channelId ?? undefined }),
       ])
 
       return buildUserDataContext(
@@ -191,6 +195,7 @@ export default class MessageProcessor {
           alerts: alertsRes.data ?? [],
           tasks: tasksRes.data ?? [],
           notes: notesRes.data ?? [],
+          links: linksRes.data ?? [],
         },
         { maxItems: options.maxItems ?? 5 }
       )
@@ -674,6 +679,106 @@ export default class MessageProcessor {
         break
       }
 
+      case AssistantsVariables.LINK: {
+        const sendGeneralLinksList = async (): Promise<IConversation> => {
+          const links = await this.#linksServices.getLinksByUserId(userId, {
+            channelId: scopeChannelId,
+          })
+
+          const messageToResponse =
+            links?.data?.length > 0
+              ? links?.data
+                  ?.map(
+                    (link) =>
+                      `• Id: _#${link.id}_ - *${link.title || link.url}*${
+                        link.tag ? ` [${link.tag}]` : ''
+                      }`
+                  )
+                  .join('\n')
+              : 'No tienes links'
+
+          const messageBlockToResponse = slackMsgUtils.msgLinksList(links?.data ?? [])
+
+          return {
+            role: roleTypes.assistant,
+            content: messageToResponse,
+            contentBlock: messageBlockToResponse,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+
+        if (assistantMessage.flags[AssistantsFlags.LIST]) {
+          responseMessage = await sendGeneralLinksList()
+          break
+        }
+
+        if (assistantMessage.flags[AssistantsFlags.LIST_TAG] !== undefined) {
+          const tagRaw = String(assistantMessage.flags[AssistantsFlags.LIST_TAG] ?? '')
+          const normalizedTag = tagRaw.trim()
+
+          if (!normalizedTag) {
+            responseMessage = await sendGeneralLinksList()
+            break
+          }
+
+          const links = await this.#linksServices.getLinksByUserId(userId, {
+            tag: normalizedTag,
+            channelId: scopeChannelId,
+          })
+
+          const messageToResponse =
+            links?.data?.length > 0
+              ? links?.data
+                  ?.map(
+                    (link) =>
+                      `• Id: _#${link.id}_ - *${link.title || link.url}*${
+                        link.tag ? ` [${link.tag}]` : ''
+                      }`
+                  )
+                  .join('\n')
+              : 'No tienes links'
+
+          responseMessage = {
+            role: roleTypes.assistant,
+            content: `#### Links - tag: ${normalizedTag} \n ` + messageToResponse,
+            provider: ConversationProviders.ASSISTANT,
+          }
+          break
+        }
+
+        if (!assistantMessage.value) {
+          throw new Error('Ups! No se pudo crear el link, debes ingresar una URL. 😅')
+        }
+
+        const linkTagRaw = (assistantMessage?.flags?.[AssistantsFlags.TAG] as string) ?? ''
+        const normalizedLinkTag = linkTagRaw.trim()
+
+        const link = await this.#linksServices.createAssistantLink(
+          userId,
+          assistantMessage.value as string,
+          {
+            title: (assistantMessage?.flags?.[AssistantsFlags.TITLE] as string) ?? '',
+            description: (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
+            tag: normalizedLinkTag || undefined,
+            channelId,
+          }
+        )
+
+        if (link.error) {
+          throw new Error(link.error)
+        }
+
+        const contentBlock = slackMsgUtils.msgLinkCreated(link.data)
+
+        responseMessage = {
+          role: roleTypes.assistant,
+          content: `Link guardado correctamente con id: #${link.data.id}`,
+          contentBlock,
+          provider: ConversationProviders.ASSISTANT,
+        }
+        break
+      }
+
       case AssistantsVariables.IMAGE: {
         // Handle list command (.img -l)
         if (assistantMessage.flags[AssistantsFlags.LIST]) {
@@ -1027,6 +1132,52 @@ export default class MessageProcessor {
               (normalizedTag
                 ? `Mostrando ${notesCountText} notas con tag "${noteTagLabel}"`
                 : `Mostrando ${notesCountText} notas`),
+            contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'link.create': {
+          if (!parsed.url) return null
+          const normalizedTag =
+            typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
+              ? parsed.tag.trim()
+              : undefined
+          const link = await this.#linksServices.createAssistantLink(userId, parsed.url, {
+            title: parsed.title || '',
+            description: parsed.description || '',
+            tag: normalizedTag,
+            channelId,
+          })
+          if (link.error) return null
+          const contentBlock = slackMsgUtils.msgLinkCreated(link.data)
+          return {
+            role: roleTypes.assistant,
+            content: `Link guardado (fallback) con id: #${link.data.id}`,
+            contentBlock,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'link.list': {
+          const normalizedTag =
+            typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
+              ? parsed.tag.trim()
+              : undefined
+          const linkFilters = normalizedTag
+            ? { tag: normalizedTag, channelId: scopeChannelId }
+            : { channelId: scopeChannelId }
+          const links = await this.#linksServices.getLinksByUserId(userId, linkFilters)
+          const totalLinks = Array.isArray(links.data) ? links.data.length : 0
+          const linkTagLabel: string = normalizedTag ?? ''
+          const linksCountText = totalLinks.toString()
+          if (links.error) return null
+          const contentBlock = slackMsgUtils.msgLinksList(links.data ?? [])
+          return {
+            role: roleTypes.assistant,
+            content:
+              parsed.successMessage ||
+              (normalizedTag
+                ? `Mostrando ${linksCountText} links con tag "${linkTagLabel}"`
+                : `Mostrando ${linksCountText} links`),
             contentBlock,
             provider: ConversationProviders.ASSISTANT,
           }
