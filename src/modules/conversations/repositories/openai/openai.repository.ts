@@ -6,9 +6,9 @@ import { IConversation } from '../../shared/interfaces/converstions'
 const log = createModuleLogger('openai.conversations')
 
 export default class OpenaiRepository {
-  static #instance: OpenaiRepository
+  private static instance: OpenaiRepository
 
-  #openai: OpenAIApi
+  private openai: OpenAIApi
 
   private constructor() {
     const configuration = new Configuration({
@@ -16,18 +16,18 @@ export default class OpenaiRepository {
       organization: 'org-dlzE8QUXcRrvBN096fSCdHBf',
     })
 
-    this.#openai = new OpenAIApi(configuration)
+    this.openai = new OpenAIApi(configuration)
 
     this.chatCompletion = this.chatCompletion.bind(this)
   }
 
   static getInstance(): OpenaiRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new OpenaiRepository()
-    return this.#instance
+    this.instance = new OpenaiRepository()
+    return this.instance
   }
 
   chatCompletion = async (
@@ -49,7 +49,7 @@ export default class OpenaiRepository {
         max_tokens: isClassification ? 200 : undefined,
       }
 
-      const completion = await this.#openai.createChatCompletion(apiRequestBot)
+      const completion = await this.openai.createChatCompletion(apiRequestBot)
 
       return completion.data.choices[0].message as IConversation
     } catch (error) {

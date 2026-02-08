@@ -5,18 +5,18 @@ export interface ISearchResultItem {
 }
 
 export default class SearchRepository {
-  static #instance: SearchRepository
+  private static instance: SearchRepository
 
-  #apiUrl: string
+  private apiUrl: string
 
   private constructor() {
-    this.#apiUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.SEARCH_API_KEY}&cx=${process.env.SEARCH_API_KEY_CX}&q=`
+    this.apiUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.SEARCH_API_KEY}&cx=${process.env.SEARCH_API_KEY_CX}&q=`
   }
 
   static getInstance(): SearchRepository {
-    if (this.#instance) return this.#instance
-    this.#instance = new SearchRepository()
-    return this.#instance
+    if (this.instance) return this.instance
+    this.instance = new SearchRepository()
+    return this.instance
   }
 
   /**
@@ -25,7 +25,7 @@ export default class SearchRepository {
    */
   private async rawSearch(query: string): Promise<ISearchResultItem[]> {
     try {
-      const url = `${this.#apiUrl}${encodeURIComponent(query)}`
+      const url = `${this.apiUrl}${encodeURIComponent(query)}`
       const res = await fetch(url)
 
       if (!res.ok) return []
@@ -53,7 +53,7 @@ export default class SearchRepository {
     const q = (query || '').trim().slice(0, 180)
     if (!q) return 'No se encontró información relevante.'
     const raw = await this.rawSearch(q)
-    return this.#compressResults(raw, q)
+    return this.compressResults(raw, q)
   }
 
   /**
@@ -68,7 +68,7 @@ export default class SearchRepository {
   /**
    * Reduce noise: dedupe, shorten, pick most relevant sentence, score & slice.
    */
-  #compressResults(results: ISearchResultItem[], query: string): string {
+  private compressResults(results: ISearchResultItem[], query: string): string {
     let responseSanity = ''
     results.forEach((item) => {
       responseSanity += `- ${item.title}. ${item.snippet}\n`

@@ -29,43 +29,43 @@ const log = createModuleLogger('images.service')
  * Follows the same pattern as ConversationsServices (AIRepositoryType pattern)
  */
 export default class ImagesServices {
-  static #instance: ImagesServices
+  private static instance: ImagesServices
 
-  #imageRepository: IImageRepository // Interface, not concrete class
-  #imagesDataSources: ImagesDataSources
-  #externalStorageServices: ExternalStorageServices
+  private imageRepository: IImageRepository // Interface, not concrete class
+  private imagesDataSources: ImagesDataSources
+  private externalStorageServices: ExternalStorageServices
 
   private constructor(repositoryType: ImageRepositoryType = getDefaultImageRepositoryType()) {
     // Factory pattern: select repository based on type
-    this.#imageRepository = ImageRepositoryByType[repositoryType].getInstance()
-    this.#imagesDataSources = ImagesDataSources.getInstance()
-    this.#externalStorageServices = ExternalStorageServices.getInstance()
+    this.imageRepository = ImageRepositoryByType[repositoryType].getInstance()
+    this.imagesDataSources = ImagesDataSources.getInstance()
+    this.externalStorageServices = ExternalStorageServices.getInstance()
 
     this.generateImages = this.generateImages.bind(this)
   }
 
   static getInstance(repositoryType?: ImageRepositoryType): ImagesServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ImagesServices(repositoryType)
-    return this.#instance
+    this.instance = new ImagesServices(repositoryType)
+    return this.instance
   }
 
   /**
    * Store generated image in database
    * Refactored to accept generic image data instead of Leap-specific types
    */
-  #storeUserImages = async (imageData: IImage): Promise<void> => {
-    await this.#imagesDataSources.createImages(imageData)
+  private storeUserImages = async (imageData: IImage): Promise<void> => {
+    await this.imagesDataSources.createImages(imageData)
   }
 
   /**
    * Upload a generated image to external storage (api-storage / Backblaze B2)
    * Downloads the temporary provider URL and re-uploads for persistent storage
    */
-  #uploadImageToStorage = async (
+  private uploadImageToStorage = async (
     imageUrl: string,
     prompt: string,
     provider: string,
@@ -83,7 +83,7 @@ export default class ImagesServices {
     if (options?.quality) metadata.quality = options.quality
     if (options?.style) metadata.style = options.style
 
-    const result = await this.#externalStorageServices.uploadFromUrl({
+    const result = await this.externalStorageServices.uploadFromUrl({
       sourceUrl: imageUrl,
       fileName,
       sourceModule: StorageSourceModule.IMAGES,
@@ -95,7 +95,7 @@ export default class ImagesServices {
       throw new Error(result.error)
     }
 
-    const detailsResult = await this.#externalStorageServices.getFileDetails(result.data.localId)
+    const detailsResult = await this.externalStorageServices.getFileDetails(result.data.localId)
 
     if (detailsResult.error) {
       throw new Error(detailsResult.error)
@@ -128,7 +128,7 @@ export default class ImagesServices {
       const startTime = Date.now()
 
       // Call repository - it handles all the polling logic now
-      const response = await this.#imageRepository.generateImage(prompt, {
+      const response = await this.imageRepository.generateImage(prompt, {
         size: '1024x1024',
         quality: 'standard',
       })
@@ -142,7 +142,7 @@ export default class ImagesServices {
       const storageUrls: string[] = []
       await Promise.all(
         response.images.map(async (image) => {
-          const uploaded = await this.#uploadImageToStorage(
+          const uploaded = await this.uploadImageToStorage(
             image.url,
             prompt,
             response.provider,
@@ -160,7 +160,7 @@ export default class ImagesServices {
             username: userData.username,
             prompt,
           }
-          await this.#storeUserImages(imageData)
+          await this.storeUserImages(imageData)
         })
       )
 
@@ -195,7 +195,7 @@ export default class ImagesServices {
   ): Promise<IImageGenerationResponse | null> => {
     try {
       // Generate image using repository
-      const response = await this.#imageRepository.generateImage(prompt, options)
+      const response = await this.imageRepository.generateImage(prompt, options)
 
       if (!response?.images?.length) {
         return null
@@ -213,7 +213,7 @@ export default class ImagesServices {
       // Upload images to persistent storage and save to database
       await Promise.all(
         response.images.map(async (image) => {
-          const uploaded = await this.#uploadImageToStorage(
+          const uploaded = await this.uploadImageToStorage(
             image.url,
             prompt,
             response.provider,
@@ -231,7 +231,7 @@ export default class ImagesServices {
             username: user.data.name,
             prompt,
           }
-          await this.#storeUserImages(imageData)
+          await this.storeUserImages(imageData)
         })
       )
 
@@ -252,7 +252,7 @@ export default class ImagesServices {
         pageSize,
       }
 
-      const images = await this.#imagesDataSources.getAllImages(options)
+      const images = await this.imagesDataSources.getAllImages(options)
 
       return { data: images }
     } catch (error) {

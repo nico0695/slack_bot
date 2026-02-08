@@ -17,16 +17,16 @@ const log = createModuleLogger('leap.images')
  * Implements IImageRepository interface following the same pattern as conversations module
  */
 export default class LeapRepository implements IImageRepository {
-  static #instance: LeapRepository
+  private static instance: LeapRepository
 
-  #header
+  private header
 
-  #modelId = 'eab32df0-de26-4b83-a908-a83f3015e971'
+  private modelId = 'eab32df0-de26-4b83-a908-a83f3015e971'
 
   private constructor() {
     this.generateImage = this.generateImage.bind(this)
 
-    this.#header = {
+    this.header = {
       accept: 'application/json',
       'Content-Type': 'application/json',
       authorization: `Bearer ${process.env.LEAP_API_KEY}`,
@@ -34,12 +34,12 @@ export default class LeapRepository implements IImageRepository {
   }
 
   static getInstance(): LeapRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new LeapRepository()
-    return this.#instance
+    this.instance = new LeapRepository()
+    return this.instance
   }
 
   /**
@@ -56,13 +56,13 @@ export default class LeapRepository implements IImageRepository {
   ): Promise<IImageGenerationResponse | null> {
     try {
       // Step 1: Call Leap API to start image generation
-      const initialResponse = await this.#callGenerateImage(prompt, options)
+      const initialResponse = await this.callGenerateImage(prompt, options)
       if (!initialResponse) {
         return null
       }
 
       // Step 2: Poll until the job is finished
-      const finalResponse = await this.#pollUntilComplete(initialResponse.inferenceId)
+      const finalResponse = await this.pollUntilComplete(initialResponse.inferenceId)
       if (!finalResponse?.images || finalResponse.images.length === 0) {
         return null
       }
@@ -87,7 +87,7 @@ export default class LeapRepository implements IImageRepository {
    * Call Leap API to start image generation (private method)
    * Returns inference ID for polling
    */
-  #callGenerateImage = async (
+  private callGenerateImage = async (
     prompt: string,
     options?: IImageGenerationOptions
   ): Promise<IGenerateImageResponse | null> => {
@@ -109,10 +109,10 @@ export default class LeapRepository implements IImageRepository {
       }
 
       const response = await axios.post(
-        `https://api.tryleap.ai/api/v1/images/models/${this.#modelId}/inferences`,
+        `https://api.tryleap.ai/api/v1/images/models/${this.modelId}/inferences`,
         payload,
         {
-          headers: this.#header,
+          headers: this.header,
         }
       )
 
@@ -130,14 +130,14 @@ export default class LeapRepository implements IImageRepository {
    * Poll Leap API until image generation is complete
    * Extracted from ImagesServices to keep polling logic in repository
    */
-  #pollUntilComplete = async (inferenceId: string): Promise<IInferaceJobResponse | null> => {
+  private pollUntilComplete = async (inferenceId: string): Promise<IInferaceJobResponse | null> => {
     try {
       let status = LeapStatus.queued
       let result: IInferaceJobResponse | null = null
 
       // Poll until finished
       while (status !== LeapStatus.finished) {
-        const jobResponse = await this.#getInferenceJob(inferenceId)
+        const jobResponse = await this.getInferenceJobPrivate(inferenceId)
         if (!jobResponse) {
           return null
         }
@@ -164,12 +164,12 @@ export default class LeapRepository implements IImageRepository {
   /**
    * Ask for inference status and images by inference ID (private method)
    */
-  #getInferenceJob = async (inferenceId: string): Promise<IInferaceJobResponse | null> => {
+  private getInferenceJobPrivate = async (inferenceId: string): Promise<IInferaceJobResponse | null> => {
     try {
-      const url = `https://api.tryleap.ai/api/v1/images/models/${this.#modelId}/inferences/${inferenceId}`
+      const url = `https://api.tryleap.ai/api/v1/images/models/${this.modelId}/inferences/${inferenceId}`
 
       const response = await axios.get(url, {
-        headers: this.#header,
+        headers: this.header,
       })
 
       return {
@@ -192,7 +192,7 @@ export default class LeapRepository implements IImageRepository {
    * Legacy method - kept for backward compatibility during migration
    */
   legacyGenerateImage = async (prompt: string): Promise<IGenerateImageResponse | null> => {
-    return await this.#callGenerateImage(prompt)
+    return await this.callGenerateImage(prompt)
   }
 
   /**
@@ -200,6 +200,6 @@ export default class LeapRepository implements IImageRepository {
    * Legacy method - kept for backward compatibility during migration
    */
   getInterfaceJob = async (inferenceId: string): Promise<IInferaceJobResponse> => {
-    return await this.#getInferenceJob(inferenceId)
+    return await this.getInferenceJobPrivate(inferenceId)
   }
 }

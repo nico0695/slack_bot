@@ -6,17 +6,17 @@ import { Users } from '../../../../entities/users'
 import { INote } from '../../shared/interfaces/notes.interfaces'
 
 export default class NotesDataSource {
-  static #instance: NotesDataSource
+  private static instance: NotesDataSource
 
   private constructor() {}
 
   static getInstance(): NotesDataSource {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new NotesDataSource()
-    return this.#instance
+    this.instance = new NotesDataSource()
+    return this.instance
   }
 
   /**

@@ -16,20 +16,20 @@ import { rPersonalConversationFlow } from '../repositories/redis/redis.constants
 const log = createModuleLogger('conversations.controller')
 
 export default class ConversationsController extends GenericController {
-  static #instance: ConversationsController
+  private static instance: ConversationsController
 
   public router: Router
 
-  #conversationServices: ConversationsServices
-  #messageProcessor: MessageProcessor
-  #flowManager: ConversationFlowManager
+  private conversationServices: ConversationsServices
+  private messageProcessor: MessageProcessor
+  private flowManager: ConversationFlowManager
 
   private constructor() {
     super()
 
-    this.#conversationServices = ConversationsServices.getInstance()
-    this.#messageProcessor = MessageProcessor.getInstance()
-    this.#flowManager = ConversationFlowManager.getInstance()
+    this.conversationServices = ConversationsServices.getInstance()
+    this.messageProcessor = MessageProcessor.getInstance()
+    this.flowManager = ConversationFlowManager.getInstance()
 
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
@@ -39,12 +39,12 @@ export default class ConversationsController extends GenericController {
   }
 
   static getInstance(): ConversationsController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ConversationsController()
-    return this.#instance
+    this.instance = new ConversationsController()
+    return this.instance
   }
 
   /** Conversation Controllers Methods */
@@ -66,7 +66,7 @@ export default class ConversationsController extends GenericController {
         provider: ConversationProviders.SLACK,
       }
 
-      const newResponse = await this.#conversationServices.generateConversation(
+      const newResponse = await this.conversationServices.generateConversation(
         newMessageFormated,
         payload.user,
         payload.channel
@@ -95,7 +95,7 @@ export default class ConversationsController extends GenericController {
       const message: string = payload.text
 
       if (message !== 'clean_cb') {
-        await this.#conversationServices.cleanConversation(payload.user, payload.channel)
+        await this.conversationServices.cleanConversation(payload.user, payload.channel)
         say('Se borro la conversación con éxito 🎉')
       }
     } catch (error) {
@@ -112,7 +112,7 @@ export default class ConversationsController extends GenericController {
     const { payload, say, body }: any = data
 
     try {
-      const conversation = await this.#conversationServices.showConversation(
+      const conversation = await this.conversationServices.showConversation(
         payload.user,
         payload.channel,
         body.team_id
@@ -146,7 +146,7 @@ export default class ConversationsController extends GenericController {
       if (normalizedMessage === 'h' || normalizedMessage === 'help') {
         const scopedChannelId =
           !isPersonal && typeof payload.channel === 'string' ? payload.channel.trim() : undefined
-        const quickHelp = await this.#conversationServices.getAssistantQuickHelp(userData.id, {
+        const quickHelp = await this.conversationServices.getAssistantQuickHelp(userData.id, {
           channelId: scopedChannelId,
           isChannelContext: !isPersonal,
         })
@@ -162,17 +162,17 @@ export default class ConversationsController extends GenericController {
       // Handle flow commands (start/end/show)
       switch (normalizedMessage) {
         case FlowKeys.START: {
-          const response = await this.#flowManager.startFlow(flowKey, ChannelType.SLACK)
+          const response = await this.flowManager.startFlow(flowKey, ChannelType.SLACK)
           say(response ?? 'No se pudo iniciar la conversación 🤷‍♂️')
           return
         }
         case FlowKeys.END: {
-          const response = await this.#flowManager.endFlow(flowKey)
+          const response = await this.flowManager.endFlow(flowKey)
           say(response ?? 'No se pudo finalizar la conversación 🤷‍♂️')
           return
         }
         case FlowKeys.SHOW: {
-          const conversation = await this.#conversationServices.showConversationFlow(
+          const conversation = await this.conversationServices.showConversationFlow(
             flowKey,
             body.team_id
           )
@@ -185,11 +185,11 @@ export default class ConversationsController extends GenericController {
       const channelId = isPersonal ? undefined : payload.channel
 
       // Check if flow is active
-      const flowActive = await this.#flowManager.isFlowActive(flowKey)
+      const flowActive = await this.flowManager.isFlowActive(flowKey)
 
       if (flowActive) {
         // Flow mode: send with context
-        await this.#handleFlowMessage(
+        await this.handleFlowMessage(
           incomingMessage,
           payload.user,
           flowKey,
@@ -199,8 +199,8 @@ export default class ConversationsController extends GenericController {
         )
       } else {
         // Assistant mode: process as single message
-        await this.#handleAssistantMessage(incomingMessage, userData.id, isPersonal, channelId, say)
-      }
+        await this.handleAssistantMessage(incomingMessage, userData.id, isPersonal, channelId, say)
+  }
     } catch (error) {
       log.error({ err: error }, 'conversationFlow failed')
       say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
@@ -210,7 +210,7 @@ export default class ConversationsController extends GenericController {
   /**
    * Handle message in flow mode (with context)
    */
-  #handleFlowMessage = async (
+  private handleFlowMessage = async (
     message: string,
     userSlackId: string,
     flowKey: string,
@@ -219,9 +219,9 @@ export default class ConversationsController extends GenericController {
     say: any
   ): Promise<void> => {
     // Check if should skip AI generation
-    if (this.#messageProcessor.shouldSkipAI(message)) {
-      const cleanMessage = this.#messageProcessor.cleanSkipFlag(message)
-      await this.#conversationServices.sendMessageToConversationFlow(
+    if (this.messageProcessor.shouldSkipAI(message)) {
+      const cleanMessage = this.messageProcessor.cleanSkipFlag(message)
+      await this.conversationServices.sendMessageToConversationFlow(
         cleanMessage,
         userSlackId,
         flowKey
@@ -230,7 +230,7 @@ export default class ConversationsController extends GenericController {
     }
 
     // Generate with AI using full context
-    const newResponse = await this.#conversationServices.generateConversationFlow(
+    const newResponse = await this.conversationServices.generateConversationFlow(
       message,
       userSlackId,
       flowKey
@@ -245,7 +245,7 @@ export default class ConversationsController extends GenericController {
    * Handle message in assistant mode (unified with Web)
    * Uses generateAssistantConversation for consistent behavior and history saving
    */
-  #handleAssistantMessage = async (
+  private handleAssistantMessage = async (
     message: string,
     userId: number,
     isPersonal: boolean,
@@ -257,7 +257,7 @@ export default class ConversationsController extends GenericController {
     const scopedChannelId =
       typeof channelId === 'string' && channelId.trim().length > 0 ? channelId.trim() : undefined
     const onProgress: ProgressCallback = (msg) => say(msg)
-    const result = await this.#messageProcessor.processAssistantMessage(
+    const result = await this.messageProcessor.processAssistantMessage(
       message,
       userId,
       scopedChannelId,
@@ -295,7 +295,7 @@ export default class ConversationsController extends GenericController {
     const isChannelContext = channelType !== 'im' && rawChannelId.trim().length > 0
     const scopedChannelId = isChannelContext ? rawChannelId.trim() : undefined
 
-    const response = await this.#conversationServices.handleAction(parsedAction, userData.id, {
+    const response = await this.conversationServices.handleAction(parsedAction, userData.id, {
       channelId: scopedChannelId,
       isChannelContext,
     })

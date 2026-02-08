@@ -221,10 +221,10 @@ import RemindersDataSource from '../repositories/database/reminders.dataSource'
 
 export default class RemindersServices {
   private static instance: RemindersServices
-  #dataSource: RemindersDataSource
+  private dataSource: RemindersDataSource
 
   private constructor() {
-    this.#dataSource = RemindersDataSource.getInstance()
+    this.dataSource = RemindersDataSource.getInstance()
   }
 
   static getInstance(): RemindersServices {
@@ -235,11 +235,11 @@ export default class RemindersServices {
   }
 
   async createReminder(data: any) {
-    return await this.#dataSource.create(data)
+    return await this.dataSource.create(data)
   }
 
   async getReminders(userId: number) {
-    return await this.#dataSource.findByUserId(userId)
+    return await this.dataSource.findByUserId(userId)
   }
 }
 ```
@@ -254,10 +254,10 @@ import RemindersServices from '../services/reminders.services'
 export default class RemindersWebController {
   private static instance: RemindersWebController
   public router: Router
-  #service: RemindersServices
+  private service: RemindersServices
 
   private constructor() {
-    this.#service = RemindersServices.getInstance()
+    this.service = RemindersServices.getInstance()
     this.router = Router()
     this.registerRoutes()
   }
@@ -275,12 +275,12 @@ export default class RemindersWebController {
   }
 
   private async getReminders(req: any, res: any) {
-    const reminders = await this.#service.getReminders(req.user.id)
+    const reminders = await this.service.getReminders(req.user.id)
     res.json(reminders)
   }
 
   private async createReminder(req: any, res: any) {
-    const reminder = await this.#service.createReminder(req.body)
+    const reminder = await this.service.createReminder(req.body)
     res.json(reminder)
   }
 }
@@ -293,17 +293,17 @@ export default class RemindersWebController {
 import RemindersWebController from './modules/reminders/controller/remindersWeb.controller'
 
 export default class App {
-  #remindersWebController: RemindersWebController
+  private remindersWebController: RemindersWebController
 
   constructor() {
     // ... other controllers
-    this.#remindersWebController = RemindersWebController.getInstance()
+    this.remindersWebController = RemindersWebController.getInstance()
     // ...
   }
 
-  #router(): void {
+  private router(): void {
     // ... other routes
-    this.#app.use('/reminders', [this.#remindersWebController.router])
+    this.app.use('/reminders', [this.remindersWebController.router])
   }
 }
 ```
@@ -503,14 +503,14 @@ enum AIProvider {
 }
 ```
 
-**4. Use private fields:**
+**4. Use TypeScript private fields (avoid JS `#`):**
 
 ```typescript
 class Service {
-  #repository: Repository // Private field
+  private repository: Repository // Private field
 
   constructor() {
-    this.#repository = new Repository()
+    this.repository = new Repository()
   }
 }
 ```
@@ -670,7 +670,7 @@ protected registerRoutes(): void {
 }
 
 private async newHandler(req: any, res: any) {
-  const result = await this.#service.doSomething(req.body)
+  const result = await this.service.doSomething(req.body)
   res.json(result)
 }
 ```
@@ -678,9 +678,9 @@ private async newHandler(req: any, res: any) {
 ### Add new Socket.io event
 
 ```typescript
-// In app.ts #socketListeners
+// In app.ts socketListeners
 socket.on('new_event', async (data) => {
-  const result = await this.#controller.handleNewEvent(data)
+  const result = await this.controller.handleNewEvent(data)
   io.in(data.channel).emit('new_event_response', result)
 })
 ```
@@ -694,14 +694,14 @@ export const slackListenersKey = {
 }
 
 // 2. Add listener in app.ts
-this.#slackApp.message(
+this.slackApp.message(
   slackListenersKey.newCommand,
-  safeHandler(this.#controller.handleCommand)
+  safeHandler(this.controller.handleCommand)
 )
 
 // 3. Implement handler in controller
 async handleCommand({ message, say }: any) {
-  const response = await this.#service.processCommand(message.text)
+  const response = await this.service.processCommand(message.text)
   await say(response)
 }
 ```

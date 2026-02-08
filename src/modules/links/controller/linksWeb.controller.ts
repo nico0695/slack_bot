@@ -11,11 +11,11 @@ import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
 export default class LinksWebController extends GenericController {
-  static #instance: LinksWebController
+  private static instance: LinksWebController
 
   public router: Router
 
-  #linksServices: LinksServices
+  private linksServices: LinksServices
 
   private constructor() {
     super()
@@ -24,19 +24,19 @@ export default class LinksWebController extends GenericController {
     this.deleteLink = this.deleteLink.bind(this)
     this.updateLink = this.updateLink.bind(this)
 
-    this.#linksServices = LinksServices.getInstance()
+    this.linksServices = LinksServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): LinksWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new LinksWebController()
-    return this.#instance
+    this.instance = new LinksWebController()
+    return this.instance
   }
 
   /** Links Routes */
@@ -67,7 +67,7 @@ export default class LinksWebController extends GenericController {
       throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
-    const response = await this.#linksServices.createLink(dataLink)
+    const response = await this.linksServices.createLink(dataLink)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -89,7 +89,7 @@ export default class LinksWebController extends GenericController {
       options.status = req.query.status
     }
 
-    const response = await this.#linksServices.getLinksByUserId(user.id, options)
+    const response = await this.linksServices.getLinksByUserId(user.id, options)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -118,7 +118,7 @@ export default class LinksWebController extends GenericController {
       dataLink.status = req.body.status
     }
 
-    const response = await this.#linksServices.updateLink(linkId, dataLink, user.id)
+    const response = await this.linksServices.updateLink(linkId, dataLink, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -132,7 +132,7 @@ export default class LinksWebController extends GenericController {
   public async deleteLink(req: any, res: any): Promise<void> {
     const user = this.userData
 
-    const response = await this.#linksServices.deleteLink(req.params.id, user.id)
+    const response = await this.linksServices.deleteLink(req.params.id, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

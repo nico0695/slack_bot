@@ -11,30 +11,30 @@ import { createModuleLogger } from '../../../config/logger'
 const log = createModuleLogger('links.service')
 
 export default class LinksServices {
-  static #instance: LinksServices
+  private static instance: LinksServices
 
-  #linksDataSource: LinksDataSource
-  #linksMetadataRepository: LinksMetadataRepository
+  private linksDataSource: LinksDataSource
+  private linksMetadataRepository: LinksMetadataRepository
 
   private constructor() {
-    this.#linksDataSource = LinksDataSource.getInstance()
-    this.#linksMetadataRepository = LinksMetadataRepository.getInstance()
+    this.linksDataSource = LinksDataSource.getInstance()
+    this.linksMetadataRepository = LinksMetadataRepository.getInstance()
   }
 
   static getInstance(): LinksServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new LinksServices()
-    return this.#instance
+    this.instance = new LinksServices()
+    return this.instance
   }
 
   /**
    * Enrich link metadata by fetching title/description from the URL.
    * If the user already provided title/description, those values are preserved.
    */
-  async #enrichLinkMetadata(
+  private async enrichLinkMetadata(
     url: string,
     currentTitle?: string,
     currentDescription?: string
@@ -46,7 +46,7 @@ export default class LinksServices {
       return { title: trimmedTitle, description: trimmedDescription }
     }
 
-    const metadata = await this.#linksMetadataRepository.fetchMetadata(url)
+    const metadata = await this.linksMetadataRepository.fetchMetadata(url)
 
     let title = trimmedTitle
     let description = trimmedDescription
@@ -81,7 +81,7 @@ export default class LinksServices {
   ): Promise<GenericResponse<Links>> {
     try {
       const sanitizedTag = options?.tag?.trim()
-      const enriched = await this.#enrichLinkMetadata(url, options?.title, options?.description)
+      const enriched = await this.enrichLinkMetadata(url, options?.title, options?.description)
 
       const payload: ILink = {
         userId,
@@ -98,7 +98,7 @@ export default class LinksServices {
         payload.channelId = options.channelId
       }
 
-      const response = await this.#linksDataSource.createLink(payload)
+      const response = await this.linksDataSource.createLink(payload)
 
       log.info({ userId, linkId: response.id }, 'Link created')
 
@@ -120,10 +120,10 @@ export default class LinksServices {
    */
   public async createLink(data: ILink): Promise<GenericResponse<Links>> {
     try {
-      const enriched = await this.#enrichLinkMetadata(data.url, data.title, data.description)
+      const enriched = await this.enrichLinkMetadata(data.url, data.title, data.description)
       const enrichedData = { ...data, title: enriched.title, description: enriched.description }
 
-      const response = await this.#linksDataSource.createLink(enrichedData)
+      const response = await this.linksDataSource.createLink(enrichedData)
 
       log.info({ userId: data.userId, linkId: response.id }, 'Link created')
 
@@ -152,7 +152,7 @@ export default class LinksServices {
     }
   ): Promise<GenericResponse<Links[]>> {
     try {
-      const response = await this.#linksDataSource.getLinksByUserId(userId, options)
+      const response = await this.linksDataSource.getLinksByUserId(userId, options)
 
       return {
         data: response,
@@ -171,7 +171,7 @@ export default class LinksServices {
     userId?: number
   ): Promise<GenericResponse<boolean>> {
     try {
-      await this.#linksDataSource.updateLink(linkId, dataUpdate, userId)
+      await this.linksDataSource.updateLink(linkId, dataUpdate, userId)
 
       return {
         data: true,
@@ -186,7 +186,7 @@ export default class LinksServices {
 
   public async deleteLink(linkId: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
-      const res = await this.#linksDataSource.deleteLink(linkId, userId)
+      const res = await this.linksDataSource.deleteLink(linkId, userId)
 
       log.info({ linkId, userId }, 'Link deleted')
 

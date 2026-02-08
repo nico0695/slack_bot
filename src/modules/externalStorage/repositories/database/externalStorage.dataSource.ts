@@ -3,17 +3,17 @@ import { StorageSourceModule } from '../../shared/constants/externalStorage.cons
 import { IStoredFileInput } from '../../shared/interfaces/externalStorage.interfaces'
 
 export default class ExternalStorageDataSource {
-  static #instance: ExternalStorageDataSource
+  private static instance: ExternalStorageDataSource
 
   private constructor() {}
 
   static getInstance(): ExternalStorageDataSource {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ExternalStorageDataSource()
-    return this.#instance
+    this.instance = new ExternalStorageDataSource()
+    return this.instance
   }
 
   public async createStoredFile(data: IStoredFileInput): Promise<StoredFile> {

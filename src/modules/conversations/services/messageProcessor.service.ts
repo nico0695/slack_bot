@@ -48,34 +48,34 @@ interface IProcessMessageResult {
 }
 
 export default class MessageProcessor {
-  static #instance: MessageProcessor
+  private static instance: MessageProcessor
 
-  #aiRepository: OpenaiRepository | GeminiRepository
-  #redisRepository: RedisRepository
-  #alertsServices: AlertsServices
-  #tasksServices: TasksServices
-  #notesServices: NotesServices
-  #linksServices: LinksServices
-  #imagesServices: ImagesServices
-  #defaultSnoozeMinutes = 10
+  private aiRepository: OpenaiRepository | GeminiRepository
+  private redisRepository: RedisRepository
+  private alertsServices: AlertsServices
+  private tasksServices: TasksServices
+  private notesServices: NotesServices
+  private linksServices: LinksServices
+  private imagesServices: ImagesServices
+  private defaultSnoozeMinutes = 10
 
   private constructor(aiToUse = AIRepositoryType.OPENAI) {
-    this.#aiRepository = AIRepositoryByType[aiToUse].getInstance()
-    this.#redisRepository = RedisRepository.getInstance()
-    this.#alertsServices = AlertsServices.getInstance()
-    this.#tasksServices = TasksServices.getInstance()
-    this.#notesServices = NotesServices.getInstance()
-    this.#linksServices = LinksServices.getInstance()
-    this.#imagesServices = ImagesServices.getInstance()
+    this.aiRepository = AIRepositoryByType[aiToUse].getInstance()
+    this.redisRepository = RedisRepository.getInstance()
+    this.alertsServices = AlertsServices.getInstance()
+    this.tasksServices = TasksServices.getInstance()
+    this.notesServices = NotesServices.getInstance()
+    this.linksServices = LinksServices.getInstance()
+    this.imagesServices = ImagesServices.getInstance()
   }
 
   static getInstance(): MessageProcessor {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new MessageProcessor()
-    return this.#instance
+    this.instance = new MessageProcessor()
+    return this.instance
   }
 
   processAssistantMessage = async (
@@ -92,7 +92,7 @@ export default class MessageProcessor {
       return { response: null, shouldSkipAI: true }
     }
 
-    const commandResponse = await this.#handleAssistantCommand(
+    const commandResponse = await this.handleAssistantCommand(
       userId,
       message,
       channelId,
@@ -102,7 +102,7 @@ export default class MessageProcessor {
       return { response: commandResponse, shouldSkipAI: false }
     }
 
-    const variableResponse = await this.#manageAssistantVariables(
+    const variableResponse = await this.manageAssistantVariables(
       userId,
       message,
       channelId,
@@ -117,7 +117,7 @@ export default class MessageProcessor {
     return { response: null, shouldSkipAI: false }
   }
 
-  #getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
+  private getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
     if (!isChannelContext) {
       return null
     }
@@ -145,7 +145,7 @@ export default class MessageProcessor {
     return message.replace(/^\+\s*/, '')
   }
 
-  #withDateContext = (prompt: string): string => {
+  private withDateContext = (prompt: string): string => {
     if (!prompt.includes('<fecha>')) return prompt
     const now = new Date()
     const dateFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -174,20 +174,20 @@ export default class MessageProcessor {
     return prompt.replace(/<fecha>/g, formatted)
   }
 
-  #fetchUserDataContext = async (
+  private fetchUserDataContext = async (
     userId: number,
     channelId?: string | null,
     options: { maxItems?: number } = {}
   ): Promise<string> => {
     try {
       const [alertsRes, tasksRes, notesRes, linksRes] = await Promise.all([
-        this.#alertsServices.getAlertsByUserId(userId, {
+        this.alertsServices.getAlertsByUserId(userId, {
           sent: false,
           channelId: channelId ?? undefined,
         }),
-        this.#tasksServices.getTasksByUserId(userId, { channelId: channelId ?? undefined }),
-        this.#notesServices.getNotesByUserId(userId, { channelId: channelId ?? undefined }),
-        this.#linksServices.getLinksByUserId(userId, { channelId: channelId ?? undefined }),
+        this.tasksServices.getTasksByUserId(userId, { channelId: channelId ?? undefined }),
+        this.notesServices.getNotesByUserId(userId, { channelId: channelId ?? undefined }),
+        this.linksServices.getLinksByUserId(userId, { channelId: channelId ?? undefined }),
       ])
 
       return buildUserDataContext(
@@ -205,7 +205,7 @@ export default class MessageProcessor {
     }
   }
 
-  #buildContextBlock = (userDataContext: string, historyContext: string): string => {
+  private buildContextBlock = (userDataContext: string, historyContext: string): string => {
     const parts: string[] = []
 
     if (userDataContext && userDataContext !== '[SIN_DATOS_PREVIOS]') {
@@ -219,16 +219,16 @@ export default class MessageProcessor {
     return parts.length > 0 ? '\n' + parts.join('\n') : ''
   }
 
-  #getSnoozeMinutes = async (userId: number): Promise<number> => {
-    const config = await this.#redisRepository.getAlertSnoozeConfig(userId)
-    return config?.defaultSnoozeMinutes ?? this.#defaultSnoozeMinutes
+  private getSnoozeMinutes = async (userId: number): Promise<number> => {
+    const config = await this.redisRepository.getAlertSnoozeConfig(userId)
+    return config?.defaultSnoozeMinutes ?? this.defaultSnoozeMinutes
   }
 
-  #setSnoozeMinutes = async (userId: number, minutes: number): Promise<void> => {
-    await this.#redisRepository.saveAlertSnoozeConfig(userId, { defaultSnoozeMinutes: minutes })
+  private setSnoozeMinutes = async (userId: number, minutes: number): Promise<void> => {
+    await this.redisRepository.saveAlertSnoozeConfig(userId, { defaultSnoozeMinutes: minutes })
   }
 
-  #buildAssistantResponse = (content: string, block?: { blocks: any[] }): IConversation => {
+  private buildAssistantResponse = (content: string, block?: { blocks: any[] }): IConversation => {
     return {
       role: roleTypes.assistant,
       content,
@@ -241,7 +241,7 @@ export default class MessageProcessor {
    * Build assistant response for image generation
    * Formats image URLs with provider info and metadata
    */
-  #buildImageResponse = (
+  private buildImageResponse = (
     images: IGeneratedImage[],
     provider: ImageProvider,
     prompt: string,
@@ -271,7 +271,7 @@ export default class MessageProcessor {
     }
   }
 
-  #handleAssistantCommand = async (
+  private handleAssistantCommand = async (
     userId: number,
     message: string,
     channelId: string | undefined,
@@ -283,13 +283,13 @@ export default class MessageProcessor {
     }
 
     const lower = trimmed.toLowerCase()
-    const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
+    const scopeChannelId = this.getScopeChannelId(channelId, isChannelContext)
 
     const snoozeMatch = lower.match(/^snooze\s+#?(\d+)(?:\s+(\d+)([mh]))?/)
     if (snoozeMatch) {
       const alertId = Number(snoozeMatch[1])
       if (!Number.isFinite(alertId)) {
-        return this.#buildAssistantResponse('Necesito un número de alerta válido para snooze.')
+        return this.buildAssistantResponse('Necesito un número de alerta válido para snooze.')
       }
 
       let minutes: number | null = null
@@ -299,27 +299,27 @@ export default class MessageProcessor {
       if (amountRaw && unit) {
         const amount = Number(amountRaw)
         if (!Number.isFinite(amount) || amount <= 0) {
-          return this.#buildAssistantResponse('Usa minutos u horas válidas para snooze.')
+          return this.buildAssistantResponse('Usa minutos u horas válidas para snooze.')
         }
         minutes = unit === 'h' ? amount * 60 : amount
       }
 
       if (!minutes) {
-        minutes = await this.#getSnoozeMinutes(userId)
+        minutes = await this.getSnoozeMinutes(userId)
       }
 
-      const result = await this.#handleAlertSnooze(alertId, userId, minutes, {
+      const result = await this.handleAlertSnooze(alertId, userId, minutes, {
         updatePreference: Boolean(amountRaw),
       })
 
       if (typeof result === 'string') {
-        return this.#buildAssistantResponse(result)
+        return this.buildAssistantResponse(result)
       }
 
       const summary = `Alerta #${alertId} reprogramada a ${minutes} minuto${
         minutes > 1 ? 's' : ''
       }.`
-      return this.#buildAssistantResponse(summary, result)
+      return this.buildAssistantResponse(summary, result)
     }
 
     const repeatMatch = lower.match(/^(?:alert\s+)?repeat\s+#?(\d+)\s+(daily|weekly)/)
@@ -328,16 +328,16 @@ export default class MessageProcessor {
       const policy = repeatMatch[2] as 'daily' | 'weekly'
       const minutesToAdd = policy === 'daily' ? 24 * 60 : 7 * 24 * 60
 
-      const result = await this.#handleAlertRepeat(alertId, userId, minutesToAdd, policy)
+      const result = await this.handleAlertRepeat(alertId, userId, minutesToAdd, policy)
 
       if (typeof result === 'string') {
-        return this.#buildAssistantResponse(result)
+        return this.buildAssistantResponse(result)
       }
 
       const summary = `Listo, la alerta #${alertId} ahora se repetirá ${
         policy === 'daily' ? 'todos los días' : 'cada semana'
       }.`
-      return this.#buildAssistantResponse(summary, result)
+      return this.buildAssistantResponse(summary, result)
     }
 
     const alertsListMatch = lower.match(
@@ -359,10 +359,10 @@ export default class MessageProcessor {
         scope = 'pending'
       }
 
-      const result = await this.#listAlertsByScope(userId, scope, scopeChannelId)
+      const result = await this.listAlertsByScope(userId, scope, scopeChannelId)
 
       if (typeof result === 'string') {
-        return this.#buildAssistantResponse(result)
+        return this.buildAssistantResponse(result)
       }
 
       const summary =
@@ -376,7 +376,7 @@ export default class MessageProcessor {
           ? 'Alertas marcadas como resueltas.'
           : 'Alertas atrasadas que necesitan atención.'
 
-      return this.#buildAssistantResponse(summary, result)
+      return this.buildAssistantResponse(summary, result)
     }
 
     const preferMatch = lower.match(
@@ -386,12 +386,12 @@ export default class MessageProcessor {
       const amount = Number(preferMatch[1])
       const unit = preferMatch[2]
       if (!Number.isFinite(amount) || amount <= 0) {
-        return this.#buildAssistantResponse('Usa un número válido para configurar el snooze.')
+        return this.buildAssistantResponse('Usa un número válido para configurar el snooze.')
       }
 
       const minutes = unit === 'h' ? amount * 60 : amount
-      await this.#setSnoozeMinutes(userId, minutes)
-      return this.#buildAssistantResponse(
+      await this.setSnoozeMinutes(userId, minutes)
+      return this.buildAssistantResponse(
         `Snooze preferido actualizado a ${minutes} minuto${minutes > 1 ? 's' : ''}.`
       )
     }
@@ -401,7 +401,7 @@ export default class MessageProcessor {
       const timeText = remindMatch[1]
       const noteText = remindMatch[2]
 
-      const alertRes = await this.#alertsServices.createAssistantAlert(
+      const alertRes = await this.alertsServices.createAssistantAlert(
         userId,
         timeText,
         noteText,
@@ -409,20 +409,20 @@ export default class MessageProcessor {
       )
 
       if (alertRes.error || !alertRes.data) {
-        return this.#buildAssistantResponse(
+        return this.buildAssistantResponse(
           'No pude crear esa alerta, intenta con otro formato de tiempo.'
         )
       }
 
       const block = slackMsgUtils.msgAlertCreated(alertRes.data)
       const summary = `Listo, te recordaré ${noteText} (${formatDateToText(alertRes.data.date)}).`
-      return this.#buildAssistantResponse(summary, block)
+      return this.buildAssistantResponse(summary, block)
     }
 
     return null
   }
 
-  #manageAssistantVariables = async (
+  private manageAssistantVariables = async (
     userId: number,
     message: string,
     channelId: string | undefined,
@@ -431,10 +431,10 @@ export default class MessageProcessor {
     onProgress?: ProgressCallback
   ): Promise<IConversation | null> => {
     const assistantMessage = new AssistantMessage(message)
-    const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
+    const scopeChannelId = this.getScopeChannelId(channelId, isChannelContext)
 
     if (!assistantMessage.variable) {
-      return await this.#intentFallbackRouter(
+      return await this.intentFallbackRouter(
         userId,
         assistantMessage.cleanMessage,
         channelId,
@@ -449,7 +449,7 @@ export default class MessageProcessor {
     switch (assistantMessage.variable) {
       case AssistantsVariables.ALERT: {
         if (assistantMessage.flags[AssistantsFlags.LIST]) {
-          const alerts = await this.#alertsServices.getAlertsByUserId(userId, {
+          const alerts = await this.alertsServices.getAlertsByUserId(userId, {
             sent: false,
             channelId: scopeChannelId,
           })
@@ -479,7 +479,7 @@ export default class MessageProcessor {
           throw new Error('Ups! No se pudo crear la alerta, debes ingresar una hora,. 😅')
         }
 
-        const alert = await this.#alertsServices.createAssistantAlert(
+        const alert = await this.alertsServices.createAssistantAlert(
           userId,
           assistantMessage.value as string,
           assistantMessage.cleanMessage,
@@ -505,7 +505,7 @@ export default class MessageProcessor {
 
       case AssistantsVariables.TASK: {
         const sendGeneralTaskList = async (): Promise<IConversation> => {
-          const tasks = await this.#tasksServices.getTasksByUserId(userId, {
+          const tasks = await this.tasksServices.getTasksByUserId(userId, {
             channelId: scopeChannelId,
           })
 
@@ -540,7 +540,7 @@ export default class MessageProcessor {
             break
           }
 
-          const tasks = await this.#tasksServices.getTasksByUserId(userId, {
+          const tasks = await this.tasksServices.getTasksByUserId(userId, {
             tag: normalizedTag,
             channelId: scopeChannelId,
           })
@@ -567,7 +567,7 @@ export default class MessageProcessor {
         const tagFlagRaw = (assistantMessage?.flags?.[AssistantsFlags.TAG] as string) ?? ''
         const normalizedTaskTag = tagFlagRaw.trim()
 
-        const task = await this.#tasksServices.createAssistantTask(
+        const task = await this.tasksServices.createAssistantTask(
           userId,
           assistantMessage.value as string,
           (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
@@ -594,7 +594,7 @@ export default class MessageProcessor {
 
       case AssistantsVariables.NOTE: {
         const sendGeneralNotesList = async (): Promise<IConversation> => {
-          const notes = await this.#notesServices.getNotesByUserId(userId, {
+          const notes = await this.notesServices.getNotesByUserId(userId, {
             channelId: scopeChannelId,
           })
 
@@ -629,7 +629,7 @@ export default class MessageProcessor {
             break
           }
 
-          const notes = await this.#notesServices.getNotesByUserId(userId, {
+          const notes = await this.notesServices.getNotesByUserId(userId, {
             tag: normalizedTag,
             channelId: scopeChannelId,
           })
@@ -656,7 +656,7 @@ export default class MessageProcessor {
         const noteTagRaw = (assistantMessage?.flags?.[AssistantsFlags.TAG] as string) ?? ''
         const normalizedNoteTag = noteTagRaw.trim()
 
-        const note = await this.#notesServices.createAssistantNote(
+        const note = await this.notesServices.createAssistantNote(
           userId,
           assistantMessage.value as string,
           (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
@@ -681,7 +681,7 @@ export default class MessageProcessor {
 
       case AssistantsVariables.LINK: {
         const sendGeneralLinksList = async (): Promise<IConversation> => {
-          const links = await this.#linksServices.getLinksByUserId(userId, {
+          const links = await this.linksServices.getLinksByUserId(userId, {
             channelId: scopeChannelId,
           })
 
@@ -721,7 +721,7 @@ export default class MessageProcessor {
             break
           }
 
-          const links = await this.#linksServices.getLinksByUserId(userId, {
+          const links = await this.linksServices.getLinksByUserId(userId, {
             tag: normalizedTag,
             channelId: scopeChannelId,
           })
@@ -753,7 +753,7 @@ export default class MessageProcessor {
         const linkTagRaw = (assistantMessage?.flags?.[AssistantsFlags.TAG] as string) ?? ''
         const normalizedLinkTag = linkTagRaw.trim()
 
-        const link = await this.#linksServices.createAssistantLink(
+        const link = await this.linksServices.createAssistantLink(
           userId,
           assistantMessage.value as string,
           {
@@ -782,7 +782,7 @@ export default class MessageProcessor {
       case AssistantsVariables.IMAGE: {
         // Handle list command (.img -l)
         if (assistantMessage.flags[AssistantsFlags.LIST]) {
-          const images = await this.#imagesServices.getImages(1, 10)
+          const images = await this.imagesServices.getImages(1, 10)
 
           if (images.error || !images.data?.data?.length) {
             responseMessage = {
@@ -859,7 +859,7 @@ export default class MessageProcessor {
         // Generate image
         onProgress?.('Generando imagen...')
         try {
-          const response = await this.#imagesServices.generateImageForAssistant(
+          const response = await this.imagesServices.generateImageForAssistant(
             imagePrompt,
             userId,
             imageOptions
@@ -870,7 +870,7 @@ export default class MessageProcessor {
           }
 
           // Build response with images
-          responseMessage = this.#buildImageResponse(
+          responseMessage = this.buildImageResponse(
             response.images,
             response.provider,
             imagePrompt,
@@ -898,7 +898,7 @@ export default class MessageProcessor {
         const promptGenerated = [
           {
             role: roleTypes.system,
-            content: this.#withDateContext(assistantPromptLite),
+            content: this.withDateContext(assistantPromptLite),
           },
           {
             role: roleTypes.user,
@@ -907,7 +907,7 @@ export default class MessageProcessor {
           },
         ]
 
-        const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated as any)
+        const messageResponse = await this.aiRepository.chatCompletion(promptGenerated as any)
 
         if (messageResponse) {
           responseMessage = messageResponse
@@ -929,7 +929,7 @@ export default class MessageProcessor {
     return responseMessage
   }
 
-  #intentFallbackRouter = async (
+  private intentFallbackRouter = async (
     userId: number,
     cleanMessage: string,
     channelId: string | undefined,
@@ -939,19 +939,19 @@ export default class MessageProcessor {
   ): Promise<IConversation | null> => {
     try {
       if (!cleanMessage) return null
-      const scopeChannelId = this.#getScopeChannelId(channelId, isChannelContext)
+      const scopeChannelId = this.getScopeChannelId(channelId, isChannelContext)
 
       const [userDataContext, historyContext] = await Promise.all([
-        this.#fetchUserDataContext(userId, scopeChannelId),
+        this.fetchUserDataContext(userId, scopeChannelId),
         Promise.resolve(formatConversationHistory(conversationHistory ?? [], 3)),
       ])
 
-      const contextBlock = this.#buildContextBlock(userDataContext, historyContext)
+      const contextBlock = this.buildContextBlock(userDataContext, historyContext)
 
       const classificationPrompt = [
         {
           role: roleTypes.system,
-          content: this.#withDateContext(assistantPromptFlagsLite2) + contextBlock,
+          content: this.withDateContext(assistantPromptFlagsLite2) + contextBlock,
           provider: ConversationProviders.ASSISTANT,
         },
         {
@@ -961,7 +961,7 @@ export default class MessageProcessor {
         },
       ]
 
-      const classificationRes = await this.#aiRepository.chatCompletion(
+      const classificationRes = await this.aiRepository.chatCompletion(
         classificationPrompt as any,
         { mode: 'classification' }
       )
@@ -1006,7 +1006,7 @@ export default class MessageProcessor {
       switch (intent) {
         case 'alert.create': {
           if (!parsed.time || !parsed.title) return null
-          const alert = await this.#alertsServices.createAssistantAlert(
+          const alert = await this.alertsServices.createAssistantAlert(
             userId,
             parsed.time,
             parsed.title,
@@ -1024,7 +1024,7 @@ export default class MessageProcessor {
           }
         }
         case 'alert.list': {
-          const alerts = await this.#alertsServices.getAlertsByUserId(userId, {
+          const alerts = await this.alertsServices.getAlertsByUserId(userId, {
             channelId: scopeChannelId,
           })
           if (alerts.error) return null
@@ -1043,7 +1043,7 @@ export default class MessageProcessor {
             typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
               ? parsed.tag.trim()
               : undefined
-          const task = await this.#tasksServices.createAssistantTask(
+          const task = await this.tasksServices.createAssistantTask(
             userId,
             parsed.title,
             parsed.description || '',
@@ -1069,7 +1069,7 @@ export default class MessageProcessor {
           const taskFilters = normalizedTag
             ? { tag: normalizedTag, channelId: scopeChannelId }
             : { channelId: scopeChannelId }
-          const tasks = await this.#tasksServices.getTasksByUserId(userId, taskFilters)
+          const tasks = await this.tasksServices.getTasksByUserId(userId, taskFilters)
           const totalTasks = Array.isArray(tasks.data) ? tasks.data.length : 0
           const tagLabel: string = normalizedTag ?? ''
           const tasksCountText: string = totalTasks.toString()
@@ -1095,7 +1095,7 @@ export default class MessageProcessor {
             typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
               ? parsed.tag.trim()
               : undefined
-          const note = await this.#notesServices.createAssistantNote(
+          const note = await this.notesServices.createAssistantNote(
             userId,
             parsed.title,
             parsed.description || '',
@@ -1119,7 +1119,7 @@ export default class MessageProcessor {
           const noteFilters = normalizedTag
             ? { tag: normalizedTag, channelId: scopeChannelId }
             : { channelId: scopeChannelId }
-          const notes = await this.#notesServices.getNotesByUserId(userId, noteFilters)
+          const notes = await this.notesServices.getNotesByUserId(userId, noteFilters)
           const totalNotes = Array.isArray(notes.data) ? notes.data.length : 0
           const noteTagLabel: string = normalizedTag ?? ''
           const notesCountText = totalNotes.toString()
@@ -1142,7 +1142,7 @@ export default class MessageProcessor {
             typeof parsed.tag === 'string' && parsed.tag.trim().length > 0
               ? parsed.tag.trim()
               : undefined
-          const link = await this.#linksServices.createAssistantLink(userId, parsed.url, {
+          const link = await this.linksServices.createAssistantLink(userId, parsed.url, {
             title: parsed.title || '',
             description: parsed.description || '',
             tag: normalizedTag,
@@ -1165,7 +1165,7 @@ export default class MessageProcessor {
           const linkFilters = normalizedTag
             ? { tag: normalizedTag, channelId: scopeChannelId }
             : { channelId: scopeChannelId }
-          const links = await this.#linksServices.getLinksByUserId(userId, linkFilters)
+          const links = await this.linksServices.getLinksByUserId(userId, linkFilters)
           const totalLinks = Array.isArray(links.data) ? links.data.length : 0
           const linkTagLabel: string = normalizedTag ?? ''
           const linksCountText = totalLinks.toString()
@@ -1226,7 +1226,7 @@ export default class MessageProcessor {
           // Generate image
           onProgress?.('Generando imagen...')
           try {
-            const response = await this.#imagesServices.generateImageForAssistant(
+            const response = await this.imagesServices.generateImageForAssistant(
               imagePrompt,
               userId,
               imageOptions
@@ -1237,7 +1237,7 @@ export default class MessageProcessor {
             }
 
             // Build and return response
-            return this.#buildImageResponse(response.images, response.provider, imagePrompt, {
+            return this.buildImageResponse(response.images, response.provider, imagePrompt, {
               size: imageOptions.size,
               quality: imageOptions.quality,
               style: imageOptions.style,
@@ -1249,7 +1249,7 @@ export default class MessageProcessor {
         }
         case 'image.list': {
           // Get recent images
-          const images = await this.#imagesServices.getImages(1, 10)
+          const images = await this.imagesServices.getImages(1, 10)
 
           if (images.error || !images.data?.data?.length) {
             return {
@@ -1277,13 +1277,13 @@ export default class MessageProcessor {
         case 'search': {
           if (!parsed.query) return null
           onProgress?.('Buscando información...')
-          return await this.#searchAndSummarize(cleanMessage, parsed.query)
+          return await this.searchAndSummarize(cleanMessage, parsed.query)
         }
         case 'question': {
           const promptGenerated = [
             {
               role: roleTypes.system,
-              content: this.#withDateContext(assistantPromptLite),
+              content: this.withDateContext(assistantPromptLite),
             },
             {
               role: roleTypes.user,
@@ -1291,7 +1291,7 @@ export default class MessageProcessor {
               provider: ConversationProviders.ASSISTANT,
             },
           ]
-          const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated as any)
+          const messageResponse = await this.aiRepository.chatCompletion(promptGenerated as any)
           return messageResponse
         }
         default:
@@ -1307,7 +1307,7 @@ export default class MessageProcessor {
     }
   }
 
-  #searchAndSummarize = async (
+  private searchAndSummarize = async (
     cleanMessage: string,
     query: string
   ): Promise<IConversation | null> => {
@@ -1326,10 +1326,10 @@ export default class MessageProcessor {
     }
 
     const summaryUser = `Consulta original: ${cleanMessage}\nConsulta optimizada: ${trimmed}\nHOY_ES:${new Date().toLocaleDateString()}\n\nResultados:${results}\n\nGenera respuesta breve (1-2 frases) usando solo datos visibles. Si hay números útiles (temperatura exacta, marcador, fecha/hora, precio) inclúyelos sin adornos. Si falta info -> indica que no hay datos suficientes.`
-    const aiSummary = await this.#aiRepository.chatCompletion([
+    const aiSummary = await this.aiRepository.chatCompletion([
       {
         role: roleTypes.system,
-        content: this.#withDateContext(assistantSearchSummaryLite),
+        content: this.withDateContext(assistantSearchSummaryLite),
       } as any,
       { role: roleTypes.user, content: summaryUser } as any,
     ])
@@ -1341,7 +1341,7 @@ export default class MessageProcessor {
     }
   }
 
-  #handleAlertSnooze = async (
+  private handleAlertSnooze = async (
     alertId: number,
     userId: number,
     minutes: number,
@@ -1351,26 +1351,26 @@ export default class MessageProcessor {
       return 'El snooze debe ser mayor a 1 minuto.'
     }
 
-    const res = await this.#alertsServices.rescheduleAlert(alertId, userId, minutes)
+    const res = await this.alertsServices.rescheduleAlert(alertId, userId, minutes)
 
     if (res.error || !res.data) {
       return res.error ?? 'No se pudo reprogramar la alerta. 😅'
     }
 
     if (options.updatePreference) {
-      await this.#setSnoozeMinutes(userId, minutes)
+      await this.setSnoozeMinutes(userId, minutes)
     }
 
     return slackMsgUtils.msgAlertDetail(res.data)
   }
 
-  #handleAlertRepeat = async (
+  private handleAlertRepeat = async (
     alertId: number,
     userId: number,
     minutesToAdd: number,
     policy: 'daily' | 'weekly'
   ): Promise<string | { blocks: any[] }> => {
-    const followUp = await this.#alertsServices.createFollowUpAlert(alertId, userId, minutesToAdd)
+    const followUp = await this.alertsServices.createFollowUpAlert(alertId, userId, minutesToAdd)
 
     if (followUp.error || !followUp.data) {
       return followUp.error ?? 'No se pudo crear la recurrencia. 😅'
@@ -1393,12 +1393,12 @@ export default class MessageProcessor {
     return messageBlock
   }
 
-  #listAlertsByScope = async (
+  private listAlertsByScope = async (
     userId: number,
     scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved',
     channelId: string | null
   ): Promise<string | { blocks: any[] }> => {
-    const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {
+    const alertsRes = await this.alertsServices.getAlertsByUserId(userId, {
       channelId,
     })
     if (alertsRes.error) {

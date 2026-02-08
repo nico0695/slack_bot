@@ -5,17 +5,17 @@ import { IPaginationOptions, IPaginationResponse } from '../../../../shared/inte
 
 const adminMail = process.env.ADMIN_MAIL
 export default class UsersDataSources {
-  static #instance: UsersDataSources
+  private static instance: UsersDataSources
 
   private constructor() {}
 
   static getInstance(): UsersDataSources {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new UsersDataSources()
-    return this.#instance
+    this.instance = new UsersDataSources()
+    return this.instance
   }
 
   /**

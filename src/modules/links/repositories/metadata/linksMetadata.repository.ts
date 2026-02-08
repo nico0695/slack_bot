@@ -5,17 +5,17 @@ import { ILinkMetadata } from '../../shared/interfaces/links.interfaces'
 const log = createModuleLogger('links.metadata')
 
 export default class LinksMetadataRepository {
-  static #instance: LinksMetadataRepository
+  private static instance: LinksMetadataRepository
 
   private constructor() {}
 
   static getInstance(): LinksMetadataRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new LinksMetadataRepository()
-    return this.#instance
+    this.instance = new LinksMetadataRepository()
+    return this.instance
   }
 
   /**
@@ -45,18 +45,18 @@ export default class LinksMetadataRepository {
         return null
       }
 
-      return this.#extractMetadata(html)
+      return this.extractMetadata(html)
     } catch (error) {
       log.debug({ err: error, url }, 'Failed to fetch metadata')
       return null
     }
   }
 
-  #extractMetadata(html: string): ILinkMetadata {
-    const ogTitle = this.#extractMetaContent(html, 'property', 'og:title')
-    const htmlTitle = this.#extractHtmlTitle(html)
-    const ogDescription = this.#extractMetaContent(html, 'property', 'og:description')
-    const metaDescription = this.#extractMetaContent(html, 'name', 'description')
+  private extractMetadata(html: string): ILinkMetadata {
+    const ogTitle = this.extractMetaContent(html, 'property', 'og:title')
+    const htmlTitle = this.extractHtmlTitle(html)
+    const ogDescription = this.extractMetaContent(html, 'property', 'og:description')
+    const metaDescription = this.extractMetaContent(html, 'name', 'description')
 
     const title = ogTitle || htmlTitle || undefined
     const description = ogDescription || metaDescription || undefined
@@ -64,12 +64,12 @@ export default class LinksMetadataRepository {
     return { title, description }
   }
 
-  #extractHtmlTitle(html: string): string | null {
+  private extractHtmlTitle(html: string): string | null {
     const match = html.match(/<title[^>]*>([^<]+)<\/title>/i)
-    return match ? this.#decodeHtmlEntities(match[1].trim()) : null
+    return match ? this.decodeHtmlEntities(match[1].trim()) : null
   }
 
-  #extractMetaContent(html: string, attr: string, value: string): string | null {
+  private extractMetaContent(html: string, attr: string, value: string): string | null {
     // Match both orderings: attr before content and content before attr
     const pattern1 = new RegExp(
       `<meta\\s+${attr}=["']${value}["']\\s+content=["']([^"']+)["']`,
@@ -81,10 +81,10 @@ export default class LinksMetadataRepository {
     )
 
     const match = html.match(pattern1) || html.match(pattern2)
-    return match ? this.#decodeHtmlEntities(match[1].trim()) : null
+    return match ? this.decodeHtmlEntities(match[1].trim()) : null
   }
 
-  #decodeHtmlEntities(text: string): string {
+  private decodeHtmlEntities(text: string): string {
     return text
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')

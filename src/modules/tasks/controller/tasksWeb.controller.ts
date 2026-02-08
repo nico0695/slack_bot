@@ -11,11 +11,11 @@ import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
 export default class TasksWebController extends GenericController {
-  static #instance: TasksWebController
+  private static instance: TasksWebController
 
   public router: Router
 
-  #tasksServices: TasksServices
+  private tasksServices: TasksServices
 
   private constructor() {
     super()
@@ -24,19 +24,19 @@ export default class TasksWebController extends GenericController {
     this.deleteTask = this.deleteTask.bind(this)
     this.updateTask = this.updateTask.bind(this)
 
-    this.#tasksServices = TasksServices.getInstance()
+    this.tasksServices = TasksServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): TasksWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new TasksWebController()
-    return this.#instance
+    this.instance = new TasksWebController()
+    return this.instance
   }
 
   /** Tasks Routes */
@@ -67,7 +67,7 @@ export default class TasksWebController extends GenericController {
       throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
-    const response = await this.#tasksServices.createTask(dataTask)
+    const response = await this.tasksServices.createTask(dataTask)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -81,7 +81,7 @@ export default class TasksWebController extends GenericController {
   public async getTasks(req: any, res: any): Promise<void> {
     const user = this.userData
 
-    const response = await this.#tasksServices.getTasksByUserId(user.id)
+    const response = await this.tasksServices.getTasksByUserId(user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -110,7 +110,7 @@ export default class TasksWebController extends GenericController {
       throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
-    const response = await this.#tasksServices.updateTask(taskId, dataTask)
+    const response = await this.tasksServices.updateTask(taskId, dataTask)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -124,7 +124,7 @@ export default class TasksWebController extends GenericController {
   public async deleteTask(req: any, res: any): Promise<void> {
     const user = this.userData
 
-    const response = await this.#tasksServices.deleteTask(req.params.id, user.id)
+    const response = await this.tasksServices.deleteTask(req.params.id, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

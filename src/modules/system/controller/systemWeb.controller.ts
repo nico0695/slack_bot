@@ -4,7 +4,7 @@ import connectionSource from '../../../config/ormconfig'
 import { RedisConfig } from '../../../config/redisConfig'
 
 export default class SystemWebController {
-  static #instance: SystemWebController
+  private static instance: SystemWebController
 
   public router: Router
 
@@ -14,12 +14,12 @@ export default class SystemWebController {
   }
 
   static getInstance(): SystemWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new SystemWebController()
-    return this.#instance
+    this.instance = new SystemWebController()
+    return this.instance
   }
 
   protected registerRoutes(): void {
