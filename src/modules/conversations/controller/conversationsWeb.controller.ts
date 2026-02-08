@@ -3,7 +3,7 @@ import { Router } from 'express'
 import { createModuleLogger } from '../../../config/logger'
 import ConversationsServices from '../services/conversations.services'
 
-import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
+import { IConversation, IUserConversation, ProgressCallback } from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
 import { roleTypes } from '../shared/constants/openai'
 import UsersServices from '../../users/services/users.services'
@@ -125,7 +125,8 @@ export default class ConversationsWebController {
    */
   public conversationAssistantFlow = async (
     userId: number,
-    message: string
+    message: string,
+    onProgress?: ProgressCallback
   ): Promise<IConversation | null> => {
     try {
       const userData = await this.#usersServices.getUserById(userId)
@@ -142,7 +143,9 @@ export default class ConversationsWebController {
         message,
         userId,
         userId.toString().padStart(8, '9'),
-        ConversationProviders.WEB
+        ConversationProviders.WEB,
+        false,
+        onProgress
       )
 
       // Return response (null if skipped with "+")

@@ -121,12 +121,7 @@ describe('MessageProcessor - channel scoped lookups', () => {
       ],
     })
 
-    const result = await processor.processAssistantMessage(
-      'alerts pending',
-      99,
-      'C12345',
-      true
-    )
+    const result = await processor.processAssistantMessage('alerts pending', 99, 'C12345', true)
 
     expect(alertsServicesMock.getAlertsByUserId).toHaveBeenCalledWith(99, {
       channelId: 'C12345',
@@ -221,16 +216,12 @@ describe('MessageProcessor - image handling', () => {
       false
     )
 
-    expect(imagesServicesMock.generateImageForAssistant).toHaveBeenCalledWith(
-      'a cat',
-      99,
-      {
-        size: '1024x1792',
-        quality: 'hd',
-        style: 'vivid',
-        numberOfImages: 2,
-      }
-    )
+    expect(imagesServicesMock.generateImageForAssistant).toHaveBeenCalledWith('a cat', 99, {
+      size: '1024x1792',
+      quality: 'hd',
+      style: 'vivid',
+      numberOfImages: 2,
+    })
     expect(result.response).toBeTruthy()
   })
 
@@ -268,5 +259,72 @@ describe('MessageProcessor - skip AI flag', () => {
   it('cleanSkipFlag removes the + prefix', () => {
     expect(processor.cleanSkipFlag('+ some message')).toBe('some message')
     expect(processor.cleanSkipFlag('+message')).toBe('message')
+  })
+})
+
+describe('MessageProcessor - onProgress callback', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = MessageProcessor.getInstance()
+  })
+
+  it('calls onProgress with "Generando imagen..." before image generation via .img', async () => {
+    const onProgress = jest.fn()
+
+    imagesServicesMock.generateImageForAssistant.mockResolvedValue({
+      images: [{ url: 'https://example.com/img.png', id: '1', createdAt: new Date() }],
+      provider: 'openai',
+    })
+
+    await processor.processAssistantMessage(
+      '.img a cat',
+      99,
+      undefined,
+      false,
+      undefined,
+      onProgress
+    )
+
+    expect(onProgress).toHaveBeenCalledWith('Generando imagen...')
+  })
+
+  it('does not fail when onProgress is undefined', async () => {
+    imagesServicesMock.generateImageForAssistant.mockResolvedValue({
+      images: [{ url: 'https://example.com/img.png', id: '1', createdAt: new Date() }],
+      provider: 'openai',
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.img a cat',
+      99,
+      undefined,
+      false,
+      undefined,
+      undefined
+    )
+
+    expect(result.response).toBeTruthy()
+  })
+
+  it('does not call onProgress for fast operations like alert create', async () => {
+    const onProgress = jest.fn()
+
+    alertsServicesMock.createAssistantAlert.mockResolvedValue({
+      data: { id: 1, date: new Date(), message: 'Test' },
+    })
+
+    await processor.processAssistantMessage(
+      '.alert 10m test reminder',
+      99,
+      undefined,
+      false,
+      undefined,
+      onProgress
+    )
+
+    expect(onProgress).not.toHaveBeenCalled()
   })
 })
