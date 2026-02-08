@@ -220,10 +220,6 @@ interface IQuickHelpPayload {
 }
 
 export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] } => {
-  const snoozeTip = data.defaultSnoozeMinutes
-    ? `Tip: Snooze rápido usando \`${data.defaultSnoozeMinutes}m\` o di "snooze #{id}".`
-    : 'Tip: prueba comandos como `alert snooze #12 10m`.'
-
   return {
     blocks: [
       {
@@ -256,7 +252,9 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*Links* (${data.links ?? 0})\n> Sin leer: *${data.linksUnread ?? 0}*\n> Usa \`.link <url>\` para guardar o \`.link -l\` para listar.`,
+          text: `*Links* (${data.links ?? 0})\n> Sin leer: *${
+            data.linksUnread ?? 0
+          }*\n> Usa \`.link <url>\` para guardar o \`.link -l\` para listar.`,
         },
         accessory: quickActionOverflow('link' as any),
       },
@@ -271,15 +269,6 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
           { label: 'Atrasadas', value: 'alert:list_overdue:0' },
           { label: 'Snoozeadas', value: 'alert:list_snoozed:0' },
         ]),
-      },
-      {
-        type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: snoozeTip,
-          },
-        ],
       },
       {
         type: 'actions',
@@ -490,9 +479,10 @@ export const msgLinkCreated = (data: Links): { blocks: any[] } => {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `:link: *Link #${data.id}*${titleLabel}${tagLabel}\n> <${data.url}|${truncateText(data.url, 60)}>\n> ${
-            truncatedDescription || '_Sin descripción_'
-          }`,
+          text: `:link: *Link #${data.id}*${titleLabel}${tagLabel}\n> <${data.url}|${truncateText(
+            data.url,
+            60
+          )}>\n> ${truncatedDescription || '_Sin descripción_'}`,
         },
         accessory: linkOverflowAccessory(data.id),
       },
@@ -525,7 +515,10 @@ export const msgLinksList = (links: Links[]): { blocks: any[] } => {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${icon} *Link #${link.id}*${titleLabel}${tagLabel}\n> <${link.url}|${truncateText(link.url, 50)}>`,
+        text: `${icon} *Link #${link.id}*${titleLabel}${tagLabel}\n> <${link.url}|${truncateText(
+          link.url,
+          50
+        )}>`,
       },
       accessory: linkOverflowAccessory(link.id),
     })
@@ -639,7 +632,13 @@ export const msgAssistantDigest = (payload: {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Alertas*: Pendientes ${payload.stats.alertsPending} · Atrasadas ${payload.stats.alertsOverdue} · Resueltas ${payload.stats.alertsResolved}\n*Tareas*: Pendientes ${payload.stats.tasksPending} · Completadas ${payload.stats.tasksCompleted}\n*Notas*: ${payload.stats.notes}\n*Links*: ${payload.stats.links ?? 0} · Sin leer: ${payload.stats.linksUnread ?? 0}`,
+        text: `*Alertas*: Pendientes ${payload.stats.alertsPending} · Atrasadas ${
+          payload.stats.alertsOverdue
+        } · Resueltas ${payload.stats.alertsResolved}\n*Tareas*: Pendientes ${
+          payload.stats.tasksPending
+        } · Completadas ${payload.stats.tasksCompleted}\n*Notas*: ${
+          payload.stats.notes
+        }\n*Links*: ${payload.stats.links ?? 0} · Sin leer: ${payload.stats.linksUnread ?? 0}`,
       },
     },
     {
@@ -744,7 +743,10 @@ export const msgAssistantDigest = (payload: {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `${icon} *#${link.id}*${titleLabel}${tagLabel}\n> <${link.url}|${truncateText(link.url, 60)}>`,
+          text: `${icon} *#${link.id}*${titleLabel}${tagLabel}\n> <${link.url}|${truncateText(
+            link.url,
+            60
+          )}>`,
         },
         accessory: linkOverflowAccessory(link.id),
       })
