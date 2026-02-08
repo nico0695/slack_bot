@@ -9,31 +9,31 @@ import { createModuleLogger } from '../../../config/logger'
 const log = createModuleLogger('textToSpeech.service')
 
 export default class TextToSpeechServices {
-  static #instance: TextToSpeechServices
+  private static instance: TextToSpeechServices
 
-  #transformersRepository: TransformersRepository
-  #textToSpeechDataSources: TextToSpeechDataSources
+  private transformersRepository: TransformersRepository
+  private textToSpeechDataSources: TextToSpeechDataSources
 
   private constructor() {
-    this.#transformersRepository = TransformersRepository.getInstance()
-    this.#textToSpeechDataSources = TextToSpeechDataSources.getInstance()
+    this.transformersRepository = TransformersRepository.getInstance()
+    this.textToSpeechDataSources = TextToSpeechDataSources.getInstance()
 
     this.generateSpeech = this.generateSpeech.bind(this)
   }
 
   static getInstance(): TextToSpeechServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new TextToSpeechServices()
-    return this.#instance
+    this.instance = new TextToSpeechServices()
+    return this.instance
   }
 
   generateSpeech = async (phrase: string): Promise<GenericResponse<string>> => {
     const res = new GenericResponse<string>()
     try {
-      const speechGenerated = await this.#transformersRepository.generateSpeech(phrase)
+      const speechGenerated = await this.transformersRepository.generateSpeech(phrase)
 
       if (!speechGenerated) {
         throw new Error('Error generating speech')
@@ -45,7 +45,7 @@ export default class TextToSpeechServices {
         username: 'xenova',
       }
 
-      await this.#textToSpeechDataSources.saveTextToSpeech(dataToSave)
+      await this.textToSpeechDataSources.saveTextToSpeech(dataToSave)
 
       res.data = speechGenerated?.fileName
       return res
@@ -66,7 +66,7 @@ export default class TextToSpeechServices {
         pageSize,
       }
 
-      const data = await this.#textToSpeechDataSources.getAllTextToSpeech(options)
+      const data = await this.textToSpeechDataSources.getAllTextToSpeech(options)
 
       return { data }
     } catch (error) {
@@ -78,7 +78,7 @@ export default class TextToSpeechServices {
   getAudio = async (id: number): Promise<GenericResponse<string>> => {
     const res = new GenericResponse<string>()
     try {
-      const data = await this.#textToSpeechDataSources.getTextToSpeechById(id)
+      const data = await this.textToSpeechDataSources.getTextToSpeechById(id)
 
       if (data) {
         res.data = data.path

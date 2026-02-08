@@ -6,28 +6,28 @@ import { ChannelType } from '../shared/constants/conversationFlow'
 const log = createModuleLogger('conversations.flowManager')
 
 export default class ConversationFlowManager {
-  static #instance: ConversationFlowManager
+  private static instance: ConversationFlowManager
 
-  #redisRepository: RedisRepository
+  private redisRepository: RedisRepository
 
   private constructor() {
-    this.#redisRepository = RedisRepository.getInstance()
+    this.redisRepository = RedisRepository.getInstance()
   }
 
   static getInstance(): ConversationFlowManager {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ConversationFlowManager()
-    return this.#instance
+    this.instance = new ConversationFlowManager()
+    return this.instance
   }
 
   /**
    * Check if conversation flow is active for a given channel/user
    */
   isFlowActive = async (channelId: string): Promise<boolean> => {
-    const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+    const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
     return conversationFlow !== null
   }
 
@@ -50,7 +50,7 @@ export default class ConversationFlowManager {
         channelType,
       }
 
-      const response = await this.#redisRepository.saveConversationFlow(channelId, newConversation)
+      const response = await this.redisRepository.saveConversationFlow(channelId, newConversation)
 
       if (!response) {
         return 'No se pudo iniciar la conversación 🤷‍♂️'
@@ -74,7 +74,7 @@ export default class ConversationFlowManager {
         return 'No existe una conversación en curso en este canal.'
       }
 
-      const response = await this.#redisRepository.deleteConversationFlow(channelId)
+      const response = await this.redisRepository.deleteConversationFlow(channelId)
 
       if (!response) {
         return 'No se pudo finalizar la conversación 🤷‍♂️'
@@ -92,7 +92,7 @@ export default class ConversationFlowManager {
    */
   getFlowContext = async (channelId: string): Promise<IConversationFlow | null> => {
     try {
-      return await this.#redisRepository.getConversationFlow(channelId)
+      return await this.redisRepository.getConversationFlow(channelId)
     } catch (error) {
       log.error({ err: error }, 'getFlowContext failed')
       return null

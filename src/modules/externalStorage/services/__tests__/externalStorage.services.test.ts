@@ -57,7 +57,7 @@ describe('ExternalStorageServices', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     // Reset singleton
-    Object.defineProperty(ExternalStorageServices, '#instance', { value: undefined })
+    Object.defineProperty(ExternalStorageServices, 'instance', { value: undefined, writable: true })
     service = ExternalStorageServices.getInstance()
   })
 

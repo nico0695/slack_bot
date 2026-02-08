@@ -17,10 +17,10 @@ const log = createModuleLogger('openai.images')
  * and avoid breaking changes in the legacy openai v3.2.1 package used by conversations
  */
 export default class OpenaiImagesRepository implements IImageRepository {
-  static #instance: OpenaiImagesRepository
+  private static instance: OpenaiImagesRepository
 
-  #apiKey: string
-  #baseUrl = 'https://api.openai.com/v1'
+  private apiKey: string
+  private baseUrl = 'https://api.openai.com/v1'
 
   private constructor() {
     const apiKey = process.env.OPENAI_API_KEY
@@ -28,17 +28,17 @@ export default class OpenaiImagesRepository implements IImageRepository {
       throw new Error('OPENAI_API_KEY is not defined in the environment variables.')
     }
 
-    this.#apiKey = apiKey
+    this.apiKey = apiKey
     this.generateImage = this.generateImage.bind(this)
   }
 
   static getInstance(): OpenaiImagesRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new OpenaiImagesRepository()
-    return this.#instance
+    this.instance = new OpenaiImagesRepository()
+    return this.instance
   }
 
   /**
@@ -55,7 +55,7 @@ export default class OpenaiImagesRepository implements IImageRepository {
   ): Promise<IImageGenerationResponse | null> {
     try {
       // Map options to DALL-E 3 parameters
-      const size = this.#mapSize(options?.size)
+      const size = this.mapSize(options?.size)
       const quality = options?.quality || 'standard'
       const style = options?.style || 'vivid'
 
@@ -69,10 +69,10 @@ export default class OpenaiImagesRepository implements IImageRepository {
         style,
       }
 
-      const response = await axios.post(`${this.#baseUrl}/images/generations`, requestBody, {
+      const response = await axios.post(`${this.baseUrl}/images/generations`, requestBody, {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.#apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
         },
       })
 
@@ -103,7 +103,7 @@ export default class OpenaiImagesRepository implements IImageRepository {
    * Map generic size options to DALL-E 3 supported sizes
    * DALL-E 3 supports: 1024x1024, 1024x1792, 1792x1024
    */
-  #mapSize(size?: string): string {
+  private mapSize(size?: string): string {
     const validSizes = ['1024x1024', '1024x1792', '1792x1024']
 
     // If 512x512 is requested (Leap default), upgrade to 1024x1024

@@ -49,43 +49,43 @@ const AIRepositoryByType = {
 }
 
 export default class ConversationsServices {
-  static #instance: ConversationsServices
+  private static instance: ConversationsServices
 
-  #aiRepository: OpenaiRepository | GeminiRepository
+  private aiRepository: OpenaiRepository | GeminiRepository
 
-  #redisRepository: RedisRepository
+  private redisRepository: RedisRepository
 
-  #usersServices: UsersServices
-  #alertsServices: AlertsServices
-  #tasksServices: TasksServices
-  #notesServices: NotesServices
-  #linksServices: LinksServices
-  #messageProcessor: MessageProcessor
-  #defaultSnoozeMinutes = 10
-  #maxContextMessages = 20
+  private usersServices: UsersServices
+  private alertsServices: AlertsServices
+  private tasksServices: TasksServices
+  private notesServices: NotesServices
+  private linksServices: LinksServices
+  private messageProcessor: MessageProcessor
+  private defaultSnoozeMinutes = 10
+  private maxContextMessages = 20
 
   private constructor(aiToUse = AIRepositoryType.OPENAI) {
-    this.#aiRepository = AIRepositoryByType[aiToUse].getInstance()
-    this.#redisRepository = RedisRepository.getInstance()
-    this.#messageProcessor = MessageProcessor.getInstance()
+    this.aiRepository = AIRepositoryByType[aiToUse].getInstance()
+    this.redisRepository = RedisRepository.getInstance()
+    this.messageProcessor = MessageProcessor.getInstance()
 
-    this.#usersServices = UsersServices.getInstance()
-    this.#alertsServices = AlertsServices.getInstance()
-    this.#tasksServices = TasksServices.getInstance()
-    this.#notesServices = NotesServices.getInstance()
-    this.#linksServices = LinksServices.getInstance()
+    this.usersServices = UsersServices.getInstance()
+    this.alertsServices = AlertsServices.getInstance()
+    this.tasksServices = TasksServices.getInstance()
+    this.notesServices = NotesServices.getInstance()
+    this.linksServices = LinksServices.getInstance()
   }
 
   static getInstance(): ConversationsServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ConversationsServices()
-    return this.#instance
+    this.instance = new ConversationsServices()
+    return this.instance
   }
 
-  #generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {
+  private generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {
     const requestMessages = conversation.map((message) => {
       return { role: message.role, content: message.content, provider: message.provider }
     })
@@ -93,7 +93,7 @@ export default class ConversationsServices {
     return [
       {
         role: roleTypes.system,
-        content: this.#withDateContext(assistantPromptLite),
+        content: this.withDateContext(assistantPromptLite),
         provider: ConversationProviders.ASSISTANT,
       },
       ...requestMessages,
@@ -104,7 +104,7 @@ export default class ConversationsServices {
    * Appends current date context to a prompt (idempotent: avoids duplicate if already present).
    * Format kept simple to reduce token usage.
    */
-  #withDateContext = (prompt: string): string => {
+  private withDateContext = (prompt: string): string => {
     if (!prompt.includes('<fecha>')) return prompt
     const now = new Date()
     // Obtener fecha en timezone AR en formato estable YYYY-MM-DD
@@ -118,12 +118,12 @@ export default class ConversationsServices {
     return prompt.replace(/<fecha>/g, formatted)
   }
 
-  #getTeamMembers = async (teamId: string): Promise<TMembersNames> => {
+  private getTeamMembers = async (teamId: string): Promise<TMembersNames> => {
     const membersNames: TMembersNames = {}
 
     /** Get team members */
     if (teamId) {
-      const teamMembers = await this.#usersServices.getUsersByTeamId(teamId)
+      const teamMembers = await this.usersServices.getUsersByTeamId(teamId)
       if (teamMembers?.data) {
         teamMembers.data.forEach((member) => {
           membersNames[member.slackId] = member.name
@@ -134,16 +134,16 @@ export default class ConversationsServices {
     return membersNames
   }
 
-  #getSnoozeMinutes = async (userId: number): Promise<number> => {
-    const config = await this.#redisRepository.getAlertSnoozeConfig(userId)
-    return config?.defaultSnoozeMinutes ?? this.#defaultSnoozeMinutes
+  private getSnoozeMinutes = async (userId: number): Promise<number> => {
+    const config = await this.redisRepository.getAlertSnoozeConfig(userId)
+    return config?.defaultSnoozeMinutes ?? this.defaultSnoozeMinutes
   }
 
-  #setSnoozeMinutes = async (userId: number, minutes: number): Promise<void> => {
-    await this.#redisRepository.saveAlertSnoozeConfig(userId, { defaultSnoozeMinutes: minutes })
+  private setSnoozeMinutes = async (userId: number, minutes: number): Promise<void> => {
+    await this.redisRepository.saveAlertSnoozeConfig(userId, { defaultSnoozeMinutes: minutes })
   }
 
-  #getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
+  private getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
     if (!isChannelContext) {
       return null
     }
@@ -167,21 +167,21 @@ export default class ConversationsServices {
       const conversationKey = rConversationKey(userId, channelId)
 
       /** Get conversation */
-      const conversationStored = await this.#redisRepository.getConversationMessages(
+      const conversationStored = await this.redisRepository.getConversationMessages(
         conversationKey
       )
 
       const newConversation = [...(conversationStored ?? []), conversation]
 
-      const promptGenerated = await this.#generatePrompt(newConversation)
+      const promptGenerated = await this.generatePrompt(newConversation)
 
       /** Generate conversation */
-      const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
+      const messageResponse = await this.aiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated = [...newConversation, messageResponse]
 
       /** Save conversation */
-      await this.#redisRepository.saveConversationMessages(
+      await this.redisRepository.saveConversationMessages(
         conversationKey,
         newConversationGenerated
       )
@@ -193,9 +193,9 @@ export default class ConversationsServices {
     }
   }
 
-  #getOrInitConversationFlow = async (channelId?: string): Promise<IConversationFlow> => {
+  private getOrInitConversationFlow = async (channelId?: string): Promise<IConversationFlow> => {
     /** Get conversation */
-    let conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+    let conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
     if (conversationFlow === null) {
       const newConversation: IConversationFlow = {
@@ -207,7 +207,7 @@ export default class ConversationsServices {
         socketChannel: channelId,
       }
 
-      const response = await this.#redisRepository.saveConversationFlow(channelId, newConversation)
+      const response = await this.redisRepository.saveConversationFlow(channelId, newConversation)
 
       if (!response) {
         return null
@@ -223,7 +223,7 @@ export default class ConversationsServices {
         socketChannel: channelId,
       }
 
-      await this.#redisRepository.saveConversationFlow(channelId, newConversation)
+      await this.redisRepository.saveConversationFlow(channelId, newConversation)
 
       conversationFlow = newConversation
     }
@@ -241,12 +241,12 @@ export default class ConversationsServices {
   ): Promise<IAssistantResponse> => {
     try {
       // Check skip FIRST (message starts with "+")
-      const shouldSkip = this.#messageProcessor.shouldSkipAI(message)
+      const shouldSkip = this.messageProcessor.shouldSkipAI(message)
       const cleanMessage = shouldSkip
-        ? this.#messageProcessor.cleanSkipFlag(message)
+        ? this.messageProcessor.cleanSkipFlag(message)
         : message
 
-      const conversationFlow = await this.#getOrInitConversationFlow(channelId)
+      const conversationFlow = await this.getOrInitConversationFlow(channelId)
 
       const newConversation: IUserConversation = {
         role: roleTypes.user,
@@ -267,11 +267,11 @@ export default class ConversationsServices {
       // If skip requested, save message and return without processing
       if (shouldSkip) {
         const updatedConversation = [
-          ...conversationStored.slice(-(this.#maxContextMessages - 1)),
+          ...conversationStored.slice(-(this.maxContextMessages - 1)),
           newConversation,
         ]
 
-        await this.#redisRepository.saveConversationFlow(channelId, {
+        await this.redisRepository.saveConversationFlow(channelId, {
           ...conversationFlow,
           conversation: updatedConversation,
           updatedAt: new Date(),
@@ -282,7 +282,7 @@ export default class ConversationsServices {
 
       const trimmedChannelId = channelId.trim()
 
-      const result = await this.#messageProcessor.processAssistantMessage(
+      const result = await this.messageProcessor.processAssistantMessage(
         cleanMessage,
         userId,
         trimmedChannelId,
@@ -294,7 +294,7 @@ export default class ConversationsServices {
 
       // Add messages to conversation history (limit to last N)
       const updatedConversation = [
-        ...conversationStored.slice(-(this.#maxContextMessages - 1)),
+        ...conversationStored.slice(-(this.maxContextMessages - 1)),
         newConversation,
       ]
 
@@ -309,7 +309,7 @@ export default class ConversationsServices {
       }
 
       /** Save conversation */
-      await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
+      await this.redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
       return { response: responseMessage, skipped: false }
     } catch (error) {
@@ -329,7 +329,7 @@ export default class ConversationsServices {
     try {
       const conversationKey = rConversationKey(userId, channelId)
 
-      await this.#redisRepository.saveConversationMessages(conversationKey, [])
+      await this.redisRepository.saveConversationMessages(conversationKey, [])
 
       return true
     } catch (error) {
@@ -347,13 +347,13 @@ export default class ConversationsServices {
       const conversationKey = rConversationKey(userId, channelId)
 
       /** Get conversation */
-      const conversationStored = await this.#redisRepository.getConversationMessages(
+      const conversationStored = await this.redisRepository.getConversationMessages(
         conversationKey
       )
 
       if (conversationStored.length === 0) return null
 
-      const membersNames = await this.#getTeamMembers(teamId)
+      const membersNames = await this.getTeamMembers(teamId)
 
       return conversationStored
         .map((message) => {
@@ -373,7 +373,7 @@ export default class ConversationsServices {
   // Conversation flow
 
   conversationFlowStarted = async (channelId?: string): Promise<boolean> => {
-    const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+    const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
     if (conversationFlow !== null) {
       return true
@@ -401,7 +401,7 @@ export default class ConversationsServices {
         channelType,
       }
 
-      const response = await this.#redisRepository.saveConversationFlow(channelId, newConversation)
+      const response = await this.redisRepository.saveConversationFlow(channelId, newConversation)
 
       if (!response) {
         return 'No se pudo iniciar la conversación 🤷‍♂️'
@@ -424,7 +424,7 @@ export default class ConversationsServices {
         return 'No existe una conversación en curso en este canal.'
       }
 
-      const response = await this.#redisRepository.deleteConversationFlow(channelId)
+      const response = await this.redisRepository.deleteConversationFlow(channelId)
 
       if (!response) {
         return 'No se pudo finalizar la conversación 🤷‍♂️'
@@ -446,7 +446,7 @@ export default class ConversationsServices {
   ): Promise<IConversation | null> => {
     try {
       /** Get conversation */
-      const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+      const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
         return null
@@ -469,7 +469,7 @@ export default class ConversationsServices {
       // save message and skip generation with open ia
       if (skipGeneration) {
         /** Save conversation */
-        await this.#redisRepository.saveConversationFlow(channelId, {
+        await this.redisRepository.saveConversationFlow(channelId, {
           ...conversationFlow,
           conversation: newConversationUser,
           updatedAt: new Date(),
@@ -479,10 +479,10 @@ export default class ConversationsServices {
       }
 
       // Limit context sent to AI to last N messages to avoid overwhelming the model
-      const limitedConversation = conversationStored.slice(-this.#maxContextMessages)
+      const limitedConversation = conversationStored.slice(-this.maxContextMessages)
       const contextForAI = [...limitedConversation, newConversation]
 
-      const promptGenerated = await this.#generatePrompt(
+      const promptGenerated = await this.generatePrompt(
         contextForAI.map((message) => ({
           role: message.role,
           content: message.content,
@@ -491,7 +491,7 @@ export default class ConversationsServices {
       )
 
       /** Generate conversation */
-      const messageResponse = await this.#aiRepository.chatCompletion(promptGenerated)
+      const messageResponse = await this.aiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated: IConversationFlow = {
         ...conversationFlow,
@@ -500,7 +500,7 @@ export default class ConversationsServices {
       }
 
       /** Save conversation */
-      await this.#redisRepository.saveConversationFlow(channelId, newConversationGenerated)
+      await this.redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
       return messageResponse
     } catch (error) {
@@ -516,7 +516,7 @@ export default class ConversationsServices {
   ): Promise<IConversation | null> => {
     try {
       /** Get conversation */
-      const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+      const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
         return null
@@ -534,7 +534,7 @@ export default class ConversationsServices {
       const newConversationUser = [...conversationStored, newConversation]
 
       /** Save conversation */
-      await this.#redisRepository.saveConversationFlow(channelId, {
+      await this.redisRepository.saveConversationFlow(channelId, {
         ...conversationFlow,
         conversation: newConversationUser,
         updatedAt: new Date(),
@@ -550,7 +550,7 @@ export default class ConversationsServices {
   showConversationFlow = async (channelId: string, teamId?: string): Promise<string[] | null> => {
     try {
       /** Get conversation */
-      const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+      const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
         return null
@@ -558,7 +558,7 @@ export default class ConversationsServices {
 
       const { conversation: conversationStored } = conversationFlow
 
-      const membersNames = teamId ? await this.#getTeamMembers(teamId) : {}
+      const membersNames = teamId ? await this.getTeamMembers(teamId) : {}
 
       return conversationStored.map((message) => {
         return `${
@@ -576,7 +576,7 @@ export default class ConversationsServices {
   showConversationFlowWeb = async (channelId: string): Promise<IConversationFlow | null> => {
     try {
       /** Get conversation */
-      const conversationFlow = await this.#redisRepository.getConversationFlow(channelId)
+      const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
         return null
@@ -592,7 +592,7 @@ export default class ConversationsServices {
   showChannelsConversationFlow = async (): Promise<string[] | null> => {
     try {
       /** Get conversation */
-      const channels = await this.#redisRepository.getChannelsConversationFlow()
+      const channels = await this.redisRepository.getChannelsConversationFlow()
 
       return channels.map((channel) => channel.replace(conversationFlowPrefix, ''))
     } catch (error) {
@@ -625,15 +625,15 @@ export default class ConversationsServices {
     try {
       switch (entity) {
         case 'alert':
-          return await this.#handleAlertAction(operation, targetId, userId, context)
+          return await this.handleAlertAction(operation, targetId, userId, context)
         case 'note':
-          return await this.#handleNoteAction(operation, targetId, userId, context)
+          return await this.handleNoteAction(operation, targetId, userId, context)
         case 'task':
-          return await this.#handleTaskAction(operation, targetId, userId, context)
+          return await this.handleTaskAction(operation, targetId, userId, context)
         case 'link':
-          return await this.#handleLinkAction(operation, targetId, userId, context)
+          return await this.handleLinkAction(operation, targetId, userId, context)
         case 'assistant':
-          return await this.#handleAssistantAction(operation, userId)
+          return await this.handleAssistantAction(operation, userId)
         default:
           return 'Acción no reconocida.'
       }
@@ -643,7 +643,7 @@ export default class ConversationsServices {
     }
   }
 
-  #handleAlertSnooze = async (
+  private handleAlertSnooze = async (
     alertId: number,
     userId: number,
     minutes: number,
@@ -653,26 +653,26 @@ export default class ConversationsServices {
       return 'El snooze debe ser mayor a 1 minuto.'
     }
 
-    const res = await this.#alertsServices.rescheduleAlert(alertId, userId, minutes)
+    const res = await this.alertsServices.rescheduleAlert(alertId, userId, minutes)
 
     if (res.error || !res.data) {
       return res.error ?? 'No se pudo reprogramar la alerta. 😅'
     }
 
     if (options.updatePreference) {
-      await this.#setSnoozeMinutes(userId, minutes)
+      await this.setSnoozeMinutes(userId, minutes)
     }
 
     return slackMsgUtils.msgAlertDetail(res.data)
   }
 
-  #handleAlertRepeat = async (
+  private handleAlertRepeat = async (
     alertId: number,
     userId: number,
     minutesToAdd: number,
     policy: 'daily' | 'weekly'
   ): Promise<string | { blocks: any[] }> => {
-    const followUp = await this.#alertsServices.createFollowUpAlert(alertId, userId, minutesToAdd)
+    const followUp = await this.alertsServices.createFollowUpAlert(alertId, userId, minutesToAdd)
 
     if (followUp.error || !followUp.data) {
       return followUp.error ?? 'No se pudo crear la recurrencia. 😅'
@@ -695,12 +695,12 @@ export default class ConversationsServices {
     return messageBlock
   }
 
-  #listAlertsByScope = async (
+  private listAlertsByScope = async (
     userId: number,
     scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved',
     channelId: string | null
   ): Promise<string | { blocks: any[] }> => {
-    const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {
+    const alertsRes = await this.alertsServices.getAlertsByUserId(userId, {
       channelId,
     })
     if (alertsRes.error) {
@@ -749,11 +749,11 @@ export default class ConversationsServices {
     return slackMsgUtils.msgAlertsList(filtered)
   }
 
-  #handleAlertResolve = async (
+  private handleAlertResolve = async (
     alertId: number,
     userId: number
   ): Promise<string | { blocks: any[] }> => {
-    const res = await this.#alertsServices.markAlertResolved(alertId, userId)
+    const res = await this.alertsServices.markAlertResolved(alertId, userId)
 
     if (res.error || !res.data) {
       return res.error ?? 'No se pudo marcar la alerta como resuelta. 😅'
@@ -762,21 +762,21 @@ export default class ConversationsServices {
     return slackMsgUtils.msgAlertDetail(res.data)
   }
 
-  #handleAssistantAction = async (
+  private handleAssistantAction = async (
     operation: string,
     userId: number
   ): Promise<string | { blocks: any[] }> => {
     switch (operation) {
       case 'set_snooze_5m': {
-        await this.#setSnoozeMinutes(userId, 5)
+        await this.setSnoozeMinutes(userId, 5)
         return 'Snooze preferido configurado en 5 minutos.'
       }
       case 'set_snooze_10m': {
-        await this.#setSnoozeMinutes(userId, 10)
+        await this.setSnoozeMinutes(userId, 10)
         return 'Snooze preferido configurado en 10 minutos.'
       }
       case 'set_snooze_30m': {
-        await this.#setSnoozeMinutes(userId, 30)
+        await this.setSnoozeMinutes(userId, 30)
         return 'Snooze preferido configurado en 30 minutos.'
       }
       default:
@@ -784,20 +784,20 @@ export default class ConversationsServices {
     }
   }
 
-  #handleAlertAction = async (
+  private handleAlertAction = async (
     operation: string,
     targetId: number,
     userId: number,
     context: { channelId?: string; isChannelContext?: boolean }
   ): Promise<string | { blocks: any[] }> => {
-    const scopeChannelId = this.#getScopeChannelId(
+    const scopeChannelId = this.getScopeChannelId(
       context.channelId,
       context.isChannelContext ?? false
     )
 
     switch (operation) {
       case 'delete': {
-        const deleteRes = await this.#alertsServices.deleteAlert(targetId, userId)
+        const deleteRes = await this.alertsServices.deleteAlert(targetId, userId)
 
         if (deleteRes.error || !deleteRes.data) {
           return `Error al eliminar la alerta, no se encontro la alerta con Id: ${targetId}`
@@ -807,7 +807,7 @@ export default class ConversationsServices {
       }
 
       case 'detail': {
-        const alertsRes = await this.#alertsServices.getAlertsByUserId(userId, {
+        const alertsRes = await this.alertsServices.getAlertsByUserId(userId, {
           channelId: scopeChannelId,
         })
         if (alertsRes.error) {
@@ -823,62 +823,62 @@ export default class ConversationsServices {
       }
 
       case 'snooze_5m':
-        return await this.#handleAlertSnooze(targetId, userId, 5)
+        return await this.handleAlertSnooze(targetId, userId, 5)
 
       case 'snooze_1h':
-        return await this.#handleAlertSnooze(targetId, userId, 60)
+        return await this.handleAlertSnooze(targetId, userId, 60)
 
       case 'snooze_default': {
-        const minutes = await this.#getSnoozeMinutes(userId)
-        return await this.#handleAlertSnooze(targetId, userId, minutes, { updatePreference: true })
+        const minutes = await this.getSnoozeMinutes(userId)
+        return await this.handleAlertSnooze(targetId, userId, minutes, { updatePreference: true })
       }
 
       case 'repeat_daily':
-        return await this.#handleAlertRepeat(targetId, userId, 24 * 60, 'daily')
+        return await this.handleAlertRepeat(targetId, userId, 24 * 60, 'daily')
 
       case 'repeat_weekly':
-        return await this.#handleAlertRepeat(targetId, userId, 7 * 24 * 60, 'weekly')
+        return await this.handleAlertRepeat(targetId, userId, 7 * 24 * 60, 'weekly')
 
       case 'resolve':
-        return await this.#handleAlertResolve(targetId, userId)
+        return await this.handleAlertResolve(targetId, userId)
 
       case 'list_overdue':
-        return await this.#listAlertsByScope(userId, 'overdue', scopeChannelId)
+        return await this.listAlertsByScope(userId, 'overdue', scopeChannelId)
 
       case 'list_snoozed':
-        return await this.#listAlertsByScope(userId, 'snoozed', scopeChannelId)
+        return await this.listAlertsByScope(userId, 'snoozed', scopeChannelId)
 
       case 'list_all':
-        return await this.#listAlertsByScope(userId, 'all', scopeChannelId)
+        return await this.listAlertsByScope(userId, 'all', scopeChannelId)
 
       case 'list_pending':
-        return await this.#listAlertsByScope(userId, 'pending', scopeChannelId)
+        return await this.listAlertsByScope(userId, 'pending', scopeChannelId)
 
       case 'list_resolved':
-        return await this.#listAlertsByScope(userId, 'resolved', scopeChannelId)
+        return await this.listAlertsByScope(userId, 'resolved', scopeChannelId)
 
       case 'list':
-        return await this.#listAlertsByScope(userId, 'pending', scopeChannelId)
+        return await this.listAlertsByScope(userId, 'pending', scopeChannelId)
 
       default:
         return 'Acción no reconocida.'
     }
   }
 
-  #handleNoteAction = async (
+  private handleNoteAction = async (
     operation: string,
     targetId: number,
     userId: number,
     context: { channelId?: string; isChannelContext?: boolean }
   ): Promise<string | { blocks: any[] }> => {
-    const scopeChannelId = this.#getScopeChannelId(
+    const scopeChannelId = this.getScopeChannelId(
       context.channelId,
       context.isChannelContext ?? false
     )
 
     switch (operation) {
       case 'delete': {
-        const deleteRes = await this.#notesServices.deleteNote(targetId, userId)
+        const deleteRes = await this.notesServices.deleteNote(targetId, userId)
 
         if (deleteRes.error || !deleteRes.data) {
           return `Error al eliminar la nota, no se encontro la nota con Id: ${targetId}`
@@ -888,7 +888,7 @@ export default class ConversationsServices {
       }
 
       case 'detail': {
-        const notesRes = await this.#notesServices.getNotesByUserId(userId, {
+        const notesRes = await this.notesServices.getNotesByUserId(userId, {
           channelId: scopeChannelId,
         })
         if (notesRes.error) {
@@ -900,11 +900,11 @@ export default class ConversationsServices {
           return `No se encontró la nota con Id: ${targetId}`
         }
 
-        return this.#formatNoteDetail(note)
+        return this.formatNoteDetail(note)
       }
 
       case 'list': {
-        const notesRes = await this.#notesServices.getNotesByUserId(userId, {
+        const notesRes = await this.notesServices.getNotesByUserId(userId, {
           channelId: scopeChannelId,
         })
         if (notesRes.error) {
@@ -922,20 +922,20 @@ export default class ConversationsServices {
     }
   }
 
-  #handleTaskAction = async (
+  private handleTaskAction = async (
     operation: string,
     targetId: number,
     userId: number,
     context: { channelId?: string; isChannelContext?: boolean }
   ): Promise<string | { blocks: any[] }> => {
-    const scopeChannelId = this.#getScopeChannelId(
+    const scopeChannelId = this.getScopeChannelId(
       context.channelId,
       context.isChannelContext ?? false
     )
 
     switch (operation) {
       case 'delete': {
-        const deleteRes = await this.#tasksServices.deleteTask(targetId, userId)
+        const deleteRes = await this.tasksServices.deleteTask(targetId, userId)
 
         if (deleteRes.error || !deleteRes.data) {
           return `Error al eliminar la tarea, no se encontro la tarea con Id: ${targetId}`
@@ -945,7 +945,7 @@ export default class ConversationsServices {
       }
 
       case 'detail': {
-        const tasksRes = await this.#tasksServices.getTasksByUserId(userId, {
+        const tasksRes = await this.tasksServices.getTasksByUserId(userId, {
           channelId: scopeChannelId,
         })
         if (tasksRes.error) {
@@ -957,11 +957,11 @@ export default class ConversationsServices {
           return `No se encontró la tarea con Id: ${targetId}`
         }
 
-        return this.#formatTaskDetail(task)
+        return this.formatTaskDetail(task)
       }
 
       case 'list': {
-        const tasksRes = await this.#tasksServices.getTasksByUserId(userId, {
+        const tasksRes = await this.tasksServices.getTasksByUserId(userId, {
           channelId: scopeChannelId,
         })
         if (tasksRes.error) {
@@ -979,20 +979,20 @@ export default class ConversationsServices {
     }
   }
 
-  #handleLinkAction = async (
+  private handleLinkAction = async (
     operation: string,
     targetId: number,
     userId: number,
     context: { channelId?: string; isChannelContext?: boolean }
   ): Promise<string | { blocks: any[] }> => {
-    const scopeChannelId = this.#getScopeChannelId(
+    const scopeChannelId = this.getScopeChannelId(
       context.channelId,
       context.isChannelContext ?? false
     )
 
     switch (operation) {
       case 'delete': {
-        const deleteRes = await this.#linksServices.deleteLink(targetId, userId)
+        const deleteRes = await this.linksServices.deleteLink(targetId, userId)
 
         if (deleteRes.error || !deleteRes.data) {
           return `Error al eliminar el link, no se encontró el link con Id: ${targetId}`
@@ -1002,7 +1002,7 @@ export default class ConversationsServices {
       }
 
       case 'detail': {
-        const linksRes = await this.#linksServices.getLinksByUserId(userId, {
+        const linksRes = await this.linksServices.getLinksByUserId(userId, {
           channelId: scopeChannelId,
         })
         if (linksRes.error) {
@@ -1014,11 +1014,11 @@ export default class ConversationsServices {
           return `No se encontró el link con Id: ${targetId}`
         }
 
-        return this.#formatLinkDetail(link)
+        return this.formatLinkDetail(link)
       }
 
       case 'read': {
-        const updateRes = await this.#linksServices.updateLink(targetId, {
+        const updateRes = await this.linksServices.updateLink(targetId, {
           status: LinkStatus.READ,
         }, userId)
 
@@ -1030,7 +1030,7 @@ export default class ConversationsServices {
       }
 
       case 'list': {
-        const linksRes = await this.#linksServices.getLinksByUserId(userId, {
+        const linksRes = await this.linksServices.getLinksByUserId(userId, {
           channelId: scopeChannelId,
         })
         if (linksRes.error) {
@@ -1048,19 +1048,19 @@ export default class ConversationsServices {
     }
   }
 
-  #formatLinkDetail = (link: Links): string => {
+  private formatLinkDetail = (link: Links): string => {
     const tagLabel = link.tag ? `\n• Etiqueta: ${link.tag}` : ''
     const titleLabel = link.title ? `\n• Título: ${link.title}` : ''
     const descLabel = link.description ? `\n• Descripción: ${link.description}` : ''
     return `Link #${link.id}\n• URL: ${link.url}${titleLabel}${descLabel}\n• Estado: ${link.status}${tagLabel}`
   }
 
-  #formatNoteDetail = (note: Notes): string => {
+  private formatNoteDetail = (note: Notes): string => {
     const tagLabel = note.tag ? `\n• Etiqueta: ${note.tag}` : ''
     return `Nota #${note.id}\n• Título: ${note.title}\n• Descripción: ${note.description}${tagLabel}`
   }
 
-  #formatTaskDetail = (task: Tasks): string => {
+  private formatTaskDetail = (task: Tasks): string => {
     const dueDate = task.alertDate
       ? formatDateToText(task.alertDate, 'es', {
           year: 'numeric',
@@ -1079,16 +1079,16 @@ export default class ConversationsServices {
     options: { channelId?: string; isChannelContext?: boolean } = {}
   ): Promise<{ blocks: any[] } | string | null> => {
     try {
-      const scopeChannelId = this.#getScopeChannelId(
+      const scopeChannelId = this.getScopeChannelId(
         options.channelId,
         options.isChannelContext ?? false
       )
 
       const [alertsRes, notesRes, tasksRes, linksRes] = await Promise.all([
-        this.#alertsServices.getAlertsByUserId(userId, { channelId: scopeChannelId }),
-        this.#notesServices.getNotesByUserId(userId, { channelId: scopeChannelId }),
-        this.#tasksServices.getTasksByUserId(userId, { channelId: scopeChannelId }),
-        this.#linksServices.getLinksByUserId(userId, { channelId: scopeChannelId }),
+        this.alertsServices.getAlertsByUserId(userId, { channelId: scopeChannelId }),
+        this.notesServices.getNotesByUserId(userId, { channelId: scopeChannelId }),
+        this.tasksServices.getTasksByUserId(userId, { channelId: scopeChannelId }),
+        this.linksServices.getLinksByUserId(userId, { channelId: scopeChannelId }),
       ])
 
       const alerts = alertsRes.data ?? []
@@ -1106,7 +1106,7 @@ export default class ConversationsServices {
         return status !== 'completed' && status !== 'canceled'
       }).length
 
-      const defaultSnoozeMinutes = await this.#getSnoozeMinutes(userId)
+      const defaultSnoozeMinutes = await this.getSnoozeMinutes(userId)
 
       const linksUnread = links.filter((link) => link.status === LinkStatus.UNREAD).length
 

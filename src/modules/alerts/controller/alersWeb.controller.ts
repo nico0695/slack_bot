@@ -11,11 +11,11 @@ import AlertsServices from '../services/alerts.services'
 import { IAlert } from '../shared/interfaces/alerts.interfaces'
 
 export default class AlertsWebController extends GenericController {
-  static #instance: AlertsWebController
+  private static instance: AlertsWebController
 
   public router: Router
 
-  #alertsServices: AlertsServices
+  private alertsServices: AlertsServices
 
   private constructor() {
     super()
@@ -23,19 +23,19 @@ export default class AlertsWebController extends GenericController {
     this.getAlerts = this.getAlerts.bind(this)
     this.deleteAlert = this.deleteAlert.bind(this)
 
-    this.#alertsServices = AlertsServices.getInstance()
+    this.alertsServices = AlertsServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): AlertsWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new AlertsWebController()
-    return this.#instance
+    this.instance = new AlertsWebController()
+    return this.instance
   }
 
   /** Alerts Routes */
@@ -63,7 +63,7 @@ export default class AlertsWebController extends GenericController {
       throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
-    const response = await this.#alertsServices.createAlert(dataAlert)
+    const response = await this.alertsServices.createAlert(dataAlert)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -77,7 +77,7 @@ export default class AlertsWebController extends GenericController {
   public async getAlerts(req: any, res: any): Promise<void> {
     const user = this.userData
 
-    const response = await this.#alertsServices.getAlertsByUserId(user.id)
+    const response = await this.alertsServices.getAlertsByUserId(user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -91,7 +91,7 @@ export default class AlertsWebController extends GenericController {
   public async deleteAlert(req: any, res: any): Promise<void> {
     const user = this.userData
 
-    const response = await this.#alertsServices.deleteAlert(req.params.id, user.id)
+    const response = await this.alertsServices.deleteAlert(req.params.id, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

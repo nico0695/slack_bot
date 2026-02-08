@@ -17,10 +17,10 @@ export class AssistantMessage {
   flags: { [key in AssistantsFlags]?: string | boolean } = {}
 
   constructor(message: string) {
-    this.#manageMessage(message)
+    this.manageMessage(message)
   }
 
-  #manageMessage(message: string): void {
+  private manageMessage(message: string): void {
     if (!message) {
       throw new Error('Message is required')
     }

@@ -17,29 +17,29 @@ const log = createModuleLogger('gemini.images')
  * Imagen 3 excels at photorealistic images and artistic styles
  */
 export default class GeminiImagesRepository implements IImageRepository {
-  static #instance: GeminiImagesRepository
+  private static instance: GeminiImagesRepository
 
-  #geminiApi: any
+  private geminiApi: any
 
   private constructor() {
-    this.#geminiApi = this.#initializeGeminiApi()
+    this.geminiApi = this.initializeGeminiApi()
     this.generateImage = this.generateImage.bind(this)
   }
 
   static getInstance(): GeminiImagesRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new GeminiImagesRepository()
-    return this.#instance
+    this.instance = new GeminiImagesRepository()
+    return this.instance
   }
 
   /**
    * Initialize Gemini API client
    * Follows the same pattern as GeminiRepository in conversations module
    */
-  #initializeGeminiApi(): any {
+  private initializeGeminiApi(): any {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is not defined in the environment variables.')
@@ -66,7 +66,7 @@ export default class GeminiImagesRepository implements IImageRepository {
       const numberOfImages = options?.numberOfImages || 1
 
       // Call Imagen 3 API
-      const response = await this.#geminiApi.models.generateImages({
+      const response = await this.geminiApi.models.generateImages({
         model: 'imagen-3.0-generate-002',
         prompt,
         numberOfImages,

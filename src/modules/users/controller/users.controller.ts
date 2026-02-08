@@ -10,11 +10,11 @@ import { Profiles } from '../../../shared/constants/auth.constants'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 
 export default class UsersController extends GenericController {
-  static #instance: UsersController
+  private static instance: UsersController
 
   public router: Router
 
-  #usersServices: UsersServices
+  private usersServices: UsersServices
 
   private constructor() {
     super()
@@ -25,19 +25,19 @@ export default class UsersController extends GenericController {
     this.updateUser = this.updateUser.bind(this)
     this.subscribeNotifications = this.subscribeNotifications.bind(this)
 
-    this.#usersServices = UsersServices.getInstance()
+    this.usersServices = UsersServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): UsersController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new UsersController()
-    return this.#instance
+    this.instance = new UsersController()
+    return this.instance
   }
 
   /** Users Routes */
@@ -69,7 +69,7 @@ export default class UsersController extends GenericController {
       throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
-    const response = await this.#usersServices.createUser(dataUser)
+    const response = await this.usersServices.createUser(dataUser)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -88,7 +88,7 @@ export default class UsersController extends GenericController {
     const pageInt = parseInt(page, 10)
     const sizeInt = parseInt(pageSize, 10)
 
-    const response = await this.#usersServices.getUsers(pageInt, sizeInt)
+    const response = await this.usersServices.getUsers(pageInt, sizeInt)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -111,7 +111,7 @@ export default class UsersController extends GenericController {
       params: { id },
     } = req
 
-    const response = await this.#usersServices.getUserById(parseInt(id, 10))
+    const response = await this.usersServices.getUserById(parseInt(id, 10))
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -141,7 +141,7 @@ export default class UsersController extends GenericController {
       throw new BadRequestError({ message: 'Datos incorrectos' })
     }
 
-    const response = await this.#usersServices.updateUserById(parseInt(id, 10), dataUser)
+    const response = await this.usersServices.updateUserById(parseInt(id, 10), dataUser)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -156,7 +156,7 @@ export default class UsersController extends GenericController {
 
     const user = this.userData
 
-    const response = await this.#usersServices.subscribeNotifications(user.id, subscription)
+    const response = await this.usersServices.subscribeNotifications(user.id, subscription)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

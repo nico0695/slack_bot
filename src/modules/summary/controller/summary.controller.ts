@@ -4,26 +4,26 @@ import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 import SummaryServices from '../services/summary.services'
 
 export default class SummaryWebController {
-  static #instance: SummaryWebController
+  private static instance: SummaryWebController
 
   public router: Router
 
-  #summaryServices: SummaryServices
+  private summaryServices: SummaryServices
 
   private constructor() {
-    this.#summaryServices = SummaryServices.getInstance()
+    this.summaryServices = SummaryServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): SummaryWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new SummaryWebController()
-    return this.#instance
+    this.instance = new SummaryWebController()
+    return this.instance
   }
 
   // ROUTES
@@ -39,7 +39,7 @@ export default class SummaryWebController {
     if (!text) {
       throw new BadRequestError({ message: 'Text is required' })
     }
-    const response = await this.#summaryServices.generateSumary(text)
+    const response = await this.summaryServices.generateSumary(text)
 
     if (response.error) {
       throw new BadRequestError({ message: 'Error al generar el resumen' })

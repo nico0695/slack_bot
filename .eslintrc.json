@@ -23,6 +23,8 @@
     "@typescript-eslint/consistent-indexed-object-style": "off",
     "@typescript-eslint/no-misused-promises": "off",
     "@typescript-eslint/member-delimiter-style": "off",
-    "no-console": "warn"
+    "no-console": "warn",
+
+    "@typescript-eslint/prefer-readonly": "off"
   }
 }

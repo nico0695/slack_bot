@@ -7,28 +7,28 @@ import { HttpAuth } from '../../../shared/middleware/auth'
 import ImagesServices from '../services/images.services'
 
 export default class ImagesWebController {
-  static #instance: ImagesWebController
+  private static instance: ImagesWebController
 
   public router: Router
 
-  #imagesServices: ImagesServices
+  private imagesServices: ImagesServices
 
   private constructor() {
     this.getImages = this.getImages.bind(this)
 
-    this.#imagesServices = ImagesServices.getInstance()
+    this.imagesServices = ImagesServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): ImagesWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ImagesWebController()
-    return this.#instance
+    this.instance = new ImagesWebController()
+    return this.instance
   }
 
   protected registerRoutes(): void {
@@ -46,7 +46,7 @@ export default class ImagesWebController {
     const pageInt = parseInt(page, 10)
     const sizeInt = parseInt(pageSize, 10)
 
-    const response = await this.#imagesServices.getImages(pageInt, sizeInt)
+    const response = await this.imagesServices.getImages(pageInt, sizeInt)
 
     if (response.error) {
       throw new BadRequestError({ message: 'Error al obtener las imagenes' })

@@ -10,11 +10,11 @@ import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
 export default class NotesWebController extends GenericController {
-  static #instance: NotesWebController
+  private static instance: NotesWebController
 
   public router: Router
 
-  #notesServices: NotesServices
+  private notesServices: NotesServices
 
   private constructor() {
     super()
@@ -23,19 +23,19 @@ export default class NotesWebController extends GenericController {
     this.deleteNote = this.deleteNote.bind(this)
     this.updateNote = this.updateNote.bind(this)
 
-    this.#notesServices = NotesServices.getInstance()
+    this.notesServices = NotesServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): NotesWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new NotesWebController()
-    return this.#instance
+    this.instance = new NotesWebController()
+    return this.instance
   }
 
   /** Notes Routes */
@@ -65,7 +65,7 @@ export default class NotesWebController extends GenericController {
       throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
-    const response = await this.#notesServices.createNote(dataNote)
+    const response = await this.notesServices.createNote(dataNote)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -79,7 +79,7 @@ export default class NotesWebController extends GenericController {
   public async getNotes(req: any, res: any): Promise<void> {
     const user = this.userData
 
-    const response = await this.#notesServices.getNotesByUserId(user.id)
+    const response = await this.notesServices.getNotesByUserId(user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -107,7 +107,7 @@ export default class NotesWebController extends GenericController {
       throw new BadRequestError({ message: 'Ingrese los datos correctos' })
     }
 
-    const response = await this.#notesServices.updateNote(taskId, dataNote)
+    const response = await this.notesServices.updateNote(taskId, dataNote)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -121,7 +121,7 @@ export default class NotesWebController extends GenericController {
   public async deleteNote(req: any, res: any): Promise<void> {
     const user = this.userData
 
-    const response = await this.#notesServices.deleteNote(req.params.id, user.id)
+    const response = await this.notesServices.deleteNote(req.params.id, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

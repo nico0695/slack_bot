@@ -105,8 +105,7 @@ describe('ImagesServices', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     // Reset singleton
-    ;(ImagesServices as any)['#instance'] = undefined
-    Object.defineProperty(ImagesServices, '#instance', { value: undefined, writable: true })
+    ;(ImagesServices as any).instance = undefined
     service = ImagesServices.getInstance()
   })
 

@@ -9,9 +9,9 @@ import {
 const log = createModuleLogger('apiStorage.repository')
 
 export default class ApiStorageRepository {
-  static #instance: ApiStorageRepository
+  private static instance: ApiStorageRepository
 
-  #client: AxiosInstance
+  private client: AxiosInstance
 
   private constructor() {
     const baseURL = process.env.STORAGE_API_URL
@@ -24,7 +24,7 @@ export default class ApiStorageRepository {
       throw new Error('STORAGE_API_KEY is not defined in the environment variables.')
     }
 
-    this.#client = axios.create({
+    this.client = axios.create({
       baseURL,
       headers: {
         'X-API-Key': apiKey,
@@ -33,12 +33,12 @@ export default class ApiStorageRepository {
   }
 
   static getInstance(): ApiStorageRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ApiStorageRepository()
-    return this.#instance
+    this.instance = new ApiStorageRepository()
+    return this.instance
   }
 
   async uploadFile(
@@ -60,7 +60,7 @@ export default class ApiStorageRepository {
         form.append('metadata', JSON.stringify(options.metadata))
       }
 
-      const response = await this.#client.post('/files/upload', form, {
+      const response = await this.client.post('/files/upload', form, {
         maxContentLength: Infinity,
         maxBodyLength: Infinity,
       })
@@ -74,7 +74,7 @@ export default class ApiStorageRepository {
 
   async getFile(fileId: string): Promise<IStorageApiFile | null> {
     try {
-      const response = await this.#client.get(`/files/${fileId}`)
+      const response = await this.client.get(`/files/${fileId}`)
       return response.data
     } catch (error) {
       log.error({ err: error, fileId }, 'getFile failed')
@@ -96,7 +96,7 @@ export default class ApiStorageRepository {
       if (options?.page) params.page = options.page
       if (options?.limit) params.limit = options.limit
 
-      const response = await this.#client.get('/files', { params })
+      const response = await this.client.get('/files', { params })
       return response.data
     } catch (error) {
       log.error({ err: error }, 'listFiles failed')
@@ -106,7 +106,7 @@ export default class ApiStorageRepository {
 
   async deleteFile(fileId: string): Promise<boolean> {
     try {
-      await this.#client.delete(`/files/${fileId}`)
+      await this.client.delete(`/files/${fileId}`)
       return true
     } catch (error) {
       log.error({ err: error, fileId }, 'deleteFile failed')

@@ -4,35 +4,35 @@ import { createModuleLogger } from './logger'
 const log = createModuleLogger('redis')
 
 export class RedisConfig {
-  static #instance: RedisConfig
+  private static instance: RedisConfig | null
 
-  #redisClient
+  private redisClient
 
   private constructor() {
     const REDIS_HOST = process.env.REDIS_HOST ? process.env.REDIS_HOST : ''
-    this.#redisClient = redis.createClient({
+    this.redisClient = redis.createClient({
       url: REDIS_HOST,
     })
 
     // Don't connect during tests to avoid async operations after tests complete
     if (process.env.NODE_ENV !== 'test') {
-      void this.#connect()
+      void this.connect()
     }
   }
 
-  #connect = async (): Promise<void> => {
+  private connect = async (): Promise<void> => {
     try {
-      await this.#redisClient.connect()
+      await this.redisClient.connect()
       log.info('Redis connected')
     } catch (error) {
       log.error({ err: error }, 'Redis connection failed')
     }
   }
 
-  #disconnect = async (): Promise<void> => {
+  private disconnectInstance = async (): Promise<void> => {
     try {
-      if (this.#redisClient.isReady) {
-        await this.#redisClient.disconnect()
+      if (this.redisClient.isReady) {
+        await this.redisClient.disconnect()
         log.info('Redis disconnected')
       }
     } catch (error) {
@@ -41,27 +41,27 @@ export class RedisConfig {
   }
 
   static getInstance(): RedisConfig {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new RedisConfig()
-    return this.#instance
+    this.instance = new RedisConfig()
+    return this.instance
   }
 
   static getClient(): any {
     const instance = RedisConfig.getInstance()
 
-    return instance.#redisClient
+    return instance.redisClient
   }
 
   static async disconnect(): Promise<void> {
-    if (this.#instance) {
-      await this.#instance.#disconnect()
+    if (this.instance) {
+      await this.instance.disconnectInstance()
     }
   }
 
   static reset(): void {
-    this.#instance = null
+    this.instance = null
   }
 }

@@ -7,17 +7,17 @@ import { ILink } from '../../shared/interfaces/links.interfaces'
 import { LinkStatus } from '../../shared/constants/links.constants'
 
 export default class LinksDataSource {
-  static #instance: LinksDataSource
+  private static instance: LinksDataSource
 
   private constructor() {}
 
   static getInstance(): LinksDataSource {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new LinksDataSource()
-    return this.#instance
+    this.instance = new LinksDataSource()
+    return this.instance
   }
 
   /**

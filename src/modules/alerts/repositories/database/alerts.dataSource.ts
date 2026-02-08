@@ -6,17 +6,17 @@ import { Users } from '../../../../entities/users'
 import { IAlertToNotify, IAlert } from '../../shared/interfaces/alerts.interfaces'
 
 export default class AlertsDataSource {
-  static #instance: AlertsDataSource
+  private static instance: AlertsDataSource
 
   private constructor() {}
 
   static getInstance(): AlertsDataSource {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new AlertsDataSource()
-    return this.#instance
+    this.instance = new AlertsDataSource()
+    return this.instance
   }
 
   /**

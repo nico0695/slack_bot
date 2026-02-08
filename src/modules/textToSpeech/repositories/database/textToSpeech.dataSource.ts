@@ -3,17 +3,17 @@ import { TextToSpeech } from '../../../../entities/textToSpeech'
 import { ITextToSpeech } from '../../shared/interfaces/textToSpeech.interfaces'
 
 export default class TextToSpeechDataSources {
-  static #instance: TextToSpeechDataSources
+  private static instance: TextToSpeechDataSources
 
   private constructor() {}
 
   static getInstance(): TextToSpeechDataSources {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new TextToSpeechDataSources()
-    return this.#instance
+    this.instance = new TextToSpeechDataSources()
+    return this.instance
   }
 
   /**

@@ -4,17 +4,17 @@ import { transformerApi } from '../../../../config/xenovaImport'
 const log = createModuleLogger('summary.transformers')
 
 export default class TransformersRepository {
-  static #instance: TransformersRepository
+  private static instance: TransformersRepository
 
   private constructor() {}
 
   static getInstance(): TransformersRepository {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new TransformersRepository()
-    return this.#instance
+    this.instance = new TransformersRepository()
+    return this.instance
   }
 
   generateSummary = async (text: string): Promise<string | null> => {

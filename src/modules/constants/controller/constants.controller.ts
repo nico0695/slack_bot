@@ -2,28 +2,28 @@ import { Router } from 'express'
 import ConstantsServices from '../services/constants.services'
 
 export default class ConstantsController {
-  static #instance: ConstantsController
+  private static instance: ConstantsController
 
   public router: Router
 
-  #constantsServices: ConstantsServices
+  private constantsServices: ConstantsServices
 
   private constructor() {
     this.getAllConstants = this.getAllConstants.bind(this)
 
-    this.#constantsServices = ConstantsServices.getInstance()
+    this.constantsServices = ConstantsServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): ConstantsController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ConstantsController()
-    return this.#instance
+    this.instance = new ConstantsController()
+    return this.instance
   }
 
   /** Constants Routes */
@@ -45,7 +45,7 @@ export default class ConstantsController {
    */
   public async getAllConstants(req: any, res: any): Promise<void> {
     try {
-      const constants = await this.#constantsServices.getAllConstants()
+      const constants = await this.constantsServices.getAllConstants()
 
       res.status(200).json(constants)
       return
@@ -64,7 +64,7 @@ export default class ConstantsController {
     try {
       const { key } = req.params
 
-      const constant = await this.#constantsServices.getConstantByKey(key)
+      const constant = await this.constantsServices.getConstantByKey(key)
 
       res.status(200).json(constant)
     } catch (error) {
@@ -83,7 +83,7 @@ export default class ConstantsController {
       const { key } = req.params
       const { value } = req.body
 
-      const constant = await this.#constantsServices.updateConstantByKey(key, value)
+      const constant = await this.constantsServices.updateConstantByKey(key, value)
 
       res.status(200).json(constant)
     } catch (error) {
@@ -101,7 +101,7 @@ export default class ConstantsController {
     try {
       const { key, value } = req.body
 
-      const constant = await this.#constantsServices.createConstant(key, value)
+      const constant = await this.constantsServices.createConstant(key, value)
 
       res.status(200).json(constant)
     } catch (error) {

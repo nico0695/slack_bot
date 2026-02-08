@@ -4,17 +4,17 @@ import { IImage } from '../../shared/interfaces/images.interfaces'
 import { IPaginationOptions, IPaginationResponse } from '../../../../shared/interfaces/pagination'
 
 export default class ImagesDataSources {
-  static #instance: ImagesDataSources
+  private static instance: ImagesDataSources
 
   private constructor() {}
 
   static getInstance(): ImagesDataSources {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ImagesDataSources()
-    return this.#instance
+    this.instance = new ImagesDataSources()
+    return this.instance
   }
 
   /**

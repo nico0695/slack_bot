@@ -10,30 +10,30 @@ import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
 export default class TextToSpeechWebController {
-  static #instance: TextToSpeechWebController
+  private static instance: TextToSpeechWebController
 
   public router: Router
 
-  #textToSpeechServices: TextToSpeechServices
+  private textToSpeechServices: TextToSpeechServices
 
   private constructor() {
     this.generateTextoToSpeech = this.generateTextoToSpeech.bind(this)
     this.getTextToSpeechList = this.getTextToSpeechList.bind(this)
     this.getAudio = this.getAudio.bind(this)
 
-    this.#textToSpeechServices = TextToSpeechServices.getInstance()
+    this.textToSpeechServices = TextToSpeechServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
   }
 
   static getInstance(): TextToSpeechWebController {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new TextToSpeechWebController()
-    return this.#instance
+    this.instance = new TextToSpeechWebController()
+    return this.instance
   }
 
   protected registerRoutes(): void {
@@ -53,7 +53,7 @@ export default class TextToSpeechWebController {
       throw new BadRequestError({ message: 'La frase es requerida' })
     }
 
-    const response = await this.#textToSpeechServices.generateSpeech(phrase)
+    const response = await this.textToSpeechServices.generateSpeech(phrase)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -72,7 +72,7 @@ export default class TextToSpeechWebController {
     const pageInt = parseInt(page, 10)
     const sizeInt = parseInt(pageSize, 10)
 
-    const response = await this.#textToSpeechServices.getTextToSpeechList(pageInt, sizeInt)
+    const response = await this.textToSpeechServices.getTextToSpeechList(pageInt, sizeInt)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -88,7 +88,7 @@ export default class TextToSpeechWebController {
       params: { id },
     } = req
 
-    const response = await this.#textToSpeechServices.getAudio(id)
+    const response = await this.textToSpeechServices.getAudio(id)
 
     if (response.error) return res.status(500).send(response)
 

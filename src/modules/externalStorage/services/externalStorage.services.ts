@@ -15,30 +15,30 @@ import {
 const log = createModuleLogger('externalStorage.service')
 
 export default class ExternalStorageServices {
-  static #instance: ExternalStorageServices
+  private static instance: ExternalStorageServices
 
-  #apiStorageRepo: ApiStorageRepository
-  #dataSource: ExternalStorageDataSource
+  private apiStorageRepo: ApiStorageRepository
+  private dataSource: ExternalStorageDataSource
 
   private constructor() {
-    this.#apiStorageRepo = ApiStorageRepository.getInstance()
-    this.#dataSource = ExternalStorageDataSource.getInstance()
+    this.apiStorageRepo = ApiStorageRepository.getInstance()
+    this.dataSource = ExternalStorageDataSource.getInstance()
   }
 
   static getInstance(): ExternalStorageServices {
-    if (this.#instance) {
-      return this.#instance
+    if (this.instance) {
+      return this.instance
     }
 
-    this.#instance = new ExternalStorageServices()
-    return this.#instance
+    this.instance = new ExternalStorageServices()
+    return this.instance
   }
 
   async uploadFile(options: IStorageUploadOptions): Promise<GenericResponse<IStorageUploadResult>> {
     try {
       const path = options.path || StoragePathByModule[options.sourceModule]
 
-      const apiResult = await this.#apiStorageRepo.uploadFile(
+      const apiResult = await this.apiStorageRepo.uploadFile(
         options.fileBuffer,
         options.fileName,
         {
@@ -52,7 +52,7 @@ export default class ExternalStorageServices {
         return { error: 'Error uploading file to storage' }
       }
 
-      const storedFile = await this.#dataSource.createStoredFile({
+      const storedFile = await this.dataSource.createStoredFile({
         storageFileId: apiResult.id,
         fileName: apiResult.name,
         path: apiResult.path,
@@ -89,7 +89,7 @@ export default class ExternalStorageServices {
     options: IStorageUploadFromUrlOptions
   ): Promise<GenericResponse<IStorageUploadResult>> {
     try {
-      const buffer = await this.#apiStorageRepo.downloadFromUrl(options.sourceUrl)
+      const buffer = await this.apiStorageRepo.downloadFromUrl(options.sourceUrl)
 
       if (!buffer) {
         return { error: 'Error downloading file from URL' }
@@ -110,20 +110,20 @@ export default class ExternalStorageServices {
 
   async getFileDetails(localId: number): Promise<GenericResponse<IStorageFileDetails>> {
     try {
-      const storedFile = await this.#dataSource.getStoredFileById(localId)
+      const storedFile = await this.dataSource.getStoredFileById(localId)
 
       if (!storedFile) {
         return { error: 'File not found' }
       }
 
-      const apiFile = await this.#apiStorageRepo.getFile(storedFile.storageFileId)
+      const apiFile = await this.apiStorageRepo.getFile(storedFile.storageFileId)
 
       if (!apiFile) {
         return { error: 'Error retrieving file details from storage' }
       }
 
       if (apiFile.downloadUrl) {
-        await this.#dataSource.updateDownloadUrl(localId, apiFile.downloadUrl)
+        await this.dataSource.updateDownloadUrl(localId, apiFile.downloadUrl)
       }
 
       return {
@@ -158,7 +158,7 @@ export default class ExternalStorageServices {
 
   async listFiles(options?: IStorageListOptions): Promise<GenericResponse<IStorageApiListResponse>> {
     try {
-      const result = await this.#apiStorageRepo.listFiles(options)
+      const result = await this.apiStorageRepo.listFiles(options)
 
       if (!result) {
         return { error: 'Error listing files from storage' }
@@ -181,19 +181,19 @@ export default class ExternalStorageServices {
 
   async deleteFile(localId: number): Promise<GenericResponse<boolean>> {
     try {
-      const storedFile = await this.#dataSource.getStoredFileById(localId)
+      const storedFile = await this.dataSource.getStoredFileById(localId)
 
       if (!storedFile) {
         return { error: 'File not found' }
       }
 
-      const deleted = await this.#apiStorageRepo.deleteFile(storedFile.storageFileId)
+      const deleted = await this.apiStorageRepo.deleteFile(storedFile.storageFileId)
 
       if (!deleted) {
         return { error: 'Error deleting file from storage' }
       }
 
-      await this.#dataSource.deleteStoredFile(localId)
+      await this.dataSource.deleteStoredFile(localId)
 
       log.info(
         { localId, storageFileId: storedFile.storageFileId },
