@@ -3,7 +3,7 @@
 /build
 
 .vscode/
-.env*
+.env
 
 /*.rdb
 /src/database/*
@@ -21,6 +21,8 @@
 /.agents
 /.gemini
 /.github/skills
+
+/custom-skills
 
 AGENTS_AND_SKILLS.md
 AGENTS.md

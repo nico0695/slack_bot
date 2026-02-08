@@ -2,8 +2,10 @@ import { Links } from '../../../entities/links'
 import { GenericResponse } from '../../../shared/interfaces/services'
 
 import LinksDataSource from '../repositories/database/links.dataSource'
+import LinksMetadataRepository from '../repositories/metadata/linksMetadata.repository'
 
 import { ILink } from '../shared/interfaces/links.interfaces'
+import { extractTitleFromUrl } from '../shared/utils/url.utils'
 import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('links.service')
@@ -12,9 +14,11 @@ export default class LinksServices {
   static #instance: LinksServices
 
   #linksDataSource: LinksDataSource
+  #linksMetadataRepository: LinksMetadataRepository
 
   private constructor() {
     this.#linksDataSource = LinksDataSource.getInstance()
+    this.#linksMetadataRepository = LinksMetadataRepository.getInstance()
   }
 
   static getInstance(): LinksServices {
@@ -24,6 +28,38 @@ export default class LinksServices {
 
     this.#instance = new LinksServices()
     return this.#instance
+  }
+
+  /**
+   * Enrich link metadata by fetching title/description from the URL.
+   * If the user already provided title/description, those values are preserved.
+   */
+  async #enrichLinkMetadata(
+    url: string,
+    currentTitle?: string,
+    currentDescription?: string
+  ): Promise<{ title: string; description: string }> {
+    const trimmedTitle = currentTitle?.trim() || ''
+    const trimmedDescription = currentDescription?.trim() || ''
+
+    if (trimmedTitle && trimmedDescription) {
+      return { title: trimmedTitle, description: trimmedDescription }
+    }
+
+    const metadata = await this.#linksMetadataRepository.fetchMetadata(url)
+
+    let title = trimmedTitle
+    let description = trimmedDescription
+
+    if (!trimmedTitle) {
+      title = metadata?.title || extractTitleFromUrl(url)
+    }
+
+    if (!trimmedDescription) {
+      description = metadata?.description || ''
+    }
+
+    return { title, description }
   }
 
   /**
@@ -45,11 +81,13 @@ export default class LinksServices {
   ): Promise<GenericResponse<Links>> {
     try {
       const sanitizedTag = options?.tag?.trim()
+      const enriched = await this.#enrichLinkMetadata(url, options?.title, options?.description)
+
       const payload: ILink = {
         userId,
         url,
-        title: options?.title ?? '',
-        description: options?.description ?? '',
+        title: enriched.title,
+        description: enriched.description,
       }
 
       if (sanitizedTag && sanitizedTag.length > 0) {
@@ -82,7 +120,10 @@ export default class LinksServices {
    */
   public async createLink(data: ILink): Promise<GenericResponse<Links>> {
     try {
-      const response = await this.#linksDataSource.createLink(data)
+      const enriched = await this.#enrichLinkMetadata(data.url, data.title, data.description)
+      const enrichedData = { ...data, title: enriched.title, description: enriched.description }
+
+      const response = await this.#linksDataSource.createLink(enrichedData)
 
       log.info({ userId: data.userId, linkId: response.id }, 'Link created')
 
