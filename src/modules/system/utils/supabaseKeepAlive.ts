@@ -16,7 +16,8 @@ export const supabaseKeepAlive = async (): Promise<void> => {
       return
     }
 
-    const response = await fetch(`${supabaseUrl}/auth/v1/health`)
+    const healthUrl = new URL('/auth/v1/health', supabaseUrl)
+    const response = await fetch(healthUrl.toString())
 
     if (response.ok) {
       log.info('Supabase keep-alive ping successful')
