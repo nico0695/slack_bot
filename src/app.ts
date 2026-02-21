@@ -31,6 +31,7 @@ import { IJoinRoomData } from './modules/conversations/shared/interfaces/convers
 import { ProgressCallback } from './modules/conversations/shared/interfaces/converstions'
 import SummaryWebController from './modules/summary/controller/summary.controller'
 import { alertCronJob } from './modules/alerts/utils/cronJob'
+import { supabaseKeepAlive } from './modules/system/utils/supabaseKeepAlive'
 import AlertsWebController from './modules/alerts/controller/alersWeb.controller'
 import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
 import NotesWebController from './modules/notes/controller/notesWeb.controller'
@@ -286,6 +287,10 @@ export default class App {
 
       // Iniciar el cron
       cronJob.start()
+
+      // Ping Supabase every 3 days to prevent free-tier inactivity pause
+      const keepAliveCron = cron.schedule('0 0 */3 * *', supabaseKeepAlive)
+      keepAliveCron.start()
     } catch (error) {
       log.error({ err: error }, 'Cron job init failed')
     }

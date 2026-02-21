@@ -1,5 +1,12 @@
 import ConversationsController from '../conversations.controller'
 
+jest.mock('../../../../config/slackConfig', () => ({
+  connectionSlackApp: {
+    client: { chat: { postMessage: jest.fn() } },
+  },
+  slackListenersKey: {},
+}))
+
 jest.mock('../../../../shared/middleware/auth', () => {
   const identityDecorator = (
     _target: any,
@@ -22,6 +29,16 @@ jest.mock('../../services/conversations.services', () => ({
       handleAction: handleActionMock,
     }),
   },
+}))
+
+jest.mock('../../services/messageProcessor.service', () => ({
+  __esModule: true,
+  default: { getInstance: () => ({}) },
+}))
+
+jest.mock('../../services/conversationFlowManager.service', () => ({
+  __esModule: true,
+  default: { getInstance: () => ({}) },
 }))
 
 describe('ConversationsController', () => {
