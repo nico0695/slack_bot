@@ -1,54 +1,54 @@
-# Plan de Migración a Inyección de Dependencias (DI) con TSyringe
+# Dependency Injection (DI) Migration Plan with TSyringe
 
-## 📋 Información del Documento
-- **Fecha de Creación:** 2026-03-15
-- **Estado:** FASE 2 - Pendiente de Confirmación
-- **Librería de DI:** `tsyringe`
-- **Alcance:** Repositorios, Servicios y Controladores
+## 📋 Document Information
+- **Creation Date:** 2026-03-15
+- **Status:** PHASE 2 - Pending Confirmation
+- **DI Library:** `tsyringe`
+- **Scope:** Repositories, Services, and Controllers
 
 ---
 
-# FASE 1: Análisis y Relevamiento Profundo
+# PHASE 1: Analysis and Deep Review
 
-## 1.1 Resumen Ejecutivo del Estado Actual
+## 1.1 Executive Summary of the Current State
 
-El proyecto `slack-bot` es un backend modular construido con Node.js, TypeScript, Express, Redis, SQLite (TypeORM), y Socket.io. La arquitectura sigue un patrón de capas (Controller → Service → Repository) pero está **fuertemente acoplado mediante el anti-patrón Singleton** (`Clase.getInstance()`).
+The `slack-bot` project is a modular backend built with Node.js, TypeScript, Express, Redis, SQLite (TypeORM), and Socket.io. The architecture follows a layered pattern (Controller → Service → Repository) but is **heavily coupled through the Singleton anti-pattern** (`Class.getInstance()`).
 
-### Estadísticas Clave
-| Métrica | Valor |
+### Key Statistics
+| Metric | Value |
 |---------|-------|
-| Clases con patrón Singleton | **49** |
-| Llamadas a `getInstance()` | **118+** |
-| Módulos Principales | 13 (users, conversations, alerts, tasks, notes, links, images, textToSpeech, summary, system, externalStorage, constants) |
-| Niveles de Anidamiento de Dependencias | Hasta 4 niveles |
+| Classes using the Singleton pattern | **49** |
+| Calls to `getInstance()` | **118+** |
+| Main modules | 13 (users, conversations, alerts, tasks, notes, links, images, textToSpeech, summary, system, externalStorage, constants) |
+| Dependency nesting levels | Up to 4 levels |
 
-## 1.2 Identificación del Composition Root
+## 1.2 Identifying the Composition Root
 
-### Entry Point Actual
+### Current Entry Point
 ```
 src/index.ts
     └── new App() → src/app.ts
-        └── Constructor inicializa 12+ controladores via getInstance()
-        └── config() inicializa conexión a BD (TypeORM)
-        └── router() registra rutas Express
-        └── start() inicia servidor HTTP, Socket.io, Slack listeners, Cron jobs
+        └── Constructor initializes 12+ controllers via getInstance()
+        └── config() initializes DB connection (TypeORM)
+        └── router() registers Express routes
+        └── start() starts HTTP server, Socket.io, Slack listeners, Cron jobs
 ```
 
-### Archivos Clave
-| Archivo | Función |
+### Key Files
+| File | Purpose |
 |---------|---------|
-| `src/index.ts` | Entry point mínimo (5 líneas) |
-| `src/app.ts` | Clase App - Composition Root actual |
-| `src/config/ormconfig.ts` | Configuración TypeORM (DataSource) |
-| `src/config/redisConfig.ts` | Singleton RedisConfig |
-| `src/config/slackConfig.ts` | Conexión Slack Bolt |
-| `src/config/socketConfig.ts` | Configuración Socket.io |
+| `src/index.ts` | Minimal entry point (5 lines) |
+| `src/app.ts` | App class - current Composition Root |
+| `src/config/ormconfig.ts` | TypeORM configuration (DataSource) |
+| `src/config/redisConfig.ts` | RedisConfig singleton |
+| `src/config/slackConfig.ts` | Slack Bolt connection |
+| `src/config/socketConfig.ts` | Socket.io configuration |
 
-## 1.3 Inventario Completo de Singletons
+## 1.3 Complete Inventory of Singletons
 
-### Capa 1: Repositorios / Data Sources (Infraestructura)
+### Layer 1: Repositories / Data Sources (Infrastructure)
 
-| Clase | Archivo | Dependencias |
+| Class | File | Dependencies |
 |-------|---------|--------------|
 | `UsersDataSources` | `src/modules/users/repositories/database/users.dataSource.ts` | TypeORM Entity (Users) |
 | `UsersRedis` | `src/modules/users/repositories/redis/users.redis.ts` | RedisConfig |
@@ -73,9 +73,9 @@ src/index.ts
 | `OpenaiImagesRepository` | `src/modules/images/repositories/openai/openaiImages.repository.ts` | OpenAI |
 | `LeapRepository` | `src/modules/images/repositories/leap/leap.repository.ts` | Leap API |
 
-### Capa 2: Servicios (Lógica de Negocio)
+### Layer 2: Services (Business Logic)
 
-| Clase | Archivo | Dependencias (getInstance calls) |
+| Class | File | Dependencies (getInstance calls) |
 |-------|---------|----------------------------------|
 | `UsersServices` | `src/modules/users/services/users.services.ts` | UsersDataSource, SlackRepository, UsersRedis |
 | `AlertsServices` | `src/modules/alerts/services/alerts.services.ts` | AlertsDataSource, UsersRedis |
@@ -91,9 +91,9 @@ src/index.ts
 | `ConstantsServices` | `src/modules/constants/services/constants.services.ts` | ConstantsDataSources |
 | `ExternalStorageServices` | `src/modules/externalStorage/services/externalStorage.services.ts` | ApiStorageRepository, ExternalStorageDataSource |
 
-### Capa 3: Controladores (API/Red)
+### Layer 3: Controllers (API/Network)
 
-| Clase | Archivo | Dependencias (getInstance calls) |
+| Class | File | Dependencies (getInstance calls) |
 |-------|---------|----------------------------------|
 | `UsersController` | `src/modules/users/controller/users.controller.ts` | UsersServices |
 | `ConversationsController` | `src/modules/conversations/controller/conversations.controller.ts` | ConversationsServices, MessageProcessor, ConversationFlowManager |
@@ -106,17 +106,17 @@ src/index.ts
 | `ImagesWebController` | `src/modules/images/controller/imagesWeb.controller.ts` | ImagesServices |
 | `TextToSpeechWebController` | `src/modules/textToSpeech/controller/textToSpeechWeb.controller.ts` | TextToSpeechServices |
 | `SummaryWebController` | `src/modules/summary/controller/summary.controller.ts` | SummaryServices |
-| `SystemWebController` | `src/modules/system/controller/systemWeb.controller.ts` | (ninguna) |
+| `SystemWebController` | `src/modules/system/controller/systemWeb.controller.ts` | (none) |
 | `ConstantsController` | `src/modules/constants/controller/constants.controller.ts` | ConstantsServices |
 
-### Infraestructura / Configuración (Fuera de Alcance Directo)
+### Infrastructure / Configuration (Out of Direct Scope)
 
-| Clase | Archivo | Notas |
+| Class | File | Notes |
 |-------|---------|-------|
-| `RedisConfig` | `src/config/redisConfig.ts` | Singleton para conexión Redis |
-| `IoServer` | `src/config/socketConfig.ts` | Static class para Socket.io |
+| `RedisConfig` | `src/config/redisConfig.ts` | Singleton for Redis connection |
+| `IoServer` | `src/config/socketConfig.ts` | Static class for Socket.io |
 
-## 1.4 Árbol de Dependencias Principal
+## 1.4 Primary Dependency Tree
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -143,41 +143,41 @@ src/index.ts
     │         │                │         │
     ▼         ▼                ▼         ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        INFRAESTRUCTURA                                       │
+│                             INFRASTRUCTURE                                  │
 │   TypeORM Entities    │    RedisConfig    │    External APIs                │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 1.5 Riesgos Identificados
+## 1.5 Identified Risks
 
-### ⚠️ Riesgo Alto
+### ⚠️ High Risk
 
-| Riesgo | Descripción | Archivos Afectados | Mitigación |
+| Risk | Description | Affected Files | Mitigation |
 |--------|-------------|-------------------|------------|
-| **Dependencias Circulares** | `ConversationsServices` ↔ `MessageProcessor` (ambos se referencian mutuamente) | `conversations.services.ts`, `messageProcessor.service.ts` | Usar Lazy Injection con `delay()` de TSyringe |
-| **Servicios en Auth Decorators** | `HttpAuth`, `SlackAuth`, `SlackAuthActions` llaman a `UsersServices.getInstance()` dentro de decoradores | `src/shared/middleware/auth.ts` | Refactorizar decoradores para recibir dependencias o usar `container.resolve()` |
-| **Cron Jobs con Singletons** | `alertCronJob` llama a `AlertsServices.getInstance()` fuera del Composition Root | `src/modules/alerts/utils/cronJob.ts` | Inyectar servicio desde app.ts o usar `container.resolve()` |
+| **Circular Dependencies** | `ConversationsServices` ↔ `MessageProcessor` (both reference each other) | `conversations.services.ts`, `messageProcessor.service.ts` | Use lazy injection with TSyringe `delay()` |
+| **Services in Auth Decorators** | `HttpAuth`, `SlackAuth`, `SlackAuthActions` call `UsersServices.getInstance()` inside decorators | `src/shared/middleware/auth.ts` | Refactor decorators to accept dependencies or use `container.resolve()` |
+| **Cron Jobs with Singletons** | `alertCronJob` calls `AlertsServices.getInstance()` outside the Composition Root | `src/modules/alerts/utils/cronJob.ts` | Inject service from app.ts or use `container.resolve()` |
 
-### ⚠️ Riesgo Medio
+### ⚠️ Medium Risk
 
-| Riesgo | Descripción | Archivos Afectados | Mitigación |
+| Risk | Description | Affected Files | Mitigation |
 |--------|-------------|-------------------|------------|
-| **Factory Pattern en AI Repos** | `ConversationsServices` y `MessageProcessor` usan `AIRepositoryByType[type].getInstance()` | Servicios de conversación | Implementar factory con DI token |
-| **Efectos Secundarios en Constructores** | `RedisConfig` y `GeminiRepository` inicializan conexiones en constructor | Repositorios | Mover conexiones a métodos `connect()` o usar `@singleton()` |
-| **Socket.io Global** | `IoServer` es un static class usado desde `app.ts` y `conversationsServices` | `socketConfig.ts`, `conversations.services.ts` | Registrar como singleton en contenedor |
+| **Factory Pattern in AI Repos** | `ConversationsServices` and `MessageProcessor` use `AIRepositoryByType[type].getInstance()` | Conversation services | Implement factory with DI token |
+| **Side Effects in Constructors** | `RedisConfig` and `GeminiRepository` initialize connections in constructors | Repositories | Move connections to `connect()` methods or use `@singleton()` |
+| **Global Socket.io** | `IoServer` is a static class used from `app.ts` and `conversationsServices` | `socketConfig.ts`, `conversations.services.ts` | Register as singleton in container |
 
-### ⚠️ Riesgo Bajo
+### ⚠️ Low Risk
 
-| Riesgo | Descripción | Archivos Afectados | Mitigación |
+| Risk | Description | Affected Files | Mitigation |
 |--------|-------------|-------------------|------------|
-| **Tests con jest.mock()** | Tests actuales mockean getInstance() con jest.mock | Todos los `__tests__/` | Migrar a inyección de mocks en constructor |
-| **GenericController Base Class** | Controladores extienden `GenericController` | Todos los controladores | Mantener herencia, solo cambiar inyección |
+| **Tests with jest.mock()** | Current tests mock getInstance() with jest.mock | All `__tests__/` | Migrate to constructor-injected mocks |
+| **GenericController Base Class** | Controllers extend `GenericController` | All controllers | Keep inheritance, only change injection |
 
-## 1.6 Análisis de Testing Actual
+## 1.6 Current Testing Analysis
 
-### Patrón de Mocking Existente
+### Existing Mocking Pattern
 ```typescript
-// Patrón actual (src/modules/conversations/services/__tests__/conversations.services.test.ts)
+// Current pattern (src/modules/conversations/services/__tests__/conversations.services.test.ts)
 jest.mock('../../repositories/openai/openai.repository', () => ({
   __esModule: true,
   default: {
@@ -186,90 +186,90 @@ jest.mock('../../repositories/openai/openai.repository', () => ({
 }))
 ```
 
-### Impacto de la Migración
-- **Antes:** Los tests mockean el método estático `getInstance()` de cada dependencia
-- **Después:** Los tests crearán instancias directamente pasando mocks al constructor
+### Migration Impact
+- **Before:** Tests mock the static `getInstance()` method for each dependency
+- **After:** Tests will create instances directly by passing mocks to the constructor
 
 ---
 
-# FASE 2: Propuesta de Estrategia y Alternativas
+# PHASE 2: Strategy Proposal and Alternatives
 
-## 2.1 Estrategia de Migración Recomendada: Bottom-Up
+## 2.1 Recommended Migration Strategy: Bottom-Up
 
-### Justificación
-La estrategia Bottom-Up (Repositorios → Servicios → Controladores) minimiza el riesgo porque:
-1. Los repositorios no dependen de otras capas (son hojas del árbol)
-2. Permite verificar que cada capa funciona antes de migrar la siguiente
-3. Facilita rollback parcial si hay problemas
+### Justification
+The Bottom-Up strategy (Repositories → Services → Controllers) minimizes risk because:
+1. Repositories do not depend on other layers (they are tree leaves)
+2. It allows verifying each layer before migrating the next
+3. It makes partial rollback easier if problems arise
 
-### Orden de Migración Propuesto
+### Proposed Migration Order
 
 ```
-Etapa 0: Configuración Base TSyringe
+Stage 0: TSyringe base configuration
     │
     ▼
-Etapa 1: Repositorios (sin dependencias internas)
+Stage 1: Repositories (no internal dependencies)
     │
     ▼
-Etapa 2: Servicios Simples (1-2 dependencias)
+Stage 2: Simple Services (1-2 dependencies)
     │
     ▼
-Etapa 3: Servicios Complejos (3+ dependencias)
+Stage 3: Complex Services (3+ dependencies)
     │
     ▼
-Etapa 4: Controladores
+Stage 4: Controllers
     │
     ▼
-Etapa 5: Casos Especiales (Decorators, Cron, Sockets)
+Stage 5: Special Cases (Decorators, Cron, Sockets)
     │
     ▼
-Etapa 6: Cleanup y Documentación
+Stage 6: Cleanup and Documentation
 ```
 
-## 2.2 Decisiones Arquitectónicas
+## 2.2 Architectural Decisions
 
-### Decisión 1: Manejo de Auth Decorators
+### Decision 1: Handling Auth Decorators
 
-#### Contexto
-Los decoradores `@HttpAuth`, `@SlackAuth`, `@SlackAuthActions` en `src/shared/middleware/auth.ts` llaman a `UsersServices.getInstance()` internamente.
+#### Context
+The `@HttpAuth`, `@SlackAuth`, `@SlackAuthActions` decorators in `src/shared/middleware/auth.ts` call `UsersServices.getInstance()` internally.
 
-#### Alternativas
+#### Alternatives
 
-| Alternativa | Pros | Contras | Recomendación |
+| Alternative | Pros | Cons | Recommendation |
 |-------------|------|---------|---------------|
-| **A) container.resolve() dentro del decorator** | Mínimo cambio, compatible con decoradores actuales | Viola principio de no usar Service Locator | ⭐ Recomendado para migración inicial |
-| **B) Refactorizar decoradores a middleware Express** | Limpio, sigue mejor prácticas DI | Cambio significativo en patrón de código | Para fase posterior |
-| **C) Pasar servicio como parámetro del decorator** | DI puro | Cambia la firma de todos los decoradores | No recomendado |
+| **A) container.resolve() inside the decorator** | Minimal change, compatible with current decorators | Violates the no Service Locator principle | ⭐ Recommended for the initial migration |
+| **B) Refactor decorators into Express middleware** | Clean, follows DI best practices | Significant change to code pattern | For a later phase |
+| **C) Pass service as a decorator parameter** | Pure DI | Changes the signature of all decorators | Not recommended |
 
-#### Recomendación: Alternativa A
-Usar `container.resolve(UsersServices)` dentro de los decoradores como caso límite aceptable. Documentar como deuda técnica para refactorizar a middlewares en el futuro.
+#### Recommendation: Alternative A
+Use `container.resolve(UsersServices)` inside the decorators as an acceptable edge case. Document it as technical debt for future refactoring to middleware.
 
 ---
 
-### Decisión 2: Manejo de Cron Jobs
+### Decision 2: Handling Cron Jobs
 
-#### Contexto
-`alertCronJob` en `src/modules/alerts/utils/cronJob.ts` es una función standalone que llama a `AlertsServices.getInstance()`.
+#### Context
+`alertCronJob` in `src/modules/alerts/utils/cronJob.ts` is a standalone function that calls `AlertsServices.getInstance()`.
 
-#### Alternativas
+#### Alternatives
 
-| Alternativa | Pros | Contras | Recomendación |
+| Alternative | Pros | Cons | Recommendation |
 |-------------|------|---------|---------------|
-| **A) container.resolve() dentro del cron** | Mínimo cambio | Service Locator pattern | Para migración rápida |
-| **B) Inyectar servicio desde app.ts** | DI puro, fácil de testear | Requiere refactorizar cómo se registra el cron | ⭐ Recomendado |
-| **C) Crear clase CronJobManager inyectable** | Organizado, escalable | Más código | Para proyectos grandes |
+| **A) container.resolve() inside the cron** | Minimal change | Service Locator pattern | For a quick migration |
+| **B) Inject service from app.ts** | Pure DI, easy to test | Requires refactoring cron registration | ⭐ Recommended |
+| **C) Create an injectable CronJobManager class** | Organized, scalable | More code | For larger projects |
 
-#### Recomendación: Alternativa B
-Modificar `alertCronJob` para recibir `AlertsServices` como parámetro. La instancia se resuelve en `app.ts` al configurar el cron.
+#### Recommendation: Alternative B
+Modify `alertCronJob` to accept `AlertsServices` as a parameter. Resolve the instance in `app.ts` when configuring the cron.
 
 ```typescript
-// Antes
+// Before
 export const alertCronJob = async (): Promise<void> => {
   const alertsServices = AlertsServices.getInstance()
   ...
 }
 
-// Después
+// After
 export const createAlertCronJob = (alertsServices: AlertsServices) => {
   return async (): Promise<void> => {
     ...
@@ -279,28 +279,28 @@ export const createAlertCronJob = (alertsServices: AlertsServices) => {
 
 ---
 
-### Decisión 3: Manejo de Socket.io
+### Decision 3: Handling Socket.io
 
-#### Contexto
-`IoServer` es una clase estática que gestiona la instancia de Socket.io. Se usa en `app.ts` y es accedida desde `ConversationsServices`.
+#### Context
+`IoServer` is a static class that manages the Socket.io instance. It is used in `app.ts` and accessed from `ConversationsServices`.
 
-#### Alternativas
+#### Alternatives
 
-| Alternativa | Pros | Contras | Recomendación |
+| Alternative | Pros | Cons | Recommendation |
 |-------------|------|---------|---------------|
-| **A) Mantener como static, no migrar** | Sin cambios | Inconsistente con resto del código | Para fase inicial |
-| **B) Registrar Server como singleton en container** | Consistente | Requiere pasar server como parámetro | ⭐ Recomendado |
-| **C) Crear SocketService inyectable** | Abstracción limpia | Más código | Ideal a largo plazo |
+| **A) Keep it static, do not migrate** | No changes | Inconsistent with the rest of the code | For the initial phase |
+| **B) Register the Server as a singleton in the container** | Consistent | Requires passing the server as a parameter | ⭐ Recommended |
+| **C) Create an injectable SocketService** | Clean abstraction | More code | Ideal long-term |
 
-#### Recomendación: Alternativa A para Fase Inicial, B para Fase 2
-Mantener `IoServer` como static inicialmente. En una segunda iteración, registrar el `Server` en el contenedor.
+#### Recommendation: Alternative A for the Initial Phase, B for Phase 2
+Keep `IoServer` static initially. In a second iteration, register the `Server` in the container.
 
 ---
 
-### Decisión 4: Factory Pattern para AI Repositories
+### Decision 4: Factory Pattern for AI Repositories
 
-#### Contexto
-`ConversationsServices` y `MessageProcessor` usan un patrón factory para seleccionar entre `OpenaiRepository` y `GeminiRepository`:
+#### Context
+`ConversationsServices` and `MessageProcessor` use a factory pattern to select between `OpenaiRepository` and `GeminiRepository`:
 ```typescript
 const AIRepositoryByType = {
   [AIRepositoryType.OPENAI]: OpenaiRepository,
@@ -309,16 +309,16 @@ const AIRepositoryByType = {
 this.aiRepository = AIRepositoryByType[aiToUse].getInstance()
 ```
 
-#### Alternativas
+#### Alternatives
 
-| Alternativa | Pros | Contras | Recomendación |
+| Alternative | Pros | Cons | Recommendation |
 |-------------|------|---------|---------------|
-| **A) Inyectar repositorio por defecto, factory en config** | Simple | Menos flexible en runtime | ⭐ Recomendado |
-| **B) Token de inyección dinámico** | Máxima flexibilidad | Complejidad adicional | Overengineering |
-| **C) Inyectar ambos repos, elegir en runtime** | Explícito | Carga innecesaria | No recomendado |
+| **A) Inject a default repository, factory in config** | Simple | Less runtime flexibility | ⭐ Recommended |
+| **B) Dynamic injection token** | Maximum flexibility | Additional complexity | Overengineering |
+| **C) Inject both repos, choose at runtime** | Explicit | Unnecessary load | Not recommended |
 
-#### Recomendación: Alternativa A
-Configurar el tipo de AI en variables de entorno. El contenedor registra el repositorio correcto basado en la configuración. Si se necesita cambiar en runtime, se crea un nuevo scope del contenedor.
+#### Recommendation: Alternative A
+Configure the AI type through environment variables. The container registers the correct repository based on configuration. If it must change at runtime, create a new container scope.
 
 ```typescript
 // di-container.ts
@@ -332,87 +332,87 @@ if (aiType === 'OPENAI') {
 
 ---
 
-### Decisión 5: Manejo de Dependencias Circulares
+### Decision 5: Handling Circular Dependencies
 
-#### Contexto
-`ConversationsServices` importa y usa `MessageProcessor`, y `MessageProcessor` importa tipos/interfaces de conversations.
+#### Context
+`ConversationsServices` imports and uses `MessageProcessor`, and `MessageProcessor` imports conversation types/interfaces.
 
-#### Verificación Necesaria
-Revisar si hay dependencia circular real o solo de tipos. TSyringe puede manejar ciclos con `delay()`.
+#### Verification Needed
+Check whether there is a real circular dependency or only type imports. TSyringe can handle cycles with `delay()`.
 
-#### Recomendación
-Usar `@inject(delay(() => MessageProcessor))` si se confirma el ciclo. Alternativamente, extraer la lógica compartida a un servicio común.
-
----
-
-## 2.3 Preguntas para el Usuario
-
-Antes de proceder a la **FASE 3: Generación del Plan de Implementación**, necesito confirmación sobre las siguientes decisiones:
-
-### ❓ Pregunta 1: Auth Decorators
-¿Está de acuerdo con usar `container.resolve()` dentro de los decoradores de autenticación como solución temporal? ¿O prefiere que se refactorizen completamente a middlewares Express desde el inicio?
-
-### ❓ Pregunta 2: Cron Jobs
-¿Confirma la estrategia de modificar `alertCronJob` para recibir el servicio como parámetro inyectado desde `app.ts`?
-
-### ❓ Pregunta 3: Socket.io
-¿Desea mantener `IoServer` como static class en esta fase, o prefiere migrarlo junto con el resto?
-
-### ❓ Pregunta 4: AI Repository Factory
-¿Es aceptable determinar el tipo de AI (OpenAI/Gemini) en tiempo de carga vía variable de entorno? ¿O necesita cambiar dinámicamente durante la ejecución?
-
-### ❓ Pregunta 5: Alcance de Tests
-¿Desea que el plan incluya la migración de todos los tests existentes a inyección por constructor? Esto aumentará el esfuerzo pero mejorará la mantenibilidad.
-
-### ❓ Pregunta 6: Módulos Prioritarios
-¿Hay módulos específicos que deban migrarse primero por razones de negocio? Actualmente el plan propone migrar por capas (Bottom-Up), pero podemos priorizar por módulo funcional si es necesario.
+#### Recommendation
+Use `@inject(delay(() => MessageProcessor))` if the cycle is confirmed. Alternatively, extract shared logic to a common service.
 
 ---
 
-## ⚠️ STOP - Esperando Confirmación
+## 2.3 Questions for the User
 
-**Por favor, revise la propuesta de estrategia y responda las preguntas anteriores.**
+Before proceeding to **PHASE 3: Implementation Plan Generation**, I need confirmation on the following decisions:
 
-Una vez confirmadas las decisiones, procederé a generar:
-- Plan de implementación detallado con pasos accionables
-- Snippets de código "Antes y Después"
-- Checklist de seguimiento
-- Documentación DI-GUIDELINES.md
-- Guía de impacto en testing
+### ❓ Question 1: Auth Decorators
+Do you agree to use `container.resolve()` inside authentication decorators as a temporary solution? Or do you prefer to refactor them fully into Express middleware from the start?
+
+### ❓ Question 2: Cron Jobs
+Do you confirm the strategy of modifying `alertCronJob` to receive the service as a parameter injected from `app.ts`?
+
+### ❓ Question 3: Socket.io
+Do you want to keep `IoServer` as a static class in this phase, or do you prefer to migrate it along with everything else?
+
+### ❓ Question 4: AI Repository Factory
+Is it acceptable to determine the AI type (OpenAI/Gemini) at load time via environment variables? Or do you need to change it dynamically at runtime?
+
+### ❓ Question 5: Test Scope
+Do you want the plan to include migrating all existing tests to constructor injection? This increases effort but improves maintainability.
+
+### ❓ Question 6: Priority Modules
+Are there specific modules that should be migrated first for business reasons? The plan currently proposes a layer-based (Bottom-Up) migration, but we can prioritize by functional module if needed.
 
 ---
 
-# FASE 3: Plan de Implementación (Pendiente de Confirmación)
+## ⚠️ STOP - Waiting for Confirmation
 
-*Esta sección se completará después de recibir confirmación del usuario en las decisiones de FASE 2.*
+**Please review the proposed strategy and answer the questions above.**
 
-## Vista Previa del Plan
+Once the decisions are confirmed, I will proceed to generate:
+- Detailed implementation plan with actionable steps
+- "Before and After" code snippets
+- Tracking checklist
+- DI-GUIDELINES.md documentation
+- Testing impact guide
 
-### A. Resumen del Plan
-*(Se completará post-confirmación)*
+---
 
-### B. Tabla de Seguimiento de Status
+# PHASE 3: Implementation Plan (Pending Confirmation)
 
-| Etapa | Tarea Específica | Archivos / Módulos Afectados | Nivel de Riesgo | Estado |
+*This section will be completed after receiving user confirmation on the PHASE 2 decisions.*
+
+## Plan Preview
+
+### A. Plan Summary
+*(Will be completed post-confirmation)*
+
+### B. Status Tracking Table
+
+| Stage | Specific Task | Affected Files / Modules | Risk Level | Status |
 |:------|:-----------------|:-----------------------------|:----------------|:-------|
-| 0 | Instalar TSyringe y configurar | `package.json`, `tsconfig.json`, `src/index.ts` | Bajo | ⏳ Pendiente |
-| 0 | Crear archivo de contenedor DI | `src/di-container.ts` (nuevo) | Bajo | ⏳ Pendiente |
-| 1 | Migrar DataSources (BD) | `src/modules/*/repositories/database/*.ts` | Medio | ⏳ Pendiente |
-| 1 | Migrar Redis Repositories | `src/modules/*/repositories/redis/*.ts` | Medio | ⏳ Pendiente |
-| 1 | Migrar API Repositories | `src/modules/*/repositories/*.ts` | Medio | ⏳ Pendiente |
-| 2 | Migrar Servicios Simples | Tasks, Notes, Links, Alerts, Summary | Medio | ⏳ Pendiente |
-| 3 | Migrar Servicios Complejos | Users, Conversations, Images, MessageProcessor | Alto | ⏳ Pendiente |
-| 4 | Migrar Controladores | Todos los `*.controller.ts` | Medio | ⏳ Pendiente |
-| 5 | Refactorizar Auth Decorators | `src/shared/middleware/auth.ts` | Alto | ⏳ Pendiente |
-| 5 | Refactorizar Cron Jobs | `src/modules/alerts/utils/cronJob.ts` | Medio | ⏳ Pendiente |
-| 5 | (Opcional) Migrar Socket.io | `src/config/socketConfig.ts` | Bajo | ⏳ Pendiente |
-| 6 | Actualizar app.ts (Composition Root) | `src/app.ts` | Alto | ⏳ Pendiente |
-| 6 | Migrar Tests | Todos los `__tests__/*.ts` | Medio | ⏳ Pendiente |
-| 6 | Documentación | `DI-GUIDELINES.md`, README updates | Bajo | ⏳ Pendiente |
+| 0 | Install TSyringe and configure | `package.json`, `tsconfig.json`, `src/index.ts` | Low | ⏳ Pending |
+| 0 | Create DI container file | `src/di-container.ts` (new) | Low | ⏳ Pending |
+| 1 | Migrate DataSources (DB) | `src/modules/*/repositories/database/*.ts` | Medium | ⏳ Pending |
+| 1 | Migrate Redis Repositories | `src/modules/*/repositories/redis/*.ts` | Medium | ⏳ Pending |
+| 1 | Migrate API Repositories | `src/modules/*/repositories/*.ts` | Medium | ⏳ Pending |
+| 2 | Migrate Simple Services | Tasks, Notes, Links, Alerts, Summary | Medium | ⏳ Pending |
+| 3 | Migrate Complex Services | Users, Conversations, Images, MessageProcessor | High | ⏳ Pending |
+| 4 | Migrate Controllers | All `*.controller.ts` | Medium | ⏳ Pending |
+| 5 | Refactor Auth Decorators | `src/shared/middleware/auth.ts` | High | ⏳ Pending |
+| 5 | Refactor Cron Jobs | `src/modules/alerts/utils/cronJob.ts` | Medium | ⏳ Pending |
+| 5 | (Optional) Migrate Socket.io | `src/config/socketConfig.ts` | Low | ⏳ Pending |
+| 6 | Update app.ts (Composition Root) | `src/app.ts` | High | ⏳ Pending |
+| 6 | Migrate Tests | All `__tests__/*.ts` | Medium | ⏳ Pending |
+| 6 | Documentation | `DI-GUIDELINES.md`, README updates | Low | ⏳ Pending |
 
-### C. Ejemplo de Migración (Preview)
+### C. Migration Example (Preview)
 
-#### Antes: Patrón Singleton
+#### Before: Singleton Pattern
 ```typescript
 // src/modules/users/repositories/database/users.dataSource.ts
 export default class UsersDataSources {
@@ -434,7 +434,7 @@ export default class UsersDataSources {
 }
 ```
 
-#### Después: TSyringe DI
+#### After: TSyringe DI
 ```typescript
 // src/modules/users/repositories/database/users.dataSource.ts
 import { singleton } from 'tsyringe'
@@ -449,7 +449,7 @@ export default class UsersDataSources {
 }
 ```
 
-#### Servicio Consumidor - Antes
+#### Consumer Service - Before
 ```typescript
 // src/modules/users/services/users.services.ts
 export default class UsersServices {
@@ -468,7 +468,7 @@ export default class UsersServices {
 }
 ```
 
-#### Servicio Consumidor - Después
+#### Consumer Service - After
 ```typescript
 // src/modules/users/services/users.services.ts
 import { injectable, inject } from 'tsyringe'
@@ -482,15 +482,15 @@ export default class UsersServices {
 }
 ```
 
-### D. Documentación a Generar
+### D. Documentation to Generate
 
-1. **`docs/DI-GUIDELINES.md`** - Guía para crear nuevos servicios con TSyringe
-2. **`docs/TESTING-WITH-DI.md`** - Cómo escribir tests con inyección de mocks
-3. **Actualización de `README.md`** - Sección de arquitectura
+1. **`docs/DI-GUIDELINES.md`** - Guide for creating new services with TSyringe
+2. **`docs/TESTING-WITH-DI.md`** - How to write tests with injected mocks
+3. **README update** - Architecture section
 
-### E. Guía de Testing (Preview)
+### E. Testing Guide (Preview)
 
-#### Antes: jest.mock()
+#### Before: jest.mock()
 ```typescript
 jest.mock('../../repositories/openai/openai.repository', () => ({
   __esModule: true,
@@ -502,7 +502,7 @@ jest.mock('../../repositories/openai/openai.repository', () => ({
 const service = ConversationsServices.getInstance()
 ```
 
-#### Después: Inyección directa
+#### After: Direct Injection
 ```typescript
 const mockAIRepo = { chatCompletion: jest.fn() }
 const mockRedisRepo = { getConversationMessages: jest.fn() }
@@ -510,21 +510,21 @@ const mockRedisRepo = { getConversationMessages: jest.fn() }
 const service = new ConversationsServices(
   mockAIRepo as any,
   mockRedisRepo as any,
-  // ... otros mocks
+  // ... other mocks
 )
 ```
 
 ---
 
-## Apéndice: Archivos de Referencia
+## Appendix: Reference Files
 
-### Estructura de Carpetas Actual
+### Current Folder Structure
 ```
 src/
-├── app.ts                          # Composition Root actual
+├── app.ts                          # Current Composition Root
 ├── index.ts                        # Entry point
 ├── config/
-│   ├── redisConfig.ts              # Singleton RedisConfig
+│   ├── redisConfig.ts              # RedisConfig singleton
 │   ├── socketConfig.ts             # Static IoServer
 │   ├── slackConfig.ts              # connectionSlackApp
 │   └── ormconfig.ts                # TypeORM DataSource
@@ -535,7 +535,7 @@ src/
 │   │   ├── repositories/database/
 │   │   ├── services/
 │   │   ├── shared/
-│   │   └── utils/cronJob.ts        # Cron job con getInstance()
+│   │   └── utils/cronJob.ts        # Cron job with getInstance()
 │   ├── conversations/
 │   │   ├── controller/
 │   │   ├── repositories/
@@ -566,30 +566,30 @@ src/
 │   └── constants/
 ├── shared/
 │   ├── middleware/
-│   │   ├── auth.ts                 # Decoradores con getInstance()
+│   │   ├── auth.ts                 # Decorators with getInstance()
 │   │   └── errors.ts
 │   ├── modules/
-│   │   └── genericController.ts    # Base class para controladores
+│   │   └── genericController.ts    # Base class for controllers
 │   ├── interfaces/
 │   └── utils/
 └── tests/
     └── setup.ts
 ```
 
-### Configuración tsconfig.json Actual
+### Current tsconfig.json Configuration
 ```json
 {
   "compilerOptions": {
-    "emitDecoratorMetadata": true,    // ✅ Ya habilitado
-    "experimentalDecorators": true,   // ✅ Ya habilitado
+    "emitDecoratorMetadata": true,    // ✅ Already enabled
+    "experimentalDecorators": true,   // ✅ Already enabled
     // ...
   }
 }
 ```
 
-### Dependencia reflect-metadata
+### reflect-metadata Dependency
 ```json
-// package.json - ✅ Ya instalada
+// package.json - ✅ Already installed
 {
   "dependencies": {
     "reflect-metadata": "^0.1.13"
@@ -599,4 +599,4 @@ src/
 
 ---
 
-**Fin del Documento - Esperando Confirmación para FASE 3**
+**End of Document - Waiting for Confirmation for PHASE 3**

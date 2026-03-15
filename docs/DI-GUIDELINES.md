@@ -1,47 +1,47 @@
-# Guía de Inyección de Dependencias con TSyringe
+# Dependency Injection Guide with TSyringe
 
-Este documento describe cómo utilizar el patrón de Inyección de Dependencias (DI) en este proyecto usando **TSyringe**.
+This document describes how to use the Dependency Injection (DI) pattern in this project using **TSyringe**.
 
-> **Nota:** Este documento se aplica después de completar la migración descrita en `DI-MIGRATION-PLAN.md`.
+> **Note:** This document applies after completing the migration described in `DI-MIGRATION-PLAN.md`.
 
-## Tabla de Contenidos
+## Table of Contents
 
-1. [Principios Básicos](#principios-básicos)
-2. [Configuración Inicial](#configuración-inicial)
-3. [Decoradores Disponibles](#decoradores-disponibles)
-4. [Crear un Nuevo Repositorio](#crear-un-nuevo-repositorio)
-5. [Crear un Nuevo Servicio](#crear-un-nuevo-servicio)
-6. [Crear un Nuevo Controlador](#crear-un-nuevo-controlador)
-7. [Patrones Comunes](#patrones-comunes)
-8. [Testing con DI](#testing-con-di)
-9. [Anti-patrones a Evitar](#anti-patrones-a-evitar)
-
----
-
-## Principios Básicos
-
-### ¿Qué es Inyección de Dependencias?
-
-La Inyección de Dependencias es un patrón de diseño donde las dependencias de una clase son proporcionadas externamente en lugar de ser creadas internamente. Esto mejora:
-
-- **Testabilidad:** Fácil de inyectar mocks para testing
-- **Mantenibilidad:** Cambios en dependencias no requieren modificar consumidores
-- **Desacoplamiento:** Las clases no conocen cómo se crean sus dependencias
-
-### Reglas del Proyecto
-
-1. **Usa inyección por constructor exclusivamente**
-2. **Nunca uses `getInstance()` en código nuevo**
-3. **Usa `container.resolve()` solo en el Composition Root (`app.ts`) o casos límite documentados**
-4. **Los repositorios son `@singleton()`**
-5. **Los servicios son `@injectable()`**
-6. **Los controladores son `@injectable()`**
+1. [Basic Principles](#basic-principles)
+2. [Initial Configuration](#initial-configuration)
+3. [Available Decorators](#available-decorators)
+4. [Create a New Repository](#create-a-new-repository)
+5. [Create a New Service](#create-a-new-service)
+6. [Create a New Controller](#create-a-new-controller)
+7. [Common Patterns](#common-patterns)
+8. [Testing with DI](#testing-with-di)
+9. [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
 
 ---
 
-## Configuración Inicial
+## Basic Principles
 
-### Requisitos en tsconfig.json
+### What is Dependency Injection?
+
+Dependency Injection is a design pattern where a class's dependencies are provided externally instead of being created internally. This improves:
+
+- **Testability:** Easy to inject mocks for testing
+- **Maintainability:** Dependency changes don't require modifying consumers
+- **Decoupling:** Classes do not know how their dependencies are created
+
+### Project Rules
+
+1. **Use constructor injection exclusively**
+2. **Never use `getInstance()` in new code**
+3. **Use `container.resolve()` only in the Composition Root (`app.ts`) or documented edge cases**
+4. **Repositories are `@singleton()`**
+5. **Services are `@injectable()`**
+6. **Controllers are `@injectable()`**
+
+---
+
+## Initial Configuration
+
+### Requirements in tsconfig.json
 
 ```json
 {
@@ -52,13 +52,13 @@ La Inyección de Dependencias es un patrón de diseño donde las dependencias de
 }
 ```
 
-### Import en Entry Point
+### Import in the Entry Point
 
-El archivo `src/index.ts` debe importar `reflect-metadata` antes de cualquier otra cosa:
+The `src/index.ts` file must import `reflect-metadata` before anything else:
 
 ```typescript
 import 'reflect-metadata'
-import './di-container' // Registros del contenedor
+import './di-container' // Container registrations
 import App from './app'
 
 const app = new App()
@@ -67,46 +67,46 @@ void app.start()
 
 ---
 
-## Decoradores Disponibles
+## Available Decorators
 
 ### `@singleton()`
 
-Registra la clase como singleton. La misma instancia se usa en toda la aplicación.
+Registers the class as a singleton. The same instance is used throughout the application.
 
 ```typescript
 import { singleton } from 'tsyringe'
 
 @singleton()
 export default class UsersDataSource {
-  // Una sola instancia para toda la app
+  // A single instance for the whole app
 }
 ```
 
-**Usar para:**
-- Repositorios de base de datos
-- Repositorios de Redis
-- Clientes de APIs externas
+**Use for:**
+- Database repositories
+- Redis repositories
+- External API clients
 
 ### `@injectable()`
 
-Marca la clase como inyectable. Se crea una nueva instancia por cada resolución (a menos que se registre explícitamente como singleton).
+Marks the class as injectable. A new instance is created for each resolution (unless explicitly registered as a singleton).
 
 ```typescript
 import { injectable } from 'tsyringe'
 
 @injectable()
 export default class UsersServices {
-  // Nueva instancia por cada resolución
+  // New instance per resolution
 }
 ```
 
-**Usar para:**
-- Servicios de negocio
-- Controladores
+**Use for:**
+- Business services
+- Controllers
 
 ### `@inject(token)`
 
-Especifica qué token usar para resolver una dependencia.
+Specifies which token to use to resolve a dependency.
 
 ```typescript
 import { injectable, inject } from 'tsyringe'
@@ -121,7 +121,7 @@ export default class MyService {
 
 ### `@delay(() => Class)`
 
-Resuelve dependencias circulares usando carga diferida.
+Resolves circular dependencies using lazy loading.
 
 ```typescript
 import { injectable, inject, delay } from 'tsyringe'
@@ -136,11 +136,11 @@ export default class ServiceA {
 
 ---
 
-## Crear un Nuevo Repositorio
+## Create a New Repository
 
-Los repositorios son la capa de acceso a datos (BD, Redis, APIs externas).
+Repositories are the data access layer (DB, Redis, external APIs).
 
-### Template: Repository de Base de Datos
+### Template: Database Repository
 
 > **Naming Convention:** Replace `{module}` with your module name. For example, if creating a repository for the "products" module, the path would be `src/modules/products/repositories/database/products.dataSource.ts`.
 
@@ -180,7 +180,7 @@ export default class MyDataSource {
 }
 ```
 
-### Template: Repository de Redis
+### Template: Redis Repository
 
 ```typescript
 // src/modules/{module}/repositories/redis/{module}.redis.ts
@@ -205,7 +205,7 @@ export default class MyRedisRepository {
 }
 ```
 
-### Template: Repository de API Externa
+### Template: External API Repository
 
 > **Naming Convention:** Replace `{api}` with the external API name. Examples: `openai.repository.ts`, `gemini.repository.ts`, `stripe.repository.ts`.
 
@@ -243,11 +243,11 @@ export default class MyApiRepository {
 
 ---
 
-## Crear un Nuevo Servicio
+## Create a New Service
 
-Los servicios contienen la lógica de negocio.
+Services contain the business logic.
 
-### Template: Servicio Básico
+### Template: Basic Service
 
 ```typescript
 // src/modules/{module}/services/{module}.services.ts
@@ -274,7 +274,7 @@ export default class MyServices {
       return { data: result }
     } catch (error) {
       log.error({ err: error }, 'create failed')
-      return { error: 'Error al crear la entidad' }
+      return { error: 'Error creating the entity' }
     }
   }
 
@@ -283,19 +283,19 @@ export default class MyServices {
       const result = await this.dataSource.findById(id)
       
       if (!result) {
-        return { error: 'Entidad no encontrada' }
+        return { error: 'Entity not found' }
       }
       
       return { data: result }
     } catch (error) {
       log.error({ err: error, id }, 'getById failed')
-      return { error: 'Error al obtener la entidad' }
+      return { error: 'Error retrieving the entity' }
     }
   }
 }
 ```
 
-### Template: Servicio con Múltiples Dependencias
+### Template: Service with Multiple Dependencies
 
 ```typescript
 // src/modules/{module}/services/{module}.services.ts
@@ -313,7 +313,7 @@ export default class MyServices {
   ) {}
 
   async complexOperation(id: number): Promise<any> {
-    // Usa las dependencias inyectadas
+    // Use injected dependencies
     const cached = await this.redisRepo.get(`entity:${id}`)
     
     if (cached) {
@@ -332,11 +332,11 @@ export default class MyServices {
 
 ---
 
-## Crear un Nuevo Controlador
+## Create a New Controller
 
-Los controladores manejan las peticiones HTTP.
+Controllers handle HTTP requests.
 
-### Template: Controlador Web
+### Template: Web Controller
 
 ```typescript
 // src/modules/{module}/controller/{module}Web.controller.ts
@@ -454,26 +454,26 @@ export default class MyWebController extends GenericController {
 
 ---
 
-## Patrones Comunes
+## Common Patterns
 
-### Registrar en el Contenedor
+### Register in the Container
 
-Para registros especiales (interfaces, tokens, factories), edita `src/di-container.ts`:
+For special registrations (interfaces, tokens, factories), edit `src/di-container.ts`:
 
 ```typescript
 // src/di-container.ts
 import { container } from 'tsyringe'
 
-// Registro básico (automático con decoradores)
-// No necesitas registrar clases decoradas con @singleton() o @injectable()
+// Basic registration (automatic with decorators)
+// You do not need to register classes decorated with @singleton() or @injectable()
 
-// Registro con token personalizado
+// Registration with custom token
 container.register('AIRepository', { useClass: GeminiRepository })
 
-// Registro de valor
+// Value registration
 container.register('API_KEY', { useValue: process.env.API_KEY })
 
-// Registro con factory
+// Factory registration
 container.register('DatabaseConnection', {
   useFactory: () => {
     return connectionSource.isInitialized ? connectionSource : null
@@ -481,7 +481,7 @@ container.register('DatabaseConnection', {
 })
 ```
 
-### Resolver desde el Composition Root
+### Resolve from the Composition Root
 
 ```typescript
 // src/app.ts
@@ -493,20 +493,20 @@ export default class App {
   private alertsController: AlertsWebController
 
   constructor() {
-    // Resolver desde el contenedor
+    // Resolve from the container
     this.usersController = container.resolve(UsersController)
     this.alertsController = container.resolve(AlertsWebController)
     
-    // ... resto de la inicialización
+    // ... rest of the initialization
   }
 }
 ```
 
 ---
 
-## Testing con DI
+## Testing with DI
 
-### Crear Tests con Mocks Inyectados
+### Create Tests with Injected Mocks
 
 ```typescript
 // src/modules/my/services/__tests__/my.services.test.ts
@@ -518,7 +518,7 @@ describe('MyServices', () => {
   let mockDataSource: jest.Mocked<MyDataSource>
 
   beforeEach(() => {
-    // Crear mock
+    // Create mock
     mockDataSource = {
       findById: jest.fn(),
       create: jest.fn(),
@@ -526,7 +526,7 @@ describe('MyServices', () => {
       delete: jest.fn(),
     } as any
 
-    // Inyectar mock en constructor
+    // Inject mock into constructor
     service = new MyServices(mockDataSource)
   })
 
@@ -550,13 +550,13 @@ describe('MyServices', () => {
 
       const result = await service.getById(999)
 
-      expect(result.error).toBe('Entidad no encontrada')
+      expect(result.error).toBe('Entity not found')
     })
   })
 })
 ```
 
-### Tests de Integración con Contenedor
+### Integration Tests with the Container
 
 ```typescript
 // src/modules/my/services/__tests__/my.services.integration.test.ts
@@ -566,10 +566,10 @@ import MyServices from '../my.services'
 
 describe('MyServices Integration', () => {
   beforeEach(() => {
-    // Crear child container para aislamiento
+    // Create child container for isolation
     container.clearInstances()
     
-    // Registrar mocks
+    // Register mocks
     container.register(MyDataSource, {
       useValue: {
         findById: jest.fn().mockResolvedValue({ id: 1 }),
@@ -586,12 +586,12 @@ describe('MyServices Integration', () => {
 
 ---
 
-## Anti-patrones a Evitar
+## Anti-Patterns to Avoid
 
-### ❌ NO: Usar getInstance()
+### ❌ NO: Use getInstance()
 
 ```typescript
-// INCORRECTO
+// INCORRECT
 export default class MyServices {
   private static instance: MyServices
   
@@ -602,10 +602,10 @@ export default class MyServices {
 }
 ```
 
-### ❌ NO: Usar container.resolve() dentro de clases de negocio
+### ❌ NO: Use container.resolve() inside business classes
 
 ```typescript
-// INCORRECTO
+// INCORRECT
 @injectable()
 export default class MyServices {
   doSomething() {
@@ -615,14 +615,14 @@ export default class MyServices {
 }
 ```
 
-### ✅ SÍ: Inyectar dependencias en constructor
+### ✅ YES: Inject dependencies in the constructor
 
 ```typescript
-// CORRECTO
+// CORRECT
 @injectable()
 export default class MyServices {
   constructor(
-    private otherService: OtherService // ✅ Inyección por constructor
+    private otherService: OtherService // ✅ Constructor injection
   ) {}
 
   doSomething() {
@@ -631,31 +631,31 @@ export default class MyServices {
 }
 ```
 
-### ❌ NO: Crear instancias manualmente
+### ❌ NO: Create instances manually
 
 ```typescript
-// INCORRECTO
+// INCORRECT
 @injectable()
 export default class MyServices {
-  private dataSource = new MyDataSource() // ❌ Instancia manual
+  private dataSource = new MyDataSource() // ❌ Manual instance
 }
 ```
 
-### ✅ SÍ: Dejar que TSyringe resuelva dependencias
+### ✅ YES: Let TSyringe resolve dependencies
 
 ```typescript
-// CORRECTO
+// CORRECT
 @injectable()
 export default class MyServices {
   constructor(
-    private dataSource: MyDataSource // ✅ TSyringe resuelve automáticamente
+    private dataSource: MyDataSource // ✅ TSyringe resolves automatically
   ) {}
 }
 ```
 
 ---
 
-## Referencias
+## References
 
 - [TSyringe Documentation](https://github.com/microsoft/tsyringe)
 - [Dependency Injection Principles](https://en.wikipedia.org/wiki/Dependency_injection)
