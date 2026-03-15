@@ -44,4 +44,7 @@ export class Users extends BaseEntity {
 
   @Column({ default: false })
   enabled: boolean
+
+  @Column({ default: null, nullable: true })
+  atlassianEmail: string
 }

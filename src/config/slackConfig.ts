@@ -19,5 +19,8 @@ export const slackListenersKey = {
 
   generateImages: /^img?\b/i,
 
+  jiraMe: /^\.jira\s+me\b/i,
+  bitbucketMe: /^\.bb\s+me\b/i,
+
   conversationFlow: /^(?!img|cb_clean|cb_show|cb\b)/i,
 }

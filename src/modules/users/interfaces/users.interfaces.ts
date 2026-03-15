@@ -19,4 +19,6 @@ export interface IUsers {
 
   image?: string
   enabled: boolean
+
+  atlassianEmail?: string
 }

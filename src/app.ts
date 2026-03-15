@@ -38,6 +38,8 @@ import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
 import SystemWebController from './modules/system/controller/systemWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
+import JiraController from './modules/jira/controller/jira.controller'
+import BitbucketController from './modules/bitbucket/controller/bitbucket.controller'
 
 dotenv.config()
 
@@ -66,6 +68,9 @@ export default class App {
   private summaryWebController: SummaryWebController
   private systemWebController: SystemWebController
 
+  private jiraController: JiraController
+  private bitbucketController: BitbucketController
+
   constructor() {
     // Controllers Instances
     this.usersController = UsersController.getInstance()
@@ -84,6 +89,9 @@ export default class App {
     this.textToSpeechWebController = TextToSpeechWebController.getInstance()
     this.summaryWebController = SummaryWebController.getInstance()
     this.systemWebController = SystemWebController.getInstance()
+
+    this.jiraController = JiraController.getInstance()
+    this.bitbucketController = BitbucketController.getInstance()
 
     // Express
     this.app = express()
@@ -160,6 +168,16 @@ export default class App {
     this.slackApp.message(
       slackListenersKey.generateImages,
       safeHandler(this.imagesController.generateImages)
+    )
+
+    this.slackApp.message(
+      slackListenersKey.jiraMe,
+      safeHandler(this.jiraController.registerAtlassianEmail)
+    )
+
+    this.slackApp.message(
+      slackListenersKey.bitbucketMe,
+      safeHandler(this.bitbucketController.registerAtlassianEmail)
     )
 
     this.slackApp.message(
