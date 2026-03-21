@@ -19,6 +19,7 @@ import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
 import LinksServices from '../../links/services/links.services'
 import ImagesServices from '../../images/services/images.services'
+import TranslateServices from '../../translate/services/translate.services'
 import SearchRepository from '../repositories/search/search.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
@@ -57,6 +58,7 @@ export default class MessageProcessor {
   private notesServices: NotesServices
   private linksServices: LinksServices
   private imagesServices: ImagesServices
+  private translateServices: TranslateServices
   private defaultSnoozeMinutes = 10
 
   private constructor(aiToUse = AIRepositoryType.OPENAI) {
@@ -67,6 +69,7 @@ export default class MessageProcessor {
     this.notesServices = NotesServices.getInstance()
     this.linksServices = LinksServices.getInstance()
     this.imagesServices = ImagesServices.getInstance()
+    this.translateServices = TranslateServices.getInstance()
   }
 
   static getInstance(): MessageProcessor {
@@ -917,6 +920,38 @@ export default class MessageProcessor {
         break
       }
 
+      case AssistantsVariables.TRANSLATE: {
+        const translateValue = (assistantMessage.value as string) || ''
+        const firstSpace = translateValue.indexOf(' ')
+        if (firstSpace === -1 || !translateValue.trim()) {
+          throw new Error(
+            'Uso: .translate <idioma> <texto> o .tr <idioma> <texto>'
+          )
+        }
+
+        const targetLang = translateValue.substring(0, firstSpace).trim()
+        const textToTranslate = translateValue.substring(firstSpace + 1).trim()
+
+        if (!textToTranslate) {
+          throw new Error(
+            'Uso: .translate <idioma> <texto> o .tr <idioma> <texto>'
+          )
+        }
+
+        const translateResult = await this.translateServices.translate(textToTranslate, targetLang)
+
+        if (translateResult.error) {
+          throw new Error(translateResult.error)
+        }
+
+        responseMessage = {
+          role: roleTypes.assistant,
+          content: translateResult.data.translatedText,
+          provider: ConversationProviders.ASSISTANT,
+        }
+        break
+      }
+
       default:
         responseMessage = {
           role: roleTypes.assistant,
@@ -1293,6 +1328,19 @@ export default class MessageProcessor {
           ]
           const messageResponse = await this.aiRepository.chatCompletion(promptGenerated as any)
           return messageResponse
+        }
+        case 'translate': {
+          if (!parsed.text || !parsed.targetLang) return null
+          const translateResult = await this.translateServices.translate(
+            parsed.text,
+            parsed.targetLang
+          )
+          if (translateResult.error) return null
+          return {
+            role: roleTypes.assistant,
+            content: translateResult.data.translatedText,
+            provider: ConversationProviders.ASSISTANT,
+          }
         }
         default:
           return {
