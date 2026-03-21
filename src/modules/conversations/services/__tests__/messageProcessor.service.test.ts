@@ -36,6 +36,10 @@ const imagesServicesMock = {
   generateImageForAssistant: jest.fn(),
 }
 
+const translateServicesMock = {
+  translate: jest.fn(),
+}
+
 jest.mock('../../repositories/redis/conversations.redis', () => ({
   RedisRepository: {
     getInstance: () => redisRepositoryMock,
@@ -88,6 +92,17 @@ jest.mock('../../../images/services/images.services', () => ({
   __esModule: true,
   default: {
     getInstance: () => imagesServicesMock,
+  },
+}))
+
+const translateServicesMock = {
+  translate: jest.fn(),
+}
+
+jest.mock('../../../translate/services/translate.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => translateServicesMock,
   },
 }))
 
@@ -436,5 +451,79 @@ describe('MessageProcessor - onProgress callback', () => {
     )
 
     expect(onProgress).not.toHaveBeenCalled()
+  })
+})
+
+describe('MessageProcessor - translate handling', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = MessageProcessor.getInstance()
+  })
+
+  it('translates text successfully with .translate command', async () => {
+    translateServicesMock.translate.mockResolvedValue({
+      data: { translatedText: 'Hola mundo' },
+    })
+
+    const result = await processor.processAssistantMessage('.translate Spanish Hello world', 99)
+
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'Spanish')
+    expect(result.response.content).toBe('Hola mundo')
+  })
+
+  it('translates text successfully with .tr shorthand', async () => {
+    translateServicesMock.translate.mockResolvedValue({
+      data: { translatedText: 'Bonjour' },
+    })
+
+    const result = await processor.processAssistantMessage('.tr French Hello', 99)
+
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello', 'French')
+    expect(result.response.content).toBe('Bonjour')
+  })
+
+  it('throws a usage error when no language and text provided', async () => {
+    await expect(
+      processor.processAssistantMessage('.translate', 99)
+    ).rejects.toThrow('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
+  })
+
+  it('throws a usage error when only language is provided without text', async () => {
+    await expect(
+      processor.processAssistantMessage('.translate Spanish', 99)
+    ).rejects.toThrow('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
+  })
+
+  it('throws a validation error when targetLang contains invalid characters', async () => {
+    await expect(
+      processor.processAssistantMessage('.translate Spa\nnish Hello world', 99)
+    ).rejects.toThrow('Parámetros inválidos:')
+  })
+
+  it('throws a validation error when targetLang exceeds max length', async () => {
+    const longLang = 'A'.repeat(51)
+    await expect(
+      processor.processAssistantMessage(`.translate ${longLang} Hello world`, 99)
+    ).rejects.toThrow('Parámetros inválidos:')
+  })
+
+  it('throws a validation error when text exceeds max length of 5000 characters', async () => {
+    const longText = 'a'.repeat(5001)
+    await expect(
+      processor.processAssistantMessage(`.translate Spanish ${longText}`, 99)
+    ).rejects.toThrow('Parámetros inválidos:')
+  })
+
+  it('throws an error when translate service returns an error', async () => {
+    translateServicesMock.translate.mockResolvedValue({
+      error: 'Translation failed',
+    })
+
+    await expect(
+      processor.processAssistantMessage('.translate Spanish Hello world', 99)
+    ).rejects.toThrow('Translation failed')
   })
 })
