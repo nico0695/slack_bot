@@ -65,8 +65,8 @@ jest.mock('../../../alerts/services/alerts.services', () => ({
 
 jest.mock('../../../tasks/services/tasks.services', () => ({
   __esModule: true,
-  default: {
-    getInstance: () => tasksServicesMock,
+  default: class MockTasksServices {
+    constructor() { Object.assign(this, tasksServicesMock) }
   },
 }))
 
@@ -79,8 +79,8 @@ jest.mock('../../../notes/services/notes.services', () => ({
 
 jest.mock('../../../links/services/links.services', () => ({
   __esModule: true,
-  default: {
-    getInstance: () => linksServicesMock,
+  default: class MockLinksServices {
+    constructor() { Object.assign(this, linksServicesMock) }
   },
 }))
 

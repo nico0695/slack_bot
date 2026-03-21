@@ -42,7 +42,7 @@ describe('ConstantsDataSources', () => {
   beforeEach(() => {
     jest.resetAllMocks()
     constantsMocks.instances.length = 0
-    repository = ConstantsDataSources.getInstance()
+    repository = new ConstantsDataSources()
   })
 
   it('creates a constant and persists it', async () => {

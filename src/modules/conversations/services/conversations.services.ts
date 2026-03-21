@@ -73,9 +73,9 @@ export default class ConversationsServices {
 
     this.usersServices = UsersServices.getInstance()
     this.alertsServices = AlertsServices.getInstance()
-    this.tasksServices = TasksServices.getInstance()
+    this.tasksServices = container.resolve(TasksServices)
     this.notesServices = container.resolve(NotesServices)
-    this.linksServices = LinksServices.getInstance()
+    this.linksServices = container.resolve(LinksServices)
   }
 
   static getInstance(): ConversationsServices {

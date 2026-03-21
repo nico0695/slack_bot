@@ -1,3 +1,5 @@
+import { injectable } from 'tsyringe'
+
 import TransformersRepository from '../repositories/transformers/transformers.repository'
 
 import { GenericResponse } from '../../../shared/interfaces/services'
@@ -5,23 +7,9 @@ import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('summary.service')
 
+@injectable()
 export default class SummaryServices {
-  private static instance: SummaryServices
-
-  private transformersRepository: TransformersRepository
-
-  private constructor() {
-    this.transformersRepository = TransformersRepository.getInstance()
-  }
-
-  static getInstance(): SummaryServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new SummaryServices()
-    return this.instance
-  }
+  constructor(private transformersRepository: TransformersRepository) {}
 
   generateSumary = async (text: string): Promise<GenericResponse<string>> => {
     const res = new GenericResponse<string>()

@@ -65,9 +65,9 @@ export default class MessageProcessor {
     this.aiRepository = AIRepositoryByType[aiToUse].getInstance()
     this.redisRepository = RedisRepository.getInstance()
     this.alertsServices = AlertsServices.getInstance()
-    this.tasksServices = TasksServices.getInstance()
+    this.tasksServices = container.resolve(TasksServices)
     this.notesServices = container.resolve(NotesServices)
-    this.linksServices = LinksServices.getInstance()
+    this.linksServices = container.resolve(LinksServices)
     this.imagesServices = ImagesServices.getInstance()
   }
 

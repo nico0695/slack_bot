@@ -39,6 +39,7 @@ import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
 import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
 import SystemWebController from './modules/system/controller/systemWeb.controller'
+import ConstantsController from './modules/constants/controller/constants.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
 dotenv.config()
@@ -60,6 +61,7 @@ export default class App {
   private tasksWebController: TasksWebController
   private notesWebController: NotesWebController
   private linksWebController: LinksWebController
+  private constantsController: ConstantsController
 
   private imagesController: ImagesController
   private imagesWebController: ImagesWebController
@@ -76,16 +78,17 @@ export default class App {
     this.conversationWebController = ConversationsWebController.getInstance()
 
     this.alertsWebController = AlertsWebController.getInstance()
-    this.tasksWebController = TasksWebController.getInstance()
+    this.tasksWebController = container.resolve(TasksWebController)
     this.notesWebController = container.resolve(NotesWebController)
-    this.linksWebController = LinksWebController.getInstance()
+    this.linksWebController = container.resolve(LinksWebController)
+    this.constantsController = container.resolve(ConstantsController)
 
     this.imagesController = ImagesController.getInstance()
     this.imagesWebController = ImagesWebController.getInstance()
 
-    this.textToSpeechWebController = TextToSpeechWebController.getInstance()
-    this.summaryWebController = SummaryWebController.getInstance()
-    this.systemWebController = SystemWebController.getInstance()
+    this.textToSpeechWebController = container.resolve(TextToSpeechWebController)
+    this.summaryWebController = container.resolve(SummaryWebController)
+    this.systemWebController = container.resolve(SystemWebController)
 
     // Express
     this.app = express()
@@ -121,6 +124,7 @@ export default class App {
     this.app.use('/tasks', [this.tasksWebController.router])
     this.app.use('/notes', [this.notesWebController.router])
     this.app.use('/links', [this.linksWebController.router])
+    this.app.use('/constants', [this.constantsController.router])
     this.app.use('/images', [this.imagesWebController.router])
     this.app.use('/text-to-speech', [this.textToSpeechWebController.router])
     this.app.use('/summary', [this.summaryWebController.router])

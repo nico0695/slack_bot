@@ -1,3 +1,5 @@
+import { injectable } from 'tsyringe'
+
 import { Tasks } from '../../../entities/tasks'
 import { GenericResponse } from '../../../shared/interfaces/services'
 
@@ -10,23 +12,9 @@ import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('tasks.service')
 
+@injectable()
 export default class TasksServices {
-  private static instance: TasksServices
-
-  private tasksDataSource: TasksDataSource
-
-  private constructor() {
-    this.tasksDataSource = TasksDataSource.getInstance()
-  }
-
-  static getInstance(): TasksServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new TasksServices()
-    return this.instance
-  }
+  constructor(private tasksDataSource: TasksDataSource) {}
 
   /**
    * Create task with user assistant data

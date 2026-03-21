@@ -1,23 +1,14 @@
 import { FindOptionsWhere, IsNull } from 'typeorm'
+import { singleton } from 'tsyringe'
 
 import { Tasks } from '../../../../entities/tasks'
 import { Users } from '../../../../entities/users'
 
 import { ITask } from '../../shared/interfaces/tasks.interfaces'
 
+@singleton()
 export default class TasksDataSource {
-  private static instance: TasksDataSource
-
-  private constructor() {}
-
-  static getInstance(): TasksDataSource {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new TasksDataSource()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Save task in database
