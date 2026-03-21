@@ -1,7 +1,7 @@
 import webpush from 'web-push'
 
 import { createModuleLogger } from '../../../config/logger'
-import { connectionSlackApp } from '../../../config/slackConfig'
+import { connectionSlackApp as slackApp } from '../../../config/slackConfig'
 import AlertsServices from '../services/alerts.services'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
@@ -14,7 +14,6 @@ export const alertCronJob = async (): Promise<void> => {
   try {
     const startTime = Date.now()
     const alertsServices = AlertsServices.getInstance()
-    const slackApp = connectionSlackApp
 
     const alerts = await alertsServices.getAlertsToNotify()
 

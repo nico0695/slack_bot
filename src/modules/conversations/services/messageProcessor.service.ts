@@ -1,3 +1,5 @@
+import { container } from 'tsyringe'
+
 import { createModuleLogger } from '../../../config/logger'
 import {
   IConversation,
@@ -64,7 +66,7 @@ export default class MessageProcessor {
     this.redisRepository = RedisRepository.getInstance()
     this.alertsServices = AlertsServices.getInstance()
     this.tasksServices = TasksServices.getInstance()
-    this.notesServices = NotesServices.getInstance()
+    this.notesServices = container.resolve(NotesServices)
     this.linksServices = LinksServices.getInstance()
     this.imagesServices = ImagesServices.getInstance()
   }

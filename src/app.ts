@@ -1,3 +1,5 @@
+import { container } from 'tsyringe'
+
 import express from 'express'
 import cors from 'cors'
 import pinoHttp from 'pino-http'
@@ -75,7 +77,7 @@ export default class App {
 
     this.alertsWebController = AlertsWebController.getInstance()
     this.tasksWebController = TasksWebController.getInstance()
-    this.notesWebController = NotesWebController.getInstance()
+    this.notesWebController = container.resolve(NotesWebController)
     this.linksWebController = LinksWebController.getInstance()
 
     this.imagesController = ImagesController.getInstance()

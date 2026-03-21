@@ -22,15 +22,8 @@ const notesDataSourceInstance = {
   deleteNote: deleteNoteMock,
 }
 
-jest.mock('../../repositories/database/notes.dataSource', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => notesDataSourceInstance,
-  },
-}))
-
 describe('NotesServices', () => {
-  const services = NotesServices.getInstance()
+  const services = new NotesServices(notesDataSourceInstance as any)
 
   beforeEach(() => {
     jest.clearAllMocks()

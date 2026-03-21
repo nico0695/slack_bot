@@ -1,3 +1,5 @@
+import { container } from 'tsyringe'
+
 import { createModuleLogger } from '../../../config/logger'
 import { GlobalConstants } from '../../../shared/constants/global'
 import { IoServer } from '../../../config/socketConfig'
@@ -72,7 +74,7 @@ export default class ConversationsServices {
     this.usersServices = UsersServices.getInstance()
     this.alertsServices = AlertsServices.getInstance()
     this.tasksServices = TasksServices.getInstance()
-    this.notesServices = NotesServices.getInstance()
+    this.notesServices = container.resolve(NotesServices)
     this.linksServices = LinksServices.getInstance()
   }
 
