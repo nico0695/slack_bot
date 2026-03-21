@@ -61,7 +61,7 @@ describe('TranslateServices', () => {
 
       const result = await services.translate('Hola mundo', 'english')
 
-      expect(result).toEqual({ error: 'Error al traducir el texto' })
+      expect(result).toEqual({ error: 'No se recibió respuesta del servicio de traducción' })
     })
 
     it('returns error when repository throws', async () => {
@@ -69,7 +69,7 @@ describe('TranslateServices', () => {
 
       const result = await services.translate('Hola mundo', 'english')
 
-      expect(result).toEqual({ error: 'Error al traducir el texto' })
+      expect(result).toEqual({ error: 'Error inesperado al procesar la traducción' })
     })
 
     it('passes system prompt to repository', async () => {

@@ -12,7 +12,6 @@ export default class OpenaiTranslateRepository implements ITranslateRepository {
   private constructor() {
     const configuration = new Configuration({
       apiKey: process.env.OPENAI_API_KEY,
-      organization: 'org-dlzE8QUXcRrvBN096fSCdHBf',
     })
 
     this.openai = new OpenAIApi(configuration)

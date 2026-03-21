@@ -45,7 +45,7 @@ export default class TranslateServices {
       )
 
       if (!translatedText) {
-        return { error: 'Error al traducir el texto' }
+        return { error: 'No se recibió respuesta del servicio de traducción' }
       }
 
       log.info({ targetLang, textLength: text.length }, 'Translation completed')
@@ -58,7 +58,7 @@ export default class TranslateServices {
       }
     } catch (error) {
       log.error({ err: error }, 'translate failed')
-      return { error: 'Error al traducir el texto' }
+      return { error: 'Error inesperado al procesar la traducción' }
     }
   }
 }
