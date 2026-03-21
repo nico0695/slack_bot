@@ -36,6 +36,10 @@ const imagesServicesMock = {
   generateImageForAssistant: jest.fn(),
 }
 
+const translateServicesMock = {
+  translate: jest.fn(),
+}
+
 jest.mock('../../repositories/redis/conversations.redis', () => ({
   RedisRepository: {
     getInstance: () => redisRepositoryMock,
