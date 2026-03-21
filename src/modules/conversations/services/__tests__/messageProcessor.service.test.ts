@@ -36,6 +36,10 @@ const imagesServicesMock = {
   generateImageForAssistant: jest.fn(),
 }
 
+const translateServicesMock = {
+  translate: jest.fn(),
+}
+
 jest.mock('../../repositories/redis/conversations.redis', () => ({
   RedisRepository: {
     getInstance: () => redisRepositoryMock,
@@ -88,6 +92,13 @@ jest.mock('../../../images/services/images.services', () => ({
   __esModule: true,
   default: {
     getInstance: () => imagesServicesMock,
+  },
+}))
+
+jest.mock('../../../translate/services/translate.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => translateServicesMock,
   },
 }))
 
@@ -436,5 +447,83 @@ describe('MessageProcessor - onProgress callback', () => {
     )
 
     expect(onProgress).not.toHaveBeenCalled()
+  })
+})
+
+describe('MessageProcessor - intentFallbackRouter translate', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    alertsServicesMock.getAlertsByUserId.mockResolvedValue({ data: [] })
+    tasksServicesMock.getTasksByUserId.mockResolvedValue({ data: [] })
+    notesServicesMock.getNotesByUserId.mockResolvedValue({ data: [] })
+    linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
+    processor = MessageProcessor.getInstance()
+  })
+
+  it('returns translated text for valid translate intent', async () => {
+    aiRepositoryMock.chatCompletion.mockResolvedValueOnce({
+      content: '{"intent":"translate","targetLang":"english","text":"hola"}',
+    })
+    translateServicesMock.translate.mockResolvedValue({
+      data: { translatedText: 'hello', targetLang: 'english' },
+    })
+
+    const result = await processor.processAssistantMessage(
+      'translate hola to english',
+      99,
+      undefined,
+      false
+    )
+
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('hola', 'english')
+    expect(result.response?.content).toBe('hello')
+  })
+
+  it('returns null when text field is missing from translate intent', async () => {
+    aiRepositoryMock.chatCompletion.mockResolvedValueOnce({
+      content: '{"intent":"translate","targetLang":"english"}',
+    })
+
+    const result = await processor.processAssistantMessage(
+      'translate to english',
+      99,
+      undefined,
+      false
+    )
+
+    expect(translateServicesMock.translate).not.toHaveBeenCalled()
+    expect(result.response).toBeNull()
+  })
+
+  it('returns null when targetLang field is missing from translate intent', async () => {
+    aiRepositoryMock.chatCompletion.mockResolvedValueOnce({
+      content: '{"intent":"translate","text":"hola"}',
+    })
+
+    const result = await processor.processAssistantMessage('translate hola', 99, undefined, false)
+
+    expect(translateServicesMock.translate).not.toHaveBeenCalled()
+    expect(result.response).toBeNull()
+  })
+
+  it('returns null when translation service returns an error', async () => {
+    aiRepositoryMock.chatCompletion.mockResolvedValueOnce({
+      content: '{"intent":"translate","targetLang":"english","text":"hola"}',
+    })
+    translateServicesMock.translate.mockResolvedValue({
+      error: 'Translation service unavailable',
+    })
+
+    const result = await processor.processAssistantMessage(
+      'translate hola to english',
+      99,
+      undefined,
+      false
+    )
+
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('hola', 'english')
+    expect(result.response).toBeNull()
   })
 })
