@@ -95,6 +95,10 @@ jest.mock('../../../images/services/images.services', () => ({
   },
 }))
 
+const translateServicesMock = {
+  translate: jest.fn(),
+}
+
 jest.mock('../../../translate/services/translate.services', () => ({
   __esModule: true,
   default: {
@@ -459,58 +463,67 @@ describe('MessageProcessor - translate handling', () => {
     processor = MessageProcessor.getInstance()
   })
 
-  it('returns translated text for .translate <lang> <text>', async () => {
+  it('translates text successfully with .translate command', async () => {
     translateServicesMock.translate.mockResolvedValue({
-      data: { translatedText: 'Hola mundo', targetLang: 'spanish' },
+      data: { translatedText: 'Hola mundo' },
     })
 
-    const result = await processor.processAssistantMessage(
-      '.translate spanish Hello world',
-      99,
-      undefined,
-      false
-    )
+    const result = await processor.processAssistantMessage('.translate Spanish Hello world', 99)
 
-    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'spanish')
-    expect(result.response).toBeTruthy()
-    expect(result.response?.content).toBe('Hola mundo')
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'Spanish')
+    expect(result.response.content).toBe('Hola mundo')
   })
 
-  it('returns translated text for the .tr short alias', async () => {
+  it('translates text successfully with .tr shorthand', async () => {
     translateServicesMock.translate.mockResolvedValue({
-      data: { translatedText: 'Bonjour le monde', targetLang: 'french' },
+      data: { translatedText: 'Bonjour' },
     })
 
-    const result = await processor.processAssistantMessage(
-      '.tr french Hello world',
-      99,
-      undefined,
-      false
-    )
+    const result = await processor.processAssistantMessage('.tr French Hello', 99)
 
-    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'french')
-    expect(result.response?.content).toBe('Bonjour le monde')
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello', 'French')
+    expect(result.response.content).toBe('Bonjour')
   })
 
-  it('throws usage error when no arguments are provided', async () => {
+  it('throws a usage error when no language and text provided', async () => {
     await expect(
-      processor.processAssistantMessage('.translate', 99, undefined, false)
+      processor.processAssistantMessage('.translate', 99)
     ).rejects.toThrow('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
   })
 
-  it('throws usage error when only language is provided with no text', async () => {
+  it('throws a usage error when only language is provided without text', async () => {
     await expect(
-      processor.processAssistantMessage('.translate spanish', 99, undefined, false)
+      processor.processAssistantMessage('.translate Spanish', 99)
     ).rejects.toThrow('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
   })
 
-  it('throws the service error when translate returns an error', async () => {
+  it('throws a validation error when targetLang contains invalid characters', async () => {
+    await expect(
+      processor.processAssistantMessage('.translate Spa\nnish Hello world', 99)
+    ).rejects.toThrow('Parámetros inválidos:')
+  })
+
+  it('throws a validation error when targetLang exceeds max length', async () => {
+    const longLang = 'A'.repeat(51)
+    await expect(
+      processor.processAssistantMessage(`.translate ${longLang} Hello world`, 99)
+    ).rejects.toThrow('Parámetros inválidos:')
+  })
+
+  it('throws a validation error when text exceeds max length of 5000 characters', async () => {
+    const longText = 'a'.repeat(5001)
+    await expect(
+      processor.processAssistantMessage(`.translate Spanish ${longText}`, 99)
+    ).rejects.toThrow('Parámetros inválidos:')
+  })
+
+  it('throws an error when translate service returns an error', async () => {
     translateServicesMock.translate.mockResolvedValue({
-      error: 'Translation API unavailable',
+      error: 'Translation failed',
     })
 
     await expect(
-      processor.processAssistantMessage('.translate spanish Hello', 99, undefined, false)
-    ).rejects.toThrow('Translation API unavailable')
+      processor.processAssistantMessage('.translate Spanish Hello world', 99)
+    ).rejects.toThrow('Translation failed')
   })
 })
