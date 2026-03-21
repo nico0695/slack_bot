@@ -273,6 +273,7 @@ export const assistantPromptFlagsLite2 = `
   * \`alert.list\`, \`task.list\`, \`note.list\`, \`link.list\`, \`image.list\`: Listing items. Use \`tag\` or \`userFilter\` if specified.
   * \`question\`: General knowledge queries not requiring database actions.
   * \`search\`: Requests requiring real-time/external info.
+  * \`translate\`: Requests to translate text to a specific language. Fields: \`targetLang\` (Required, target language name), \`text\` (Required, the text to translate). Example: "Traducí esto al inglés: Hola mundo" -> {"intent":"translate","targetLang":"english","text":"Hola mundo"}
   ### CRITICAL PARSING LOGIC
   1.  **Date/Time Calculation**:
       * You act as a calendar engine.
@@ -326,6 +327,12 @@ export const assistantPromptFlagsLite2 = `
 
   input: "¿Cómo hago para reiniciar el router?"
   output: {"intent":"question","successMessage":"Respondo tu pregunta","errorMessage":""}
+
+  input: "Traducí esto al inglés: Hola mundo"
+  output: {"intent":"translate","targetLang":"english","text":"Hola mundo","successMessage":"Traduciendo al inglés","errorMessage":""}
+
+  input: "Translate to spanish: Hello world"
+  output: {"intent":"translate","targetLang":"spanish","text":"Hello world","successMessage":"Traduciendo al español","errorMessage":""}
 
   #IMPORTANT
   - All user-facing content must be in Spanish
