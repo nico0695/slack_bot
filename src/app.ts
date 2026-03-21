@@ -37,7 +37,6 @@ import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
 import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
 import SystemWebController from './modules/system/controller/systemWeb.controller'
-import TranslateController from './modules/translate/controller/translate.controller'
 import TranslateWebController from './modules/translate/controller/translateWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
@@ -67,7 +66,6 @@ export default class App {
   private textToSpeechWebController: TextToSpeechWebController
   private summaryWebController: SummaryWebController
   private systemWebController: SystemWebController
-  private translateController: TranslateController
   private translateWebController: TranslateWebController
 
   constructor() {
@@ -88,7 +86,6 @@ export default class App {
     this.textToSpeechWebController = TextToSpeechWebController.getInstance()
     this.summaryWebController = SummaryWebController.getInstance()
     this.systemWebController = SystemWebController.getInstance()
-    this.translateController = TranslateController.getInstance()
     this.translateWebController = TranslateWebController.getInstance()
 
     // Express
@@ -167,11 +164,6 @@ export default class App {
     this.slackApp.message(
       slackListenersKey.generateImages,
       safeHandler(this.imagesController.generateImages)
-    )
-
-    this.slackApp.message(
-      slackListenersKey.translate,
-      safeHandler(this.translateController.translate)
     )
 
     this.slackApp.message(

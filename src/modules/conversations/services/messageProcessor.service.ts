@@ -938,7 +938,6 @@ export default class MessageProcessor {
           )
         }
 
-        onProgress?.('Traduciendo...')
         const translateResult = await this.translateServices.translate(textToTranslate, targetLang)
 
         if (translateResult.error) {
@@ -1332,7 +1331,6 @@ export default class MessageProcessor {
         }
         case 'translate': {
           if (!parsed.text || !parsed.targetLang) return null
-          onProgress?.('Traduciendo...')
           const translateResult = await this.translateServices.translate(
             parsed.text,
             parsed.targetLang

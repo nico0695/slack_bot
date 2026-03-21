@@ -19,7 +19,5 @@ export const slackListenersKey = {
 
   generateImages: /^img?\b/i,
 
-  translate: /^\.t(ranslate)?\s/i,
-
-  conversationFlow: /^(?!img|cb_clean|cb_show|cb\b|\.t(ranslate)?\s)/i,
+  conversationFlow: /^(?!img|cb_clean|cb_show|cb\b)/i,
 }
