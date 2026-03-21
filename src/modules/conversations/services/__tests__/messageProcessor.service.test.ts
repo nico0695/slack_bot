@@ -95,10 +95,6 @@ jest.mock('../../../images/services/images.services', () => ({
   },
 }))
 
-const translateServicesMock = {
-  translate: jest.fn(),
-}
-
 jest.mock('../../../translate/services/translate.services', () => ({
   __esModule: true,
   default: {
