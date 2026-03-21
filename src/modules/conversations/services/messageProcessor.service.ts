@@ -20,6 +20,7 @@ import NotesServices from '../../notes/services/notes.services'
 import LinksServices from '../../links/services/links.services'
 import ImagesServices from '../../images/services/images.services'
 import TranslateServices from '../../translate/services/translate.services'
+import { translateSchema } from '../../translate/shared/schemas/translate.schemas'
 import SearchRepository from '../repositories/search/search.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
@@ -929,14 +930,26 @@ export default class MessageProcessor {
           )
         }
 
-        const targetLang = translateValue.substring(0, firstSpace).trim()
-        const textToTranslate = translateValue.substring(firstSpace + 1).trim()
+        const rawTargetLang = translateValue.substring(0, firstSpace).trim()
+        const rawTextToTranslate = translateValue.substring(firstSpace + 1).trim()
 
-        if (!textToTranslate) {
+        if (!rawTextToTranslate) {
           throw new Error(
             'Uso: .translate <idioma> <texto> o .tr <idioma> <texto>'
           )
         }
+
+        const validation = translateSchema.safeParse({
+          text: rawTextToTranslate,
+          targetLang: rawTargetLang,
+        })
+
+        if (!validation.success) {
+          const messages = validation.error.errors.map((e) => e.message).join(', ')
+          throw new Error(`Parámetros inválidos: ${messages}`)
+        }
+
+        const { text: textToTranslate, targetLang } = validation.data
 
         const translateResult = await this.translateServices.translate(textToTranslate, targetLang)
 
