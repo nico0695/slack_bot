@@ -36,6 +36,10 @@ const imagesServicesMock = {
   generateImageForAssistant: jest.fn(),
 }
 
+const translateServicesMock = {
+  translate: jest.fn(),
+}
+
 jest.mock('../../repositories/redis/conversations.redis', () => ({
   RedisRepository: {
     getInstance: () => redisRepositoryMock,
@@ -88,6 +92,13 @@ jest.mock('../../../images/services/images.services', () => ({
   __esModule: true,
   default: {
     getInstance: () => imagesServicesMock,
+  },
+}))
+
+jest.mock('../../../translate/services/translate.services', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => translateServicesMock,
   },
 }))
 
@@ -436,5 +447,70 @@ describe('MessageProcessor - onProgress callback', () => {
     )
 
     expect(onProgress).not.toHaveBeenCalled()
+  })
+})
+
+describe('MessageProcessor - translate handling', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = MessageProcessor.getInstance()
+  })
+
+  it('returns translated text for .translate <lang> <text>', async () => {
+    translateServicesMock.translate.mockResolvedValue({
+      data: { translatedText: 'Hola mundo', targetLang: 'spanish' },
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.translate spanish Hello world',
+      99,
+      undefined,
+      false
+    )
+
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'spanish')
+    expect(result.response).toBeTruthy()
+    expect(result.response?.content).toBe('Hola mundo')
+  })
+
+  it('returns translated text for the .tr short alias', async () => {
+    translateServicesMock.translate.mockResolvedValue({
+      data: { translatedText: 'Bonjour le monde', targetLang: 'french' },
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.tr french Hello world',
+      99,
+      undefined,
+      false
+    )
+
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'french')
+    expect(result.response?.content).toBe('Bonjour le monde')
+  })
+
+  it('throws usage error when no arguments are provided', async () => {
+    await expect(
+      processor.processAssistantMessage('.translate', 99, undefined, false)
+    ).rejects.toThrow('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
+  })
+
+  it('throws usage error when only language is provided with no text', async () => {
+    await expect(
+      processor.processAssistantMessage('.translate spanish', 99, undefined, false)
+    ).rejects.toThrow('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
+  })
+
+  it('throws the service error when translate returns an error', async () => {
+    translateServicesMock.translate.mockResolvedValue({
+      error: 'Translation API unavailable',
+    })
+
+    await expect(
+      processor.processAssistantMessage('.translate spanish Hello', 99, undefined, false)
+    ).rejects.toThrow('Translation API unavailable')
   })
 })
