@@ -4,7 +4,11 @@ import { injectable } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import ConversationsServices from '../services/conversations.services'
 
-import { IConversation, IUserConversation, ProgressCallback } from '../shared/interfaces/converstions'
+import {
+  IConversation,
+  IUserConversation,
+  ProgressCallback,
+} from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
 import { roleTypes } from '../shared/constants/openai'
 import UsersServices from '../../users/services/users.services'
@@ -17,7 +21,7 @@ export default class ConversationsWebController {
 
   constructor(
     private conversationServices: ConversationsServices,
-    private usersServices: UsersServices,
+    private usersServices: UsersServices
   ) {
     this.router = Router()
     this.registerRoutes()
@@ -56,9 +60,7 @@ export default class ConversationsWebController {
     conversation: IUserConversation[]
   }> => {
     try {
-      const conversationFlow = await this.conversationServices.showConversationFlowWeb(
-        data.channel
-      )
+      const conversationFlow = await this.conversationServices.showConversationFlowWeb(data.channel)
 
       return {
         message: 'Conversación iniciada',

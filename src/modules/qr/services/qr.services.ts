@@ -3,7 +3,11 @@ import QRCode from 'qrcode'
 import { createModuleLogger } from '../../../config/logger'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { IQrResponse } from '../shared/interfaces/qr.interfaces'
-import { QR_ERROR_CORRECTION_LEVEL, QR_IMAGE_WIDTH, QR_TEXT_MAX_LENGTH } from '../shared/constants/qr.constants'
+import {
+  QR_ERROR_CORRECTION_LEVEL,
+  QR_IMAGE_WIDTH,
+  QR_TEXT_MAX_LENGTH,
+} from '../shared/constants/qr.constants'
 
 const log = createModuleLogger('qr.services')
 

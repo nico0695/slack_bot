@@ -6,7 +6,13 @@ import fs from 'fs'
 import path from 'path'
 
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
-import { validateBody, validateQuery, validateParams, paginationSchema, idParamSchema } from '../../../shared/utils/validation'
+import {
+  validateBody,
+  validateQuery,
+  validateParams,
+  paginationSchema,
+  idParamSchema,
+} from '../../../shared/utils/validation'
 
 import TextToSpeechServices from '../services/textToSpeech.services'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'

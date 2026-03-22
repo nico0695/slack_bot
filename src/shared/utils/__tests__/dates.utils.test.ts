@@ -1,4 +1,9 @@
-import { formatDateToText, formatTextToDate, formatTimeLeft, getRelativeTimeCompact } from '../dates.utils'
+import {
+  formatDateToText,
+  formatTextToDate,
+  formatTimeLeft,
+  getRelativeTimeCompact,
+} from '../dates.utils'
 
 describe('formatTimeLeft', () => {
   const mockNow = new Date('2024-01-01T12:00:00Z')
@@ -41,7 +46,9 @@ describe('formatTextToDate', () => {
     const naiveDate = new Date('2024-05-10 12:30')
     const argOffsetMinutes = 180
     const serverOffsetMinutes = new Date().getTimezoneOffset()
-    const expected = new Date(naiveDate.getTime() + (argOffsetMinutes - serverOffsetMinutes) * 60000)
+    const expected = new Date(
+      naiveDate.getTime() + (argOffsetMinutes - serverOffsetMinutes) * 60000
+    )
 
     expect(formatTextToDate('2024-05-10 12:30')).toEqual(expected)
   })

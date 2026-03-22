@@ -14,10 +14,7 @@ const log = createModuleLogger('alerts.service')
 
 @singleton()
 export default class AlertsServices {
-  constructor(
-    private alertsDataSource: AlertsDataSource,
-    private usersRedis: UsersRedis
-  ) {}
+  constructor(private alertsDataSource: AlertsDataSource, private usersRedis: UsersRedis) {}
 
   /**
    * Create alert with user assistant data

@@ -57,7 +57,7 @@ export default class ConversationsServices {
     private tasksServices: TasksServices,
     private notesServices: NotesServices,
     private linksServices: LinksServices,
-    private messageProcessor: MessageProcessor,
+    private messageProcessor: MessageProcessor
   ) {}
 
   private generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {
@@ -140,9 +140,7 @@ export default class ConversationsServices {
     try {
       const conversationKey = rConversationKey(userId, channelId)
 
-      const conversationStored = await this.redisRepository.getConversationMessages(
-        conversationKey
-      )
+      const conversationStored = await this.redisRepository.getConversationMessages(conversationKey)
 
       const newConversation = [...(conversationStored ?? []), conversation]
 
@@ -152,10 +150,7 @@ export default class ConversationsServices {
 
       const newConversationGenerated = [...newConversation, messageResponse]
 
-      await this.redisRepository.saveConversationMessages(
-        conversationKey,
-        newConversationGenerated
-      )
+      await this.redisRepository.saveConversationMessages(conversationKey, newConversationGenerated)
 
       return messageResponse.content
     } catch (error) {
@@ -212,9 +207,7 @@ export default class ConversationsServices {
     try {
       // Check the skip flag before any other processing.
       const shouldSkip = this.messageProcessor.shouldSkipAI(message)
-      const cleanMessage = shouldSkip
-        ? this.messageProcessor.cleanSkipFlag(message)
-        : message
+      const cleanMessage = shouldSkip ? this.messageProcessor.cleanSkipFlag(message) : message
 
       const conversationFlow = await this.getOrInitConversationFlow(channelId)
 
@@ -315,9 +308,7 @@ export default class ConversationsServices {
     try {
       const conversationKey = rConversationKey(userId, channelId)
 
-      const conversationStored = await this.redisRepository.getConversationMessages(
-        conversationKey
-      )
+      const conversationStored = await this.redisRepository.getConversationMessages(conversationKey)
 
       if (conversationStored.length === 0) return null
 
@@ -974,9 +965,13 @@ export default class ConversationsServices {
       }
 
       case 'read': {
-        const updateRes = await this.linksServices.updateLink(targetId, {
-          status: LinkStatus.READ,
-        }, userId)
+        const updateRes = await this.linksServices.updateLink(
+          targetId,
+          {
+            status: LinkStatus.READ,
+          },
+          userId
+        )
 
         if (updateRes.error || !updateRes.data) {
           return `Error al actualizar el link con Id: ${targetId}`

@@ -5,16 +5,17 @@ const isTest = process.env.NODE_ENV === 'test'
 
 const level = process.env.LOG_LEVEL ?? (isTest ? 'silent' : isProduction ? 'info' : 'debug')
 
-const transport = !isProduction && !isTest
-  ? {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
-        ignore: 'pid,hostname',
-      },
-    }
-  : undefined
+const transport =
+  !isProduction && !isTest
+    ? {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+          ignore: 'pid,hostname',
+        },
+      }
+    : undefined
 
 const logger = pino({
   level,

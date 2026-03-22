@@ -498,15 +498,15 @@ describe('MessageProcessor - QR handling', () => {
   })
 
   it('throws a usage error when no text provided', async () => {
-    await expect(
-      processor.processAssistantMessage('.qr', 99)
-    ).rejects.toThrow('Uso: .qr <texto o URL>')
+    await expect(processor.processAssistantMessage('.qr', 99)).rejects.toThrow(
+      'Uso: .qr <texto o URL>'
+    )
   })
 
   it('throws a usage error when only whitespace provided', async () => {
-    await expect(
-      processor.processAssistantMessage('.qr   ', 99)
-    ).rejects.toThrow('Uso: .qr <texto o URL>')
+    await expect(processor.processAssistantMessage('.qr   ', 99)).rejects.toThrow(
+      'Uso: .qr <texto o URL>'
+    )
   })
 
   it('throws an error when QR service returns an error', async () => {
@@ -514,8 +514,8 @@ describe('MessageProcessor - QR handling', () => {
       error: 'Error inesperado al generar el código QR',
     })
 
-    await expect(
-      processor.processAssistantMessage('.qr test', 99)
-    ).rejects.toThrow('Error inesperado al generar el código QR')
+    await expect(processor.processAssistantMessage('.qr test', 99)).rejects.toThrow(
+      'Error inesperado al generar el código QR'
+    )
   })
 })

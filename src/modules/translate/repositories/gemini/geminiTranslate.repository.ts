@@ -24,11 +24,7 @@ export default class GeminiTranslateRepository implements ITranslateRepository {
     })
   }
 
-  async translate(
-    text: string,
-    targetLang: string,
-    systemPrompt: string
-  ): Promise<string | null> {
+  async translate(text: string, targetLang: string, systemPrompt: string): Promise<string | null> {
     try {
       const userPrompt = `Translate the following to ${targetLang}:\n\n${text}`
 

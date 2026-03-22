@@ -10,11 +10,9 @@ describe('NotesDataSource', () => {
 
   describe('createNote', () => {
     it('saves note for user', async () => {
-      jest.spyOn(Notes.prototype as any, 'save').mockImplementation(
-        async function (this: Notes) {
-          return this
-        }
-      )
+      jest.spyOn(Notes.prototype as any, 'save').mockImplementation(async function (this: Notes) {
+        return this
+      })
 
       const result = await dataSource.createNote({
         userId: 4,

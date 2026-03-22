@@ -29,7 +29,10 @@ describe('QrServices', () => {
 
       const result = await services.generateQr('https://example.com')
 
-      expect(toDataURLMock).toHaveBeenCalledWith('https://example.com', { width: 300, errorCorrectionLevel: 'M' })
+      expect(toDataURLMock).toHaveBeenCalledWith('https://example.com', {
+        width: 300,
+        errorCorrectionLevel: 'M',
+      })
       expect(result).toEqual({
         data: {
           qrBase64: 'data:image/png;base64,abc123',

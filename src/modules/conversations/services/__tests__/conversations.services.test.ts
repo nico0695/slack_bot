@@ -80,7 +80,7 @@ const buildService = (): ConversationsServices =>
     tasksServicesMock as any,
     notesServicesMock as any,
     linksServicesMock as any,
-    messageProcessorMock as any,
+    messageProcessorMock as any
   )
 
 describe('ConversationsServices', () => {
@@ -273,7 +273,14 @@ describe('ConversationsServices', () => {
     it('shows link detail', async () => {
       linksServicesMock.getLinksByUserId.mockResolvedValue({
         data: [
-          { id: 5, url: 'https://example.com', title: 'Test', description: 'Desc', status: 'unread', tag: 'dev' },
+          {
+            id: 5,
+            url: 'https://example.com',
+            title: 'Test',
+            description: 'Desc',
+            status: 'unread',
+            tag: 'dev',
+          },
         ],
       })
 
@@ -326,10 +333,7 @@ describe('ConversationsServices', () => {
         data: [{ id: 1, url: 'https://example.com', title: 'Test', status: 'unread' }],
       })
 
-      await service.handleAction(
-        { entity: 'link', operation: 'list', targetId: 0 },
-        42
-      )
+      await service.handleAction({ entity: 'link', operation: 'list', targetId: 0 }, 42)
 
       expect(slackMessagesUtils.msgLinksList).toHaveBeenCalled()
     })

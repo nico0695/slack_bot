@@ -79,7 +79,7 @@ describe('ImagesServices', () => {
       mockImageRepository as any,
       mockImagesDataSource as any,
       mockExternalStorageServices as any,
-      mockUsersServices as any,
+      mockUsersServices as any
     )
   })
 
@@ -189,7 +189,11 @@ describe('ImagesServices', () => {
     })
 
     it('should call uploadFromUrl with options when provided', async () => {
-      const options = { size: '1024x1792' as const, quality: 'hd' as const, style: 'vivid' as const }
+      const options = {
+        size: '1024x1792' as const,
+        quality: 'hd' as const,
+        style: 'vivid' as const,
+      }
       mockImageRepository.generateImage.mockResolvedValue(mockGenerateImageResponse())
       mockUsersServices.getUserById.mockResolvedValue(mockUser)
       mockUploadSuccess()

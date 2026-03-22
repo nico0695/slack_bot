@@ -26,9 +26,7 @@ describe('extractTitleFromUrl', () => {
   })
 
   it('should handle GitHub-style URLs', () => {
-    expect(extractTitleFromUrl('https://github.com/user/repo')).toBe(
-      'github.com - user/repo'
-    )
+    expect(extractTitleFromUrl('https://github.com/user/repo')).toBe('github.com - user/repo')
   })
 
   it('should strip file extensions from segments', () => {
@@ -58,8 +56,6 @@ describe('extractTitleFromUrl', () => {
   })
 
   it('should handle http protocol', () => {
-    expect(extractTitleFromUrl('http://example.com/page')).toBe(
-      'example.com - page'
-    )
+    expect(extractTitleFromUrl('http://example.com/page')).toBe('example.com - page')
   })
 })

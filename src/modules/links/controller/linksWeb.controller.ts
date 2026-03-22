@@ -3,12 +3,21 @@ import { injectable } from 'tsyringe'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
-import { validateBody, validateQuery, validateParams, idParamSchema } from '../../../shared/utils/validation'
+import {
+  validateBody,
+  validateQuery,
+  validateParams,
+  idParamSchema,
+} from '../../../shared/utils/validation'
 
 import LinksServices from '../services/links.services'
 
 import { ILink } from '../shared/interfaces/links.interfaces'
-import { createLinkSchema, updateLinkSchema, getLinkQuerySchema } from '../shared/schemas/links.schemas'
+import {
+  createLinkSchema,
+  updateLinkSchema,
+  getLinkQuerySchema,
+} from '../shared/schemas/links.schemas'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 

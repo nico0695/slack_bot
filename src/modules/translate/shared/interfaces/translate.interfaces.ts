@@ -9,9 +9,5 @@ export interface ITranslateResponse {
 }
 
 export interface ITranslateRepository {
-  translate: (
-    text: string,
-    targetLang: string,
-    systemPrompt: string
-  ) => Promise<string | null>
+  translate: (text: string, targetLang: string, systemPrompt: string) => Promise<string | null>
 }

@@ -1,7 +1,13 @@
 import { z } from 'zod'
 
 import BadRequestError from '../errors/BadRequestError'
-import { validateBody, validateQuery, validateParams, paginationSchema, idParamSchema } from '../validation'
+import {
+  validateBody,
+  validateQuery,
+  validateParams,
+  paginationSchema,
+  idParamSchema,
+} from '../validation'
 
 describe('validation utilities', () => {
   const testSchema = z.object({

@@ -38,7 +38,7 @@ describe('ConversationsController', () => {
     controller = new ConversationsController(
       conversationsServicesMock as any,
       messageProcessorMock as any,
-      flowManagerMock as any,
+      flowManagerMock as any
     )
     controller.userData = { id: 123 } as any
   })

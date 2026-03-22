@@ -60,19 +60,10 @@ describe('ConstantsServices', () => {
     const updated = { key: GlobalConfigKey.openiaIsActive, value: 'false' }
     updateConstantByKeyMock.mockResolvedValue(updated)
 
-    const result = await service.updateConstantByKey(
-      GlobalConfigKey.openiaIsActive,
-      'false'
-    )
+    const result = await service.updateConstantByKey(GlobalConfigKey.openiaIsActive, 'false')
 
-    expect(updateConstantByKeyMock).toHaveBeenCalledWith(
-      GlobalConfigKey.openiaIsActive,
-      'false'
-    )
-    expect(setGlobalConfigValue).toHaveBeenCalledWith(
-      GlobalConfigKey.openiaIsActive,
-      'false'
-    )
+    expect(updateConstantByKeyMock).toHaveBeenCalledWith(GlobalConfigKey.openiaIsActive, 'false')
+    expect(setGlobalConfigValue).toHaveBeenCalledWith(GlobalConfigKey.openiaIsActive, 'false')
     expect(result).toBe(updated)
   })
 
@@ -83,10 +74,7 @@ describe('ConstantsServices', () => {
     const result = await service.createConstant(GlobalConfigKey.openiaIsActive, 'true')
 
     expect(createConstantMock).toHaveBeenCalledWith(GlobalConfigKey.openiaIsActive, 'true')
-    expect(setGlobalConfigValue).toHaveBeenCalledWith(
-      GlobalConfigKey.openiaIsActive,
-      'true'
-    )
+    expect(setGlobalConfigValue).toHaveBeenCalledWith(GlobalConfigKey.openiaIsActive, 'true')
     expect(result).toBe(created)
   })
 })

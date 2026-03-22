@@ -31,7 +31,7 @@ describe('ConversationsWebController', () => {
     jest.clearAllMocks()
     controller = new ConversationsWebController(
       conversationServicesMock as any,
-      usersServicesMock as any,
+      usersServicesMock as any
     )
   })
 
@@ -121,7 +121,14 @@ describe('ConversationsWebController', () => {
 
       const result = await controller.conversationAssistantFlow(42, 'hola')
 
-      expect(generateAssistantConversationMock).toHaveBeenCalledWith('hola', 42, '99999942', 'web', false, undefined)
+      expect(generateAssistantConversationMock).toHaveBeenCalledWith(
+        'hola',
+        42,
+        '99999942',
+        'web',
+        false,
+        undefined
+      )
       expect(result).toBe(assistantResponse)
     })
 

@@ -23,7 +23,7 @@ export default class ConversationsController extends GenericController {
   constructor(
     private conversationServices: ConversationsServices,
     private messageProcessor: MessageProcessor,
-    private flowManager: ConversationFlowManager,
+    private flowManager: ConversationFlowManager
   ) {
     super()
 
@@ -173,7 +173,7 @@ export default class ConversationsController extends GenericController {
       } else {
         // Assistant mode: process as single message
         await this.handleAssistantMessage(incomingMessage, userData.id, isPersonal, channelId, say)
-  }
+      }
     } catch (error) {
       log.error({ err: error }, 'conversationFlow failed')
       say('Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️')
