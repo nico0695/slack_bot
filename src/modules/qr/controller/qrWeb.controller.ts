@@ -58,14 +58,21 @@ export default class QrWebController {
         return { error: response.error }
       }
 
-      const base64Image = response.data.buffer.toString('base64')
+      const serviceData = response.data
+
+      if (!serviceData) {
+        log.error({ response }, 'QR service returned empty data without error')
+        return { error: 'Error al generar el código QR' }
+      }
+
+      const base64Image = serviceData.buffer.toString('base64')
 
       log.info({ contentLength: parsed.content.length }, 'QR generated for socket client')
 
       return {
         data: {
           image: base64Image,
-          content: response.data.content,
+          content: serviceData.content,
         },
       }
     } catch (error) {

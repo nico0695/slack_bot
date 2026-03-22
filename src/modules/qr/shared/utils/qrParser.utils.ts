@@ -7,12 +7,18 @@ const FG_FLAG_PATTERN = /-fg\s+(#[0-9A-Fa-f]{6})\b/
 const BG_FLAG_PATTERN = /-bg\s+(#[0-9A-Fa-f]{6})\b/
 const ECL_FLAG_PATTERN = /-e\s+([LMQH])\b/
 
+// Escape special characters in a string for safe use in a RegExp
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 // Pre-compile shortcut patterns
-const SHORTCUT_PATTERNS = Object.entries(QR_SHORTCUTS).map(([key, shortcut]) => ({
-  key,
-  shortcut,
-  pattern: new RegExp(`^-${key}\\s+(.+)$`, 's'),
-}))
+const SHORTCUT_PATTERNS = Object.values(QR_SHORTCUTS).map(shortcut => {
+  const escapedFlag = escapeRegExp(shortcut.flag)
+  return {
+    shortcut,
+    pattern: new RegExp(`^${escapedFlag}\\s+(.+)$`, 's'),
+  }
+})
 
 /**
  * Parse raw input string for the .qr command.
