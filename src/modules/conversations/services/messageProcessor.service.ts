@@ -1386,6 +1386,18 @@ export default class MessageProcessor {
             provider: ConversationProviders.ASSISTANT,
           }
         }
+        case 'qr.generate': {
+          if (!parsed.text) return null
+          const qrValidation = qrSchema.safeParse({ text: parsed.text })
+          if (!qrValidation.success) return null
+          const qrResult = await this.qrServices.generateQr(qrValidation.data.text)
+          if (qrResult.error) return null
+          return {
+            role: roleTypes.assistant,
+            content: qrResult.data.qrBase64,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
         default:
           return {
             role: roleTypes.assistant,
