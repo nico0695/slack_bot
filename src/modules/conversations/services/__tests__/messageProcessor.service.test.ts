@@ -44,6 +44,10 @@ const translateServicesMock = {
   translate: jest.fn(),
 }
 
+const qrServicesMock = {
+  generateQrCode: jest.fn(),
+}
+
 const buildBlocksMock = (): { blocks: any[] } => ({ blocks: [] as any[] })
 
 jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
@@ -69,6 +73,7 @@ const buildProcessor = (): MessageProcessor =>
     imagesServicesMock as any,
     searchRepositoryMock as any,
     translateServicesMock as any,
+    qrServicesMock as any
   )
 
 describe('MessageProcessor - channel scoped lookups', () => {
