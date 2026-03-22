@@ -1,5 +1,5 @@
 import BadRequestError from '../../../../shared/utils/errors/BadRequestError'
-import AlertsWebController from '../alersWeb.controller'
+import AlertsWebController from '../alertsWeb.controller'
 
 jest.mock('../../../../shared/middleware/auth', () => {
   const identityDecorator = (

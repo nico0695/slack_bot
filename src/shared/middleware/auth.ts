@@ -9,6 +9,8 @@ import { createModuleLogger } from '../../config/logger'
 
 const log = createModuleLogger('middleware.auth')
 
+const userServices = container.resolve(UsersServices)
+
 // Create a single supabase client for interacting with your database
 const supabase = (() => {
   try {
@@ -35,8 +37,6 @@ export const verifyToken = async (
     if (supabaseResponse.error || !supabaseUser) {
       return res.status(401).json({ message: 'Token invalido' })
     }
-
-    const userServices = container.resolve(UsersServices)
 
     await userServices.getOrCreateUserSupabase({
       email: supabaseUser.email,
@@ -71,8 +71,6 @@ export function HttpAuth(target: any, propertyKey: string, descriptor: PropertyD
       throw new UnauthorizedError({ message: 'Unauthorized' })
     }
 
-    const userServices = container.resolve(UsersServices)
-
     const { data: user } = await userServices.getOrCreateUserSupabase({
       email: supabaseUser.email,
       supabaseId: supabaseUser.id,
@@ -95,8 +93,6 @@ export function SlackAuth(target: any, propertyKey: string, descriptor: Property
     const [{ payload, say }] = args
 
     try {
-      const userServices = container.resolve(UsersServices)
-
       const meChannelId = payload.channel_type === 'im' ? payload.channel : undefined
 
       const { data: user } = await userServices.getOrCreateUserBySlackId(payload.user, meChannelId)
@@ -126,8 +122,6 @@ export function SlackAuthActions(
     const [{ body, payload, ack, say }]: any = args
 
     try {
-      const userServices = container.resolve(UsersServices)
-
       const meChannelId =
         body.channel?.id ?? (payload.channel_type === 'im' ? payload.channel : undefined)
 

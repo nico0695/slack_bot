@@ -34,7 +34,7 @@ import { ProgressCallback } from './modules/conversations/shared/interfaces/conv
 import SummaryWebController from './modules/summary/controller/summary.controller'
 import { alertCronJob } from './modules/alerts/utils/cronJob'
 import { supabaseKeepAlive } from './modules/system/utils/supabaseKeepAlive'
-import AlertsWebController from './modules/alerts/controller/alersWeb.controller'
+import AlertsWebController from './modules/alerts/controller/alertsWeb.controller'
 import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
 import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
