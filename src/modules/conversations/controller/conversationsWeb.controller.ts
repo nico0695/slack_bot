@@ -28,8 +28,6 @@ export default class ConversationsWebController {
     this.router.post('/close-channel', this.closeChannel)
   }
 
-  /** Conversation Controllers Methods */
-
   public joinChannel = async (data: {
     channel: string
     username: string
@@ -71,10 +69,6 @@ export default class ConversationsWebController {
     }
   }
 
-  /**
-   *
-   * @param data { username, channel, message, iaEnabled }
-   */
   public generateConversation = async (data: {
     username: string
     channel: string
@@ -107,10 +101,6 @@ export default class ConversationsWebController {
     }
   }
 
-  /**
-   * Manage assistant conversation (unified with Slack)
-   * Skip AI by prefixing message with "+"
-   */
   public conversationAssistantFlow = async (
     userId: number,
     message: string,
@@ -136,7 +126,6 @@ export default class ConversationsWebController {
         onProgress
       )
 
-      // Return response (null if skipped with "+")
       return result.response
     } catch (error) {
       log.error({ err: error }, 'conversationAssistantFlow failed')
@@ -144,11 +133,8 @@ export default class ConversationsWebController {
     }
   }
 
-  // ROUTES
-
   public showChannels = async (req: any, res: any): Promise<void> => {
     const response = await this.conversationServices.showChannelsConversationFlow()
-
     res.send(response)
   }
 

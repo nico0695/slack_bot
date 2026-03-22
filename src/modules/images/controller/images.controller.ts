@@ -18,12 +18,6 @@ export default class ImagessController {
     this.generateImages = this.generateImages.bind(this)
   }
 
-  /** Images Controllers Methods */
-
-  /**
-   *
-   * @param data slack response
-   */
   public generateImages = async (data: any): Promise<void> => {
     const { payload, say, body }: any = data
 

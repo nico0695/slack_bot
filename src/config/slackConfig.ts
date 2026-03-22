@@ -3,7 +3,7 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-// Initializes your app with your bot token and signing secret
+// Initialize the Slack app
 export const connectionSlackApp = new SlackApp({
   token: process.env.SLACK_BOT_TOKEN,
   signingSecret: process.env.SLACK_SIGNING_SECRET,
@@ -11,7 +11,7 @@ export const connectionSlackApp = new SlackApp({
   appToken: process.env.APP_TOKEN,
 })
 
-// Regex to listen slack messages
+// Regex patterns for Slack messages
 export const slackListenersKey = {
   generateConversation: /^cb?\b/i,
   cleanConversation: /^cb_clean?\b/i,

@@ -1,11 +1,7 @@
 import { injectable, inject } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import ImagesDataSources from '../repositories/database/images.dataSource'
-import {
-  IImage,
-  IUserData,
-  IImageRepository,
-} from '../shared/interfaces/images.interfaces'
+import { IImage, IUserData, IImageRepository } from '../shared/interfaces/images.interfaces'
 import {
   IImageGenerationOptions,
   IImageGenerationResponse,
@@ -30,7 +26,7 @@ export default class ImagesServices {
     @inject('ImageRepository') private imageRepository: IImageRepository,
     private imagesDataSources: ImagesDataSources,
     private externalStorageServices: ExternalStorageServices,
-    private usersServices: UsersServices,
+    private usersServices: UsersServices
   ) {
     this.generateImages = this.generateImages.bind(this)
   }
@@ -104,23 +100,19 @@ export default class ImagesServices {
     say: (message: string) => void
   ): Promise<string> => {
     try {
-      // Notify user that generation started
       say('Generando imagen...')
 
       const startTime = Date.now()
 
-      // Call repository - it handles all the polling logic now
       const response = await this.imageRepository.generateImage(prompt, {
         size: '1024x1024',
         quality: 'standard',
       })
 
-      // Check if generation was successful
       if (!response?.images?.length) {
         return 'No se pudo generar la imagen'
       }
 
-      // Upload images to persistent storage and save to database
       const storageUrls: string[] = []
       await Promise.all(
         response.images.map(async (image) => {
@@ -148,9 +140,11 @@ export default class ImagesServices {
 
       const durationMs = Date.now() - startTime
 
-      log.info({ durationMs, provider: response.provider, imageCount: response.images.length }, 'Image generation completed')
+      log.info(
+        { durationMs, provider: response.provider, imageCount: response.images.length },
+        'Image generation completed'
+      )
 
-      // Format response with persistent storage URLs
       const imageUrlsText = storageUrls
         .map((url, index) => `Imagen #${index + 1}: ${url}`)
         .join('\n')
@@ -176,14 +170,12 @@ export default class ImagesServices {
     options?: IImageGenerationOptions
   ): Promise<IImageGenerationResponse | null> => {
     try {
-      // Generate image using repository
       const response = await this.imageRepository.generateImage(prompt, options)
 
       if (!response?.images?.length) {
         return null
       }
 
-      // Get user info for database storage
       const user = await this.usersServices.getUserById(userId)
 
       if (!user?.data) {
@@ -191,7 +183,6 @@ export default class ImagesServices {
         return response // Return images but don't store
       }
 
-      // Upload images to persistent storage and save to database
       await Promise.all(
         response.images.map(async (image) => {
           const uploaded = await this.uploadImageToStorage(

@@ -28,16 +28,12 @@ export default class TasksWebController extends GenericController {
     this.registerRoutes()
   }
 
-  /** Tasks Routes */
-
   protected registerRoutes(): void {
     this.router.get('/', this.getTasks)
     this.router.post('/', this.createTask)
     this.router.put('/:id', this.updateTask)
     this.router.delete('/:id', this.deleteTask)
   }
-
-  /** Tasks Controllers Methods */
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])

@@ -34,12 +34,6 @@ export default class ConversationsController extends GenericController {
     this.handleActions = this.handleActions.bind(this)
   }
 
-  /** Conversation Controllers Methods */
-
-  /**
-   *
-   * @param data slack response
-   */
   @SlackAuth
   public async generateConversation(data: any): Promise<void> {
     const { payload, say }: any = data
@@ -70,10 +64,6 @@ export default class ConversationsController extends GenericController {
     }
   }
 
-  /**
-   * Clean conversation
-   * @param data slack response
-   */
   @SlackAuth
   public async cleanConversation(data: any): Promise<void> {
     const { payload, say }: any = data
@@ -90,10 +80,6 @@ export default class ConversationsController extends GenericController {
     }
   }
 
-  /**
-   * Clean conversation
-   * @param data slack response
-   */
   @SlackAuth
   public async showConversation(data: any): Promise<void> {
     const { payload, say, body }: any = data
@@ -194,9 +180,6 @@ export default class ConversationsController extends GenericController {
     }
   }
 
-  /**
-   * Handle message in flow mode (with context)
-   */
   private handleFlowMessage = async (
     message: string,
     userSlackId: string,
@@ -205,7 +188,6 @@ export default class ConversationsController extends GenericController {
     channelId: string | undefined,
     say: any
   ): Promise<void> => {
-    // Check if should skip AI generation
     if (this.messageProcessor.shouldSkipAI(message)) {
       const cleanMessage = this.messageProcessor.cleanSkipFlag(message)
       await this.conversationServices.sendMessageToConversationFlow(
@@ -216,7 +198,6 @@ export default class ConversationsController extends GenericController {
       return
     }
 
-    // Generate with AI using full context
     const newResponse = await this.conversationServices.generateConversationFlow(
       message,
       userSlackId,
@@ -228,10 +209,6 @@ export default class ConversationsController extends GenericController {
     }
   }
 
-  /**
-   * Handle message in assistant mode (unified with Web)
-   * Uses generateAssistantConversation for consistent behavior and history saving
-   */
   private handleAssistantMessage = async (
     message: string,
     userId: number,
@@ -239,7 +216,6 @@ export default class ConversationsController extends GenericController {
     channelId: string | undefined,
     say: any
   ): Promise<void> => {
-    // Process with MessageProcessor
     const isChannelContext = !isPersonal
     const scopedChannelId =
       typeof channelId === 'string' && channelId.trim().length > 0 ? channelId.trim() : undefined

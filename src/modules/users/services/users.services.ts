@@ -169,17 +169,14 @@ export default class UsersServices {
 
   public async getUsersByTeamId(teamId: string): Promise<GenericResponse<IUsers[]>> {
     try {
-      /** Get User from database */
       const usersDb = await this.usersDataSource.getUsersBySlackTeamId(teamId)
 
       if (usersDb.length > 0) {
         return { data: usersDb }
       }
 
-      /** if users team is empty get users team from Slack */
       const teamMembers = await this.slackRepository.getTeamMembers(teamId)
 
-      /** save and return new users */
       const members: IUsers[] = []
 
       for await (const member of teamMembers) {
@@ -212,7 +209,6 @@ export default class UsersServices {
     }
   }
 
-  // Push Notifications
   public async subscribeNotifications(
     userId: number,
     subscription: any
@@ -243,7 +239,6 @@ export default class UsersServices {
     }
   }
 
-  // Admin users
   public async getUsers(
     page: number,
     pageSize: number
@@ -265,7 +260,6 @@ export default class UsersServices {
     }
   }
 
-  // get or create user by user slack id
   public async getOrCreateUserBySlackId(
     slackId: string,
     channelId?: string
@@ -274,7 +268,6 @@ export default class UsersServices {
       const userDb = await this.usersDataSource.getUserBySlackId(slackId)
 
       if (userDb) {
-        // If user exist in database without channel id update channel id
         if (channelId && userDb.slackChannelId !== channelId) {
           const responseUpdateUser = await this.usersDataSource.updateUserById(userDb.id, {
             slackChannelId: channelId,
@@ -286,7 +279,6 @@ export default class UsersServices {
         return { data: userDb }
       }
 
-      // If user not exist in database get user from slack and create user
       const userSlack = await this.slackRepository.getUserInfo(slackId)
 
       if (!userSlack) {
@@ -295,7 +287,6 @@ export default class UsersServices {
         }
       }
 
-      // Check if user exist in database by email
       const user = await this.usersDataSource.getUserByEmail(userSlack.profile.email)
 
       if (user) {
@@ -308,7 +299,6 @@ export default class UsersServices {
         return { data: responseUpdateUser }
       }
 
-      // Create user
       const newUser: IUsers = {
         username: userSlack.name,
         name: userSlack.profile.first_name,

@@ -14,8 +14,6 @@ export default class SummaryWebController {
     this.registerRoutes()
   }
 
-  // ROUTES
-
   protected registerRoutes(): void {
     this.router.post('/', this.generateSumaryText)
   }

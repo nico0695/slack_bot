@@ -8,11 +8,6 @@ import { ITextToSpeech } from '../../shared/interfaces/textToSpeech.interfaces'
 export default class TextToSpeechDataSources {
   constructor() {}
 
-  /**
-   * Save user in database
-   * @param data IImage - Data image
-   * @returns
-   */
   public async saveTextToSpeech(data: ITextToSpeech): Promise<TextToSpeech> {
     try {
       const textToSpeech = new TextToSpeech()
@@ -31,12 +26,6 @@ export default class TextToSpeechDataSources {
     }
   }
 
-  /**
-   * Get all speech with pagination
-   * @param page number - Page
-   * @param pageSize number - Limit
-   * @returns TextToSpeech[]
-   */
   public async getAllTextToSpeech(
     options: IPaginationOptions
   ): Promise<IPaginationResponse<TextToSpeech>> {

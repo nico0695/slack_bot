@@ -11,7 +11,6 @@ const log = createModuleLogger('middleware.auth')
 
 const userServices = container.resolve(UsersServices)
 
-// Create a single supabase client for interacting with your database
 const supabase = (() => {
   try {
     return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_TOKEN)
@@ -50,7 +49,6 @@ export const verifyToken = async (
   }
 }
 
-// Auth decorator
 export function HttpAuth(target: any, propertyKey: string, descriptor: PropertyDescriptor): void {
   const originalMethod = descriptor.value
 

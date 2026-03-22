@@ -35,8 +35,6 @@ export default class TextToSpeechWebController {
     this.router.post('/generate', this.generateTextoToSpeech)
   }
 
-  // ROUTES
-
   @HttpAuth
   @Permission([Profiles.ADMIN, Profiles.USER_PREMIUM])
   public async generateTextoToSpeech(req: any, res: any): Promise<void> {

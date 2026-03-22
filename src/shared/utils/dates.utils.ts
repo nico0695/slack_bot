@@ -10,7 +10,7 @@ export function formatTextToDate(dateText: string): Date {
   const date = new Date(raw)
 
   if (date.toString() !== 'Invalid Date' && absolutePattern.test(raw)) {
-    // Interpret the naive date/time as Argentina local time (UTC-3, offset minutes = 180)
+    // Interpret naive date/time values in the Argentina timezone.
     const ARG_OFFSET_MINUTES = 180 // Argentina (UTC-3) timezoneOffset
     const serverOffsetMinutes = new Date().getTimezoneOffset() // minutes between UTC and server local
     const diffMinutes = ARG_OFFSET_MINUTES - serverOffsetMinutes
@@ -20,8 +20,6 @@ export function formatTextToDate(dateText: string): Date {
   if (date.toString() !== 'Invalid Date') {
     return date
   }
-
-  // Format w d h m to date
 
   const newDate = new Date()
 
@@ -77,7 +75,6 @@ export const formatDateToText = (
   return new Intl.DateTimeFormat(local, baseOptions).format(date)
 }
 
-// Output: "2h", "30m", "venc1h", "mañana10:00", "15/0310:00"
 export const getRelativeTimeCompact = (date: Date, now: Date = new Date()): string => {
   const diffMs = date.getTime() - now.getTime()
   const diffMins = Math.round(diffMs / 60000)
@@ -131,18 +128,15 @@ export const formatTimeLeft = (targetDate: Date): string => {
   const now = new Date()
   const diffInMilliseconds = targetDate.getTime() - now.getTime()
 
-  // If the alert is in the past, return a simple message
   if (diffInMilliseconds < 0) {
     return 'Alerta vencida'
   }
 
-  // Calculate the time components
   const seconds = Math.floor(diffInMilliseconds / 1000)
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
 
-  // Determine the largest unit and format the string
   if (days > 0) {
     const remainingHours = hours % 24
     return `${days} día${days > 1 ? 's' : ''}${
