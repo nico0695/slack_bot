@@ -45,7 +45,7 @@ const translateServicesMock = {
 }
 
 const qrServicesMock = {
-  generateQrCode: jest.fn(),
+  generateQr: jest.fn(),
 }
 
 const buildBlocksMock = (): { blocks: any[] } => ({ blocks: [] as any[] })
@@ -474,5 +474,48 @@ describe('MessageProcessor - translate handling', () => {
     await expect(
       processor.processAssistantMessage('.translate Spanish Hello world', 99)
     ).rejects.toThrow('Translation failed')
+  })
+})
+
+describe('MessageProcessor - QR handling', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = buildProcessor()
+  })
+
+  it('generates QR code successfully with .qr command', async () => {
+    qrServicesMock.generateQr.mockResolvedValue({
+      data: { qrBase64: 'data:image/png;base64,abc123' },
+    })
+
+    const result = await processor.processAssistantMessage('.qr https://example.com', 99)
+
+    expect(qrServicesMock.generateQr).toHaveBeenCalledWith('https://example.com')
+    expect(result.response.content).toBe('data:image/png;base64,abc123')
+  })
+
+  it('throws a usage error when no text provided', async () => {
+    await expect(
+      processor.processAssistantMessage('.qr', 99)
+    ).rejects.toThrow('Uso: .qr <texto o URL>')
+  })
+
+  it('throws a usage error when only whitespace provided', async () => {
+    await expect(
+      processor.processAssistantMessage('.qr   ', 99)
+    ).rejects.toThrow('Uso: .qr <texto o URL>')
+  })
+
+  it('throws an error when QR service returns an error', async () => {
+    qrServicesMock.generateQr.mockResolvedValue({
+      error: 'Error inesperado al generar el código QR',
+    })
+
+    await expect(
+      processor.processAssistantMessage('.qr test', 99)
+    ).rejects.toThrow('Error inesperado al generar el código QR')
   })
 })

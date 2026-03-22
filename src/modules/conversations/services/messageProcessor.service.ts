@@ -1361,6 +1361,24 @@ export default class MessageProcessor {
             provider: ConversationProviders.ASSISTANT,
           }
         }
+        case 'qr.generate': {
+          if (!parsed.text) return null
+          const qrValidation = qrSchema.safeParse({ text: parsed.text })
+          if (!qrValidation.success) {
+            log.warn({ errors: qrValidation.error.errors }, 'Intent fallback router - qr.generate validation failed')
+            return null
+          }
+          const qrResult = await this.qrServices.generateQr(qrValidation.data.text)
+          if (qrResult.error) {
+            log.error({ error: qrResult.error }, 'Intent fallback router - qr.generate failed')
+            return null
+          }
+          return {
+            role: roleTypes.assistant,
+            content: qrResult.data.qrBase64,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
         default:
           return {
             role: roleTypes.assistant,
