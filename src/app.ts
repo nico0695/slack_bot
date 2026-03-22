@@ -74,8 +74,8 @@ export default class App {
     // Controllers Instances
     this.usersController = container.resolve(UsersController)
 
-    this.conversationController = ConversationController.getInstance()
-    this.conversationWebController = ConversationsWebController.getInstance()
+    this.conversationController = container.resolve(ConversationController)
+    this.conversationWebController = container.resolve(ConversationsWebController)
 
     this.alertsWebController = container.resolve(AlertsWebController)
     this.tasksWebController = container.resolve(TasksWebController)
@@ -83,8 +83,8 @@ export default class App {
     this.linksWebController = container.resolve(LinksWebController)
     this.constantsController = container.resolve(ConstantsController)
 
-    this.imagesController = ImagesController.getInstance()
-    this.imagesWebController = ImagesWebController.getInstance()
+    this.imagesController = container.resolve(ImagesController)
+    this.imagesWebController = container.resolve(ImagesWebController)
 
     this.textToSpeechWebController = container.resolve(TextToSpeechWebController)
     this.summaryWebController = container.resolve(SummaryWebController)

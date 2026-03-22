@@ -37,23 +37,13 @@ describe('GeminiImagesRepository', () => {
   describe('Environment Variables', () => {
     it('should throw error if GEMINI_API_KEY is not defined', () => {
       const originalKey = process.env.GEMINI_API_KEY
-
-      // Note: This test only works in isolation due to singleton pattern
-      // In a real scenario, the app would fail to start if API key is missing
-      if (originalKey) {
-        // Can't properly test this with singleton already instantiated
-        // Just verify the constructor would throw by checking the code logic
-        expect(true).toBe(true)
-        return
-      }
-
       delete process.env.GEMINI_API_KEY
 
-      expect(() => {
-        GeminiImagesRepository.getInstance()
-      }).toThrow('GEMINI_API_KEY is not defined in the environment variables.')
+      expect(() => new GeminiImagesRepository()).toThrow(
+        'GEMINI_API_KEY is not defined in the environment variables.'
+      )
 
-      process.env.GEMINI_API_KEY = originalKey
+      if (originalKey) process.env.GEMINI_API_KEY = originalKey
     })
   })
 
@@ -62,22 +52,11 @@ describe('GeminiImagesRepository', () => {
     mockGenerateImages.mockClear()
 
     process.env.GEMINI_API_KEY = 'test-key'
-    // Reset singleton instance for each test
-    ;(GeminiImagesRepository as any).instance = undefined
-    repository = GeminiImagesRepository.getInstance()
+    repository = new GeminiImagesRepository()
   })
 
   afterEach(() => {
     delete process.env.GEMINI_API_KEY
-  })
-
-  describe('Singleton Pattern', () => {
-    it('should return the same instance on multiple calls', () => {
-      const instance1 = GeminiImagesRepository.getInstance()
-      const instance2 = GeminiImagesRepository.getInstance()
-
-      expect(instance1).toBe(instance2)
-    })
   })
 
   describe('generateImage', () => {

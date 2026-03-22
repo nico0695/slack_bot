@@ -48,84 +48,13 @@ const linksServicesMock = {
   updateLink: jest.fn(),
 }
 
-const imagesServicesMock = {
-  generateImageForAssistant: jest.fn(),
-  getImages: jest.fn(),
+const messageProcessorMock = {
+  processAssistantMessage: jest.fn(),
+  cleanSkipFlag: jest.fn(),
 }
-
-jest.mock('../../repositories/openai/openai.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => aiRepositoryMock,
-  },
-}))
-
-jest.mock('../../repositories/gemini/gemini.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => aiRepositoryMock,
-  },
-}))
-
-jest.mock('../../repositories/redis/conversations.redis', () => ({
-  RedisRepository: {
-    getInstance: () => redisRepositoryMock,
-  },
-}))
 
 jest.mock('../../../../config/socketConfig', () => ({
   IoServer: { io: { in: () => ({ emit: jest.fn() }) } },
-}))
-
-jest.mock('../../../users/services/users.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => usersServicesMock,
-  },
-}))
-
-jest.mock('../../../alerts/services/alerts.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => alertsServicesMock,
-  },
-}))
-
-jest.mock('../../../tasks/services/tasks.services', () => ({
-  __esModule: true,
-  default: class MockTasksServices {
-    constructor() { Object.assign(this, tasksServicesMock) }
-  },
-}))
-
-jest.mock('../../../notes/services/notes.services', () => ({
-  __esModule: true,
-  default: class MockNotesServices {
-    constructor() { Object.assign(this, notesServicesMock) }
-  },
-}))
-
-jest.mock('../../../links/services/links.services', () => ({
-  __esModule: true,
-  default: class MockLinksServices {
-    constructor() { Object.assign(this, linksServicesMock) }
-  },
-}))
-
-jest.mock('../../../images/services/images.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => imagesServicesMock,
-  },
-}))
-
-jest.mock('../../repositories/search/search.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      search: jest.fn(),
-    }),
-  },
 }))
 
 const buildBlocksMock = (): { blocks: any[] } => ({ blocks: [] as any[] })
@@ -142,12 +71,24 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgAssistantQuickHelp: jest.fn(() => buildBlocksMock()),
 }))
 
+const buildService = (): ConversationsServices =>
+  new ConversationsServices(
+    aiRepositoryMock as any,
+    redisRepositoryMock as any,
+    usersServicesMock as any,
+    alertsServicesMock as any,
+    tasksServicesMock as any,
+    notesServicesMock as any,
+    linksServicesMock as any,
+    messageProcessorMock as any,
+  )
+
 describe('ConversationsServices', () => {
   let service: ConversationsServices
 
   beforeEach(() => {
     jest.resetAllMocks()
-    service = ConversationsServices.getInstance()
+    service = buildService()
   })
 
   describe('generateConversation', () => {

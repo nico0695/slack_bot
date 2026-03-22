@@ -36,69 +36,9 @@ const imagesServicesMock = {
   generateImageForAssistant: jest.fn(),
 }
 
-jest.mock('../../repositories/redis/conversations.redis', () => ({
-  RedisRepository: {
-    getInstance: () => redisRepositoryMock,
-  },
-}))
-
-jest.mock('../../repositories/openai/openai.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => aiRepositoryMock,
-  },
-}))
-
-jest.mock('../../repositories/gemini/gemini.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => aiRepositoryMock,
-  },
-}))
-
-jest.mock('../../../alerts/services/alerts.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => alertsServicesMock,
-  },
-}))
-
-jest.mock('../../../tasks/services/tasks.services', () => ({
-  __esModule: true,
-  default: class MockTasksServices {
-    constructor() { Object.assign(this, tasksServicesMock) }
-  },
-}))
-
-jest.mock('../../../notes/services/notes.services', () => ({
-  __esModule: true,
-  default: class MockNotesServices {
-    constructor() { Object.assign(this, notesServicesMock) }
-  },
-}))
-
-jest.mock('../../../links/services/links.services', () => ({
-  __esModule: true,
-  default: class MockLinksServices {
-    constructor() { Object.assign(this, linksServicesMock) }
-  },
-}))
-
-jest.mock('../../../images/services/images.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => imagesServicesMock,
-  },
-}))
-
-jest.mock('../../repositories/search/search.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      search: jest.fn(),
-    }),
-  },
-}))
+const searchRepositoryMock = {
+  search: jest.fn(),
+}
 
 const buildBlocksMock = (): { blocks: any[] } => ({ blocks: [] as any[] })
 
@@ -114,13 +54,25 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgLinkCreated: jest.fn(() => buildBlocksMock()),
 }))
 
+const buildProcessor = (): MessageProcessor =>
+  new MessageProcessor(
+    aiRepositoryMock as any,
+    redisRepositoryMock as any,
+    alertsServicesMock as any,
+    tasksServicesMock as any,
+    notesServicesMock as any,
+    linksServicesMock as any,
+    imagesServicesMock as any,
+    searchRepositoryMock as any,
+  )
+
 describe('MessageProcessor - channel scoped lookups', () => {
   let processor: MessageProcessor
 
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('requests channel-specific alerts when running inside a channel', async () => {
@@ -163,7 +115,7 @@ describe('MessageProcessor - image handling', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('lists images when using .img -l variable', async () => {
@@ -260,7 +212,7 @@ describe('MessageProcessor - skip AI flag', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('returns shouldSkipAI true when message starts with +', async () => {
@@ -282,7 +234,7 @@ describe('MessageProcessor - link handling', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('creates a link with .link <url>', async () => {
@@ -378,7 +330,7 @@ describe('MessageProcessor - onProgress callback', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('calls onProgress with "Generando imagen..." before image generation via .img', async () => {

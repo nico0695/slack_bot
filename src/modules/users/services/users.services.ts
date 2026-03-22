@@ -1,4 +1,4 @@
-import { container, singleton } from 'tsyringe'
+import { singleton } from 'tsyringe'
 
 import { GenericResponse } from '../../../shared/interfaces/services'
 
@@ -21,10 +21,6 @@ export default class UsersServices {
     private userRedis: UsersRedis
   ) {
     this.createUser = this.createUser.bind(this)
-  }
-
-  static getInstance(): UsersServices {
-    return container.resolve(UsersServices)
   }
 
   /**

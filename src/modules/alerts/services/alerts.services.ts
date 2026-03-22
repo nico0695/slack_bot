@@ -1,4 +1,4 @@
-import { container, singleton } from 'tsyringe'
+import { singleton } from 'tsyringe'
 
 import { Alerts } from '../../../entities/alerts'
 import { GenericResponse } from '../../../shared/interfaces/services'
@@ -18,10 +18,6 @@ export default class AlertsServices {
     private alertsDataSource: AlertsDataSource,
     private usersRedis: UsersRedis
   ) {}
-
-  static getInstance(): AlertsServices {
-    return container.resolve(AlertsServices)
-  }
 
   /**
    * Create alert with user assistant data

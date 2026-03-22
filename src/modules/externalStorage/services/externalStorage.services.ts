@@ -1,4 +1,4 @@
-import { container, singleton } from 'tsyringe'
+import { singleton } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import { GenericResponse } from '../../../shared/interfaces/services'
@@ -22,10 +22,6 @@ export default class ExternalStorageServices {
     private apiStorageRepo: ApiStorageRepository,
     private dataSource: ExternalStorageDataSource
   ) {}
-
-  static getInstance(): ExternalStorageServices {
-    return container.resolve(ExternalStorageServices)
-  }
 
   async uploadFile(options: IStorageUploadOptions): Promise<GenericResponse<IStorageUploadResult>> {
     try {

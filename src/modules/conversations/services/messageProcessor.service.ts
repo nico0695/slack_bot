@@ -1,4 +1,4 @@
-import { container } from 'tsyringe'
+import { injectable, inject } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import {
@@ -34,51 +34,25 @@ import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 const log = createModuleLogger('conversations.messageProcessor')
 
-export enum AIRepositoryType {
-  OPENAI = 'OPENAI',
-  GEMINI = 'GEMINI',
-}
-
-const AIRepositoryByType = {
-  [AIRepositoryType.OPENAI]: OpenaiRepository,
-  [AIRepositoryType.GEMINI]: GeminiRepository,
-}
-
 interface IProcessMessageResult {
   response: IConversation | null
   shouldSkipAI: boolean
 }
 
+@injectable()
 export default class MessageProcessor {
-  private static instance: MessageProcessor
-
-  private aiRepository: OpenaiRepository | GeminiRepository
-  private redisRepository: RedisRepository
-  private alertsServices: AlertsServices
-  private tasksServices: TasksServices
-  private notesServices: NotesServices
-  private linksServices: LinksServices
-  private imagesServices: ImagesServices
   private defaultSnoozeMinutes = 10
 
-  private constructor(aiToUse = AIRepositoryType.OPENAI) {
-    this.aiRepository = AIRepositoryByType[aiToUse].getInstance()
-    this.redisRepository = RedisRepository.getInstance()
-    this.alertsServices = AlertsServices.getInstance()
-    this.tasksServices = container.resolve(TasksServices)
-    this.notesServices = container.resolve(NotesServices)
-    this.linksServices = container.resolve(LinksServices)
-    this.imagesServices = ImagesServices.getInstance()
-  }
-
-  static getInstance(): MessageProcessor {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new MessageProcessor()
-    return this.instance
-  }
+  constructor(
+    @inject('AIRepository') private aiRepository: OpenaiRepository | GeminiRepository,
+    private redisRepository: RedisRepository,
+    private alertsServices: AlertsServices,
+    private tasksServices: TasksServices,
+    private notesServices: NotesServices,
+    private linksServices: LinksServices,
+    private imagesServices: ImagesServices,
+    private searchRepository: SearchRepository,
+  ) {}
 
   processAssistantMessage = async (
     message: string,
@@ -1316,8 +1290,7 @@ export default class MessageProcessor {
     const trimmed = (query || '').trim()
     if (!trimmed) return null
 
-    const searchRepo = SearchRepository.getInstance()
-    const results = await searchRepo.search(trimmed)
+    const results = await this.searchRepository.search(trimmed)
 
     if (!results.length) {
       return {

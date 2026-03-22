@@ -1,3 +1,4 @@
+import { injectable } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import { RedisRepository } from '../repositories/redis/conversations.redis'
 import { IConversationFlow } from '../shared/interfaces/converstions'
@@ -5,23 +6,9 @@ import { ChannelType } from '../shared/constants/conversationFlow'
 
 const log = createModuleLogger('conversations.flowManager')
 
+@injectable()
 export default class ConversationFlowManager {
-  private static instance: ConversationFlowManager
-
-  private redisRepository: RedisRepository
-
-  private constructor() {
-    this.redisRepository = RedisRepository.getInstance()
-  }
-
-  static getInstance(): ConversationFlowManager {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ConversationFlowManager()
-    return this.instance
-  }
+  constructor(private redisRepository: RedisRepository) {}
 
   /**
    * Check if conversation flow is active for a given channel/user
