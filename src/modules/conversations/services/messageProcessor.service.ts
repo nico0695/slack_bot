@@ -21,6 +21,8 @@ import LinksServices from '../../links/services/links.services'
 import ImagesServices from '../../images/services/images.services'
 import TranslateServices from '../../translate/services/translate.services'
 import { translateSchema } from '../../translate/shared/schemas/translate.schemas'
+import QrServices from '../../qr/services/qr.services'
+import { qrSchema } from '../../qr/shared/schemas/qr.schemas'
 import SearchRepository from '../repositories/search/search.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
@@ -60,6 +62,7 @@ export default class MessageProcessor {
   private linksServices: LinksServices
   private imagesServices: ImagesServices
   private translateServices: TranslateServices
+  private qrServices: QrServices
   private defaultSnoozeMinutes = 10
 
   private constructor(aiToUse = AIRepositoryType.OPENAI) {
@@ -71,6 +74,7 @@ export default class MessageProcessor {
     this.linksServices = LinksServices.getInstance()
     this.imagesServices = ImagesServices.getInstance()
     this.translateServices = TranslateServices.getInstance()
+    this.qrServices = QrServices.getInstance()
   }
 
   static getInstance(): MessageProcessor {
@@ -960,6 +964,33 @@ export default class MessageProcessor {
         responseMessage = {
           role: roleTypes.assistant,
           content: translateResult.data.translatedText,
+          provider: ConversationProviders.ASSISTANT,
+        }
+        break
+      }
+
+      case AssistantsVariables.QR: {
+        const qrValue = (assistantMessage.value as string) || ''
+        if (!qrValue.trim()) {
+          throw new Error('Uso: .qr <texto o URL>')
+        }
+
+        const qrValidation = qrSchema.safeParse({ text: qrValue })
+
+        if (!qrValidation.success) {
+          const messages = qrValidation.error.errors.map((e) => e.message).join(', ')
+          throw new Error(`Parámetros inválidos: ${messages}`)
+        }
+
+        const qrResult = await this.qrServices.generateQr(qrValidation.data.text)
+
+        if (qrResult.error) {
+          throw new Error(qrResult.error)
+        }
+
+        responseMessage = {
+          role: roleTypes.assistant,
+          content: qrResult.data.qrBase64,
           provider: ConversationProviders.ASSISTANT,
         }
         break
