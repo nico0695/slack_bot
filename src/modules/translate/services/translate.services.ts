@@ -2,25 +2,20 @@ import { injectable, inject } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { ITranslateRepository, ITranslateResponse } from '../shared/interfaces/translate.interfaces'
-import { TRANSLATE_SYSTEM_PROMPT } from '../shared/constants/translate.constants'
+import { translateSystemPrompt } from '../shared/constants/translate.constants'
 
 const log = createModuleLogger('translate.services')
 
 @injectable()
 export default class TranslateServices {
-  constructor(
-    @inject('TranslateRepository') private translateRepository: ITranslateRepository
-  ) {}
+  constructor(@inject('TranslateRepository') private translateRepository: ITranslateRepository) {}
 
-  async translate(
-    text: string,
-    targetLang: string
-  ): Promise<GenericResponse<ITranslateResponse>> {
+  async translate(text: string, targetLang: string): Promise<GenericResponse<ITranslateResponse>> {
     try {
       const translatedText = await this.translateRepository.translate(
         text,
         targetLang,
-        TRANSLATE_SYSTEM_PROMPT
+        translateSystemPrompt
       )
 
       if (!translatedText) {

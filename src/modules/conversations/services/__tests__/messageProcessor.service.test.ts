@@ -414,7 +414,7 @@ describe('MessageProcessor - translate handling', () => {
 
     const result = await processor.processAssistantMessage('.translate Spanish Hello world', 99)
 
-    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'Spanish')
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'spanish')
     expect(result.response.content).toBe('Hola mundo')
   })
 
@@ -425,7 +425,7 @@ describe('MessageProcessor - translate handling', () => {
 
     const result = await processor.processAssistantMessage('.tr French Hello', 99)
 
-    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello', 'French')
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello', 'french')
     expect(result.response.content).toBe('Bonjour')
   })
 
