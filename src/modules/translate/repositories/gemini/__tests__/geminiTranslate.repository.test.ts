@@ -25,7 +25,7 @@ describe('GeminiTranslateRepository', () => {
 
   beforeAll(() => {
     process.env.GEMINI_API_KEY = 'gemini-token'
-    repository = GeminiTranslateRepository.getInstance()
+    repository = new GeminiTranslateRepository()
   })
 
   beforeEach(() => {

@@ -1,25 +1,16 @@
+import { singleton } from 'tsyringe'
 import { GoogleGenAI } from '@google/genai'
 import { createModuleLogger } from '../../../../config/logger'
 import { ITranslateRepository } from '../../shared/interfaces/translate.interfaces'
 
 const log = createModuleLogger('gemini.translate')
 
+@singleton()
 export default class GeminiTranslateRepository implements ITranslateRepository {
-  private static instance: GeminiTranslateRepository
-
   private geminiApi
 
-  private constructor() {
+  constructor() {
     this.geminiApi = this.initializeGeminiApi()
-  }
-
-  static getInstance(): GeminiTranslateRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new GeminiTranslateRepository()
-    return this.instance
   }
 
   private initializeGeminiApi(): any {

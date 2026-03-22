@@ -45,8 +45,6 @@ interface IProcessMessageResult {
 export default class MessageProcessor {
   private defaultSnoozeMinutes = 10
 
-  private translateServices: TranslateServices
-
   constructor(
     @inject('AIRepository') private aiRepository: OpenaiRepository | GeminiRepository,
     private redisRepository: RedisRepository,
@@ -55,10 +53,9 @@ export default class MessageProcessor {
     private notesServices: NotesServices,
     private linksServices: LinksServices,
     private imagesServices: ImagesServices,
-    private searchRepository: SearchRepository
-  ) {
-    this.translateServices = TranslateServices.getInstance()
-  }
+    private searchRepository: SearchRepository,
+    private translateServices: TranslateServices,
+  ) {}
 
   processAssistantMessage = async (
     message: string,

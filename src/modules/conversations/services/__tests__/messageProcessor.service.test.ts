@@ -44,13 +44,6 @@ const translateServicesMock = {
   translate: jest.fn(),
 }
 
-jest.mock('../../../translate/services/translate.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => translateServicesMock,
-  },
-}))
-
 const buildBlocksMock = (): { blocks: any[] } => ({ blocks: [] as any[] })
 
 jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
@@ -74,7 +67,8 @@ const buildProcessor = (): MessageProcessor =>
     notesServicesMock as any,
     linksServicesMock as any,
     imagesServicesMock as any,
-    searchRepositoryMock as any
+    searchRepositoryMock as any,
+    translateServicesMock as any,
   )
 
 describe('MessageProcessor - channel scoped lookups', () => {

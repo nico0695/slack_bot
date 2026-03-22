@@ -91,7 +91,7 @@ export default class App {
     this.textToSpeechWebController = container.resolve(TextToSpeechWebController)
     this.summaryWebController = container.resolve(SummaryWebController)
     this.systemWebController = container.resolve(SystemWebController)
-    this.translateWebController = TranslateWebController.getInstance()
+    this.translateWebController = container.resolve(TranslateWebController)
 
     // Express
     this.app = express()
