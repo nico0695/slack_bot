@@ -11,6 +11,7 @@ export enum AssistantsVariables {
   QUESTION = 'question',
   IMAGE = 'image',
   TRANSLATE = 'translate',
+  QR = 'qr',
 }
 
 export const assistantsVariablesKey: {
@@ -37,6 +38,8 @@ export const assistantsVariablesKey: {
 
   translate: AssistantsVariables.TRANSLATE,
   tr: AssistantsVariables.TRANSLATE,
+
+  qr: AssistantsVariables.QR,
 }
 
 export enum AssistantsFlags {
@@ -189,6 +192,10 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
     },
   },
   [AssistantsVariables.TRANSLATE]: {
+    defaultValue: null,
+    manyWords: true,
+  },
+  [AssistantsVariables.QR]: {
     defaultValue: null,
     manyWords: true,
   },

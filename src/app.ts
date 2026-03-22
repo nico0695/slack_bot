@@ -41,6 +41,8 @@ import LinksWebController from './modules/links/controller/linksWeb.controller'
 import SystemWebController from './modules/system/controller/systemWeb.controller'
 import ConstantsController from './modules/constants/controller/constants.controller'
 import TranslateWebController from './modules/translate/controller/translateWeb.controller'
+import QrController from './modules/qr/controller/qr.controller'
+import QrWebController from './modules/qr/controller/qrWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
 dotenv.config()
@@ -71,6 +73,8 @@ export default class App {
   private summaryWebController: SummaryWebController
   private systemWebController: SystemWebController
   private translateWebController: TranslateWebController
+  private qrController: QrController
+  private qrWebController: QrWebController
 
   constructor() {
     // Controllers Instances
@@ -92,6 +96,8 @@ export default class App {
     this.summaryWebController = container.resolve(SummaryWebController)
     this.systemWebController = container.resolve(SystemWebController)
     this.translateWebController = container.resolve(TranslateWebController)
+    this.qrController = container.resolve(QrController)
+    this.qrWebController = container.resolve(QrWebController)
 
     // Express
     this.app = express()
@@ -132,6 +138,7 @@ export default class App {
     this.app.use('/text-to-speech', [this.textToSpeechWebController.router])
     this.app.use('/summary', [this.summaryWebController.router])
     this.app.use('/translate', [this.translateWebController.router])
+    this.app.use('/qr', [this.qrWebController.router])
   }
 
   private slackListeners(): void {
@@ -171,6 +178,8 @@ export default class App {
       slackListenersKey.generateImages,
       safeHandler(this.imagesController.generateImages)
     )
+
+    this.slackApp.message(slackListenersKey.generateQr, safeHandler(this.qrController.generateQr))
 
     this.slackApp.message(
       slackListenersKey.conversationFlow,

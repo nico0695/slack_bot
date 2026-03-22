@@ -27,5 +27,7 @@ container.register('ImageRepository', {
 
 // Translate repository (seleccionado por env var)
 const translateType = process.env.TRANSLATE_REPOSITORY_TYPE ?? 'OPENAI'
-const translateRepoClass = (translateType === 'GEMINI' ? GeminiTranslateRepository : OpenaiTranslateRepository) as any
+const translateRepoClass = (
+  translateType === 'GEMINI' ? GeminiTranslateRepository : OpenaiTranslateRepository
+) as any
 container.register('TranslateRepository', { useClass: translateRepoClass })
