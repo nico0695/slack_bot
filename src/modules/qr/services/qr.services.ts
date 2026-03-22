@@ -10,17 +10,19 @@ const log = createModuleLogger('qr.services')
 @singleton()
 export default class QrServices {
   async generateQr(text: string): Promise<GenericResponse<IQrResponse>> {
-    if (!text || text.length > QR_TEXT_MAX_LENGTH) {
+    const trimmedText = (text ?? '').trim()
+
+    if (!trimmedText || trimmedText.length > QR_TEXT_MAX_LENGTH) {
       return { error: 'El texto debe tener entre 1 y 2000 caracteres' }
     }
 
     try {
-      const qrBase64 = await QRCode.toDataURL(text, {
+      const qrBase64 = await QRCode.toDataURL(trimmedText, {
         width: QR_IMAGE_WIDTH,
         errorCorrectionLevel: QR_ERROR_CORRECTION_LEVEL,
       })
 
-      log.info({ textLength: text.length }, 'QR code generated')
+      log.info({ textLength: trimmedText.length }, 'QR code generated')
 
       return {
         data: {
