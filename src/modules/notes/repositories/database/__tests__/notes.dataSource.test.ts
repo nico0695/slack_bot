@@ -2,7 +2,7 @@ import { Notes } from '../../../../../entities/notes'
 import NotesDataSource from '../notes.dataSource'
 
 describe('NotesDataSource', () => {
-  const dataSource = NotesDataSource.getInstance()
+  const dataSource = new NotesDataSource()
 
   afterEach(() => {
     jest.restoreAllMocks()

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
@@ -12,32 +13,18 @@ import AlertsServices from '../services/alerts.services'
 import { IAlert } from '../shared/interfaces/alerts.interfaces'
 import { createAlertSchema } from '../shared/schemas/alerts.schemas'
 
+@injectable()
 export default class AlertsWebController extends GenericController {
-  private static instance: AlertsWebController
-
   public router: Router
 
-  private alertsServices: AlertsServices
-
-  private constructor() {
+  constructor(private alertsServices: AlertsServices) {
     super()
     this.createAlert = this.createAlert.bind(this)
     this.getAlerts = this.getAlerts.bind(this)
     this.deleteAlert = this.deleteAlert.bind(this)
 
-    this.alertsServices = AlertsServices.getInstance()
-
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): AlertsWebController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new AlertsWebController()
-    return this.instance
   }
 
   /** Alerts Routes */

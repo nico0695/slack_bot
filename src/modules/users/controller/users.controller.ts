@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 
 import GenericController from '../../../shared/modules/genericController'
 
@@ -9,14 +10,11 @@ import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 
+@injectable()
 export default class UsersController extends GenericController {
-  private static instance: UsersController
-
   public router: Router
 
-  private usersServices: UsersServices
-
-  private constructor() {
+  constructor(private usersServices: UsersServices) {
     super()
     this.createUser = this.createUser.bind(this)
     this.getUsers = this.getUsers.bind(this)
@@ -25,19 +23,8 @@ export default class UsersController extends GenericController {
     this.updateUser = this.updateUser.bind(this)
     this.subscribeNotifications = this.subscribeNotifications.bind(this)
 
-    this.usersServices = UsersServices.getInstance()
-
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): UsersController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new UsersController()
-    return this.instance
   }
 
   /** Users Routes */

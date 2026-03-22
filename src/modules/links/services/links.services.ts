@@ -1,3 +1,5 @@
+import { injectable } from 'tsyringe'
+
 import { Links } from '../../../entities/links'
 import { GenericResponse } from '../../../shared/interfaces/services'
 
@@ -10,25 +12,12 @@ import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('links.service')
 
+@injectable()
 export default class LinksServices {
-  private static instance: LinksServices
-
-  private linksDataSource: LinksDataSource
-  private linksMetadataRepository: LinksMetadataRepository
-
-  private constructor() {
-    this.linksDataSource = LinksDataSource.getInstance()
-    this.linksMetadataRepository = LinksMetadataRepository.getInstance()
-  }
-
-  static getInstance(): LinksServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new LinksServices()
-    return this.instance
-  }
+  constructor(
+    private linksDataSource: LinksDataSource,
+    private linksMetadataRepository: LinksMetadataRepository
+  ) {}
 
   /**
    * Enrich link metadata by fetching title/description from the URL.

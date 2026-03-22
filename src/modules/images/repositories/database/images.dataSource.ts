@@ -1,21 +1,12 @@
+import { singleton } from 'tsyringe'
 import { Images } from '../../../../entities/images'
 
 import { IImage } from '../../shared/interfaces/images.interfaces'
 import { IPaginationOptions, IPaginationResponse } from '../../../../shared/interfaces/pagination'
 
+@singleton()
 export default class ImagesDataSources {
-  private static instance: ImagesDataSources
-
-  private constructor() {}
-
-  static getInstance(): ImagesDataSources {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ImagesDataSources()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Save user in database

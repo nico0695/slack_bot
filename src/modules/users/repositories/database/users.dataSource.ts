@@ -1,22 +1,15 @@
+import { singleton } from 'tsyringe'
+
 import { Users } from '../../../../entities/users'
 import { IUsers } from '../../interfaces/users.interfaces'
 
 import { IPaginationOptions, IPaginationResponse } from '../../../../shared/interfaces/pagination'
 
 const adminMail = process.env.ADMIN_MAIL
+
+@singleton()
 export default class UsersDataSources {
-  private static instance: UsersDataSources
-
-  private constructor() {}
-
-  static getInstance(): UsersDataSources {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new UsersDataSources()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Verify if email exist in database

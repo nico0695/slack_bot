@@ -31,20 +31,13 @@ const notesServicesMock = {
   deleteNote: deleteNoteMock,
 }
 
-jest.mock('../../services/notes.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => notesServicesMock,
-  },
-}))
-
 describe('NotesWebController', () => {
   let controller: NotesWebController
   let res: any
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = NotesWebController.getInstance()
+    controller = new NotesWebController(notesServicesMock as any)
     controller.userData = { id: 11 } as any
     res = { send: jest.fn() }
   })

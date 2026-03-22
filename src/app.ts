@@ -1,3 +1,5 @@
+import { container } from 'tsyringe'
+
 import express from 'express'
 import cors from 'cors'
 import pinoHttp from 'pino-http'
@@ -32,11 +34,12 @@ import { ProgressCallback } from './modules/conversations/shared/interfaces/conv
 import SummaryWebController from './modules/summary/controller/summary.controller'
 import { alertCronJob } from './modules/alerts/utils/cronJob'
 import { supabaseKeepAlive } from './modules/system/utils/supabaseKeepAlive'
-import AlertsWebController from './modules/alerts/controller/alersWeb.controller'
+import AlertsWebController from './modules/alerts/controller/alertsWeb.controller'
 import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
 import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
 import SystemWebController from './modules/system/controller/systemWeb.controller'
+import ConstantsController from './modules/constants/controller/constants.controller'
 import TranslateWebController from './modules/translate/controller/translateWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
@@ -59,6 +62,7 @@ export default class App {
   private tasksWebController: TasksWebController
   private notesWebController: NotesWebController
   private linksWebController: LinksWebController
+  private constantsController: ConstantsController
 
   private imagesController: ImagesController
   private imagesWebController: ImagesWebController
@@ -70,23 +74,24 @@ export default class App {
 
   constructor() {
     // Controllers Instances
-    this.usersController = UsersController.getInstance()
+    this.usersController = container.resolve(UsersController)
 
-    this.conversationController = ConversationController.getInstance()
-    this.conversationWebController = ConversationsWebController.getInstance()
+    this.conversationController = container.resolve(ConversationController)
+    this.conversationWebController = container.resolve(ConversationsWebController)
 
-    this.alertsWebController = AlertsWebController.getInstance()
-    this.tasksWebController = TasksWebController.getInstance()
-    this.notesWebController = NotesWebController.getInstance()
-    this.linksWebController = LinksWebController.getInstance()
+    this.alertsWebController = container.resolve(AlertsWebController)
+    this.tasksWebController = container.resolve(TasksWebController)
+    this.notesWebController = container.resolve(NotesWebController)
+    this.linksWebController = container.resolve(LinksWebController)
+    this.constantsController = container.resolve(ConstantsController)
 
-    this.imagesController = ImagesController.getInstance()
-    this.imagesWebController = ImagesWebController.getInstance()
+    this.imagesController = container.resolve(ImagesController)
+    this.imagesWebController = container.resolve(ImagesWebController)
 
-    this.textToSpeechWebController = TextToSpeechWebController.getInstance()
-    this.summaryWebController = SummaryWebController.getInstance()
-    this.systemWebController = SystemWebController.getInstance()
-    this.translateWebController = TranslateWebController.getInstance()
+    this.textToSpeechWebController = container.resolve(TextToSpeechWebController)
+    this.summaryWebController = container.resolve(SummaryWebController)
+    this.systemWebController = container.resolve(SystemWebController)
+    this.translateWebController = container.resolve(TranslateWebController)
 
     // Express
     this.app = express()
@@ -122,6 +127,7 @@ export default class App {
     this.app.use('/tasks', [this.tasksWebController.router])
     this.app.use('/notes', [this.notesWebController.router])
     this.app.use('/links', [this.linksWebController.router])
+    this.app.use('/constants', [this.constantsController.router])
     this.app.use('/images', [this.imagesWebController.router])
     this.app.use('/text-to-speech', [this.textToSpeechWebController.router])
     this.app.use('/summary', [this.summaryWebController.router])
@@ -256,12 +262,11 @@ export default class App {
           io.in(channel).emit('receive_assistant_progress', progressMessage)
         }
 
-        const conversationResponse =
-          await this.conversationWebController.conversationAssistantFlow(
-            userId,
-            message,
-            onProgress
-          )
+        const conversationResponse = await this.conversationWebController.conversationAssistantFlow(
+          userId,
+          message,
+          onProgress
+        )
 
         if (conversationResponse) {
           io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender

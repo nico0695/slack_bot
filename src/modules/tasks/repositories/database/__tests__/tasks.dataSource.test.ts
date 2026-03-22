@@ -3,7 +3,7 @@ import { TaskStatus } from '../../../shared/constants/tasks.constants'
 import TasksDataSource from '../tasks.dataSource'
 
 describe('TasksDataSource', () => {
-  const dataSource = TasksDataSource.getInstance()
+  const dataSource = new TasksDataSource()
 
   afterEach(() => {
     jest.restoreAllMocks()

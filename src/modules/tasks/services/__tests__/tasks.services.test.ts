@@ -24,19 +24,12 @@ const tasksDataSourceInstance = {
   deleteTask: deleteTaskMock,
 }
 
-jest.mock('../../repositories/database/tasks.dataSource', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => tasksDataSourceInstance,
-  },
-}))
-
 jest.mock('../../../../shared/utils/dates.utils', () => ({
   formatTextToDate: (...args: any[]) => formatTextToDateMock(...args),
 }))
 
 describe('TasksServices', () => {
-  const services = TasksServices.getInstance()
+  const services = new TasksServices(tasksDataSourceInstance as any)
 
   beforeEach(() => {
     jest.clearAllMocks()

@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { singleton } from 'tsyringe'
 import { createModuleLogger } from '../../../../config/logger'
 import {
   IImageRepository,
@@ -16,23 +17,13 @@ const log = createModuleLogger('gemini.images')
  * Uses @google/genai library (same as GeminiRepository in conversations)
  * Imagen 3 excels at photorealistic images and artistic styles
  */
+@singleton()
 export default class GeminiImagesRepository implements IImageRepository {
-  private static instance: GeminiImagesRepository
-
   private geminiApi: any
 
-  private constructor() {
+  constructor() {
     this.geminiApi = this.initializeGeminiApi()
     this.generateImage = this.generateImage.bind(this)
-  }
-
-  static getInstance(): GeminiImagesRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new GeminiImagesRepository()
-    return this.instance
   }
 
   /**

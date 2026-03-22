@@ -1,28 +1,20 @@
 import { App as SlackApp } from '@slack/bolt'
 import { UsersListResponse } from '@slack/web-api'
+import { singleton } from 'tsyringe'
+
 import { createModuleLogger } from '../../../../config/logger'
 import { connectionSlackApp } from '../../../../config/slackConfig'
 
 const log = createModuleLogger('users.slack')
 
+@singleton()
 export default class SlackRepository {
-  private static instance: SlackRepository
-
   private slackApp: SlackApp
 
-  private constructor() {
+  constructor() {
     this.getTeamMembers = this.getTeamMembers.bind(this)
 
     this.slackApp = connectionSlackApp
-  }
-
-  static getInstance(): SlackRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new SlackRepository()
-    return this.instance
   }
 
   getTeamMembers = async (teamId: string): Promise<any | null> => {

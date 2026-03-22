@@ -37,9 +37,7 @@ describe('ApiStorageRepository', () => {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { default: Repo } = require('../apiStorage.repository')
 
-        expect(() => {
-          Repo.getInstance()
-        }).toThrow('STORAGE_API_URL is not defined in the environment variables.')
+        expect(() => new Repo()).toThrow('STORAGE_API_URL is not defined in the environment variables.')
       })
     })
 
@@ -51,9 +49,7 @@ describe('ApiStorageRepository', () => {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { default: Repo } = require('../apiStorage.repository')
 
-        expect(() => {
-          Repo.getInstance()
-        }).toThrow('STORAGE_API_KEY is not defined in the environment variables.')
+        expect(() => new Repo()).toThrow('STORAGE_API_KEY is not defined in the environment variables.')
       })
     })
   })
@@ -68,7 +64,7 @@ describe('ApiStorageRepository', () => {
 
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const ApiStorageRepository = require('../apiStorage.repository').default
-      repository = ApiStorageRepository.getInstance()
+      repository = new ApiStorageRepository()
     })
 
     beforeEach(() => {
@@ -78,17 +74,6 @@ describe('ApiStorageRepository', () => {
     afterAll(() => {
       delete process.env.STORAGE_API_URL
       delete process.env.STORAGE_API_KEY
-    })
-
-    describe('Singleton Pattern', () => {
-      it('should return the same instance on multiple calls', () => {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const ApiStorageRepository = require('../apiStorage.repository').default
-        const instance1 = ApiStorageRepository.getInstance()
-        const instance2 = ApiStorageRepository.getInstance()
-
-        expect(instance1).toBe(instance2)
-      })
     })
 
     describe('uploadFile', () => {

@@ -15,12 +15,14 @@
 .build-docker.sh
 
 /coverage
-/doc
+/docs/old
+/docs/temp
+/docs/custom-skills
+/*-temp.*
 
 /.claude
 /.agents
 /.gemini
-/.github/skills
 
 /custom-skills
 
