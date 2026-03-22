@@ -762,7 +762,6 @@ export default class MessageProcessor {
       }
 
       case AssistantsVariables.IMAGE: {
-        // Handle list command (.img -l)
         if (assistantMessage.flags[AssistantsFlags.LIST]) {
           const images = await this.imagesServices.getImages(1, 10)
 
@@ -793,19 +792,16 @@ export default class MessageProcessor {
           break
         }
 
-        // Validate prompt
         if (!assistantMessage.value && !assistantMessage.cleanMessage) {
           throw new Error('Ups! Necesito una descripción de la imagen que quieres generar. 😅')
         }
 
-        // Extract prompt
         const imagePrompt = (assistantMessage.value as string) || assistantMessage.cleanMessage
 
         if (!imagePrompt.trim()) {
           throw new Error('Ups! La descripción de la imagen no puede estar vacía. 😅')
         }
 
-        // Parse options from flags
         const imageOptions: any = {}
 
         if (assistantMessage.flags[AssistantsFlags.SIZE]) {
@@ -838,7 +834,6 @@ export default class MessageProcessor {
           }
         }
 
-        // Generate image
         onProgress?.('Generando imagen...')
         try {
           const response = await this.imagesServices.generateImageForAssistant(
@@ -851,7 +846,6 @@ export default class MessageProcessor {
             throw new Error('No se pudo generar la imagen')
           }
 
-          // Build response with images
           responseMessage = this.buildImageResponse(
             response.images,
             response.provider,
@@ -1235,7 +1229,6 @@ export default class MessageProcessor {
           }
         }
         case 'image.create': {
-          // Validate required fields
           if (!parsed.prompt || typeof parsed.prompt !== 'string') {
             return null
           }
@@ -1246,7 +1239,6 @@ export default class MessageProcessor {
             return null
           }
 
-          // Parse options
           const imageOptions: any = {}
 
           if (parsed.size && typeof parsed.size === 'string') {
@@ -1275,7 +1267,6 @@ export default class MessageProcessor {
             }
           }
 
-          // Generate image
           onProgress?.('Generando imagen...')
           try {
             const response = await this.imagesServices.generateImageForAssistant(
@@ -1288,7 +1279,6 @@ export default class MessageProcessor {
               return null
             }
 
-            // Build and return response
             return this.buildImageResponse(response.images, response.provider, imagePrompt, {
               size: imageOptions.size,
               quality: imageOptions.quality,
@@ -1300,7 +1290,6 @@ export default class MessageProcessor {
           }
         }
         case 'image.list': {
-          // Get recent images
           const images = await this.imagesServices.getImages(1, 10)
 
           if (images.error || !images.data?.data?.length) {
@@ -1365,7 +1354,10 @@ export default class MessageProcessor {
           if (!parsed.text) return null
           const qrValidation = qrSchema.safeParse({ text: parsed.text })
           if (!qrValidation.success) {
-            log.warn({ errors: qrValidation.error.errors }, 'Intent fallback router - qr.generate validation failed')
+            log.warn(
+              { errors: qrValidation.error.errors },
+              'Intent fallback router - qr.generate validation failed'
+            )
             return null
           }
           const qrResult = await this.qrServices.generateQr(qrValidation.data.text)

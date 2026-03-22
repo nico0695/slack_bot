@@ -27,15 +27,11 @@ export default class AlertsWebController extends GenericController {
     this.registerRoutes()
   }
 
-  /** Alerts Routes */
-
   protected registerRoutes(): void {
     this.router.get('/', this.getAlerts)
     this.router.post('/', this.createAlert)
     this.router.delete('/:id', this.deleteAlert)
   }
-
-  /** Alerts Controllers Methods */
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])

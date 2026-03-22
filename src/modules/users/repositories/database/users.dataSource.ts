@@ -12,8 +12,7 @@ export default class UsersDataSources {
   constructor() {}
 
   /**
-   * Verify if email exist in database
-   * @param email string - Email user
+   * Check whether the email already exists.
    */
   public async existEmail(email: string): Promise<boolean> {
     try {
@@ -27,9 +26,7 @@ export default class UsersDataSources {
   }
 
   /**
-   * Save user in database
-   * @param data IUsers - Data user
-   * @returns
+   * Create a user record.
    */
   public async createUser(data: IUsers): Promise<Users> {
     try {
@@ -43,7 +40,7 @@ export default class UsersDataSources {
       newUser.slackId = data.slackId
       newUser.slackTeamId = data.slackTeamId
       newUser.supabaseId = data.supabaseId
-      // TODO: Change this logic to initial user
+      // TODO: Move this default profile assignment to user initialization.
       newUser.profile = data.email === adminMail ? 1 : 3
       newUser.enabled = data.email === adminMail
 
@@ -56,9 +53,7 @@ export default class UsersDataSources {
   }
 
   /**
-   * Update user by id
-   * @param data Partial<IUsers>
-   * @returns IUser
+   * Update a user by id.
    */
   public async updateUserById(id: number, data: Partial<IUsers>): Promise<IUsers | undefined> {
     try {
@@ -73,9 +68,7 @@ export default class UsersDataSources {
   }
 
   /**
-   * Get user by slackId
-   * @param slackId string - Slack Id user
-   * @returns IUsers
+   * Get a user by Slack id.
    */
   public async getUserBySlackId(slackId: string): Promise<IUsers | undefined> {
     try {

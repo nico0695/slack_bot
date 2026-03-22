@@ -34,13 +34,13 @@ export class AssistantMessage {
     let flagValue: string[]
 
     for (const word of words) {
-      // if word is a variable set config and valueStored
+      // Capture variable values.
       if (word.startsWith(assistantsPrefix.variables)) {
         this.variable = assistantsVariablesKey[word.slice(1)] ?? null
 
         messageConfig = assistantMessageConfig[this.variable]
 
-        // if variable has defaultValue set it, else initialize valueStored
+        // Use the default value when available.
         if (messageConfig?.defaultValue !== null) {
           this.value = messageConfig.defaultValue
         } else {
@@ -50,7 +50,7 @@ export class AssistantMessage {
         continue
       }
 
-      // if valueStored is defined, concat word to valueStored or set value and reset valueStored
+      // Keep collecting multi-word variable values.
       if (valueStored !== undefined) {
         if (word.startsWith(assistantsPrefix.flags)) {
           this.value = valueStored.join(' ')
@@ -67,7 +67,7 @@ export class AssistantMessage {
         }
       }
 
-      // if flagKey is defined, concat word to flagValue or set flag and reset flagKey and flagValue
+      // Keep collecting multi-word flag values.
       if (flagKey) {
         if (!word.startsWith(assistantsPrefix.flags)) {
           flagValue.push(word)
@@ -82,7 +82,7 @@ export class AssistantMessage {
       if (word.startsWith(assistantsPrefix.flags)) {
         const flagKeyFormated = assistantFlagsKey[word.slice(1)]
 
-        // if flagKey does not exist in messageConfig flags, continue
+        // Ignore unsupported flags for the current variable.
         if (!messageConfig?.flags?.[flagKeyFormated]) {
           continue
         }

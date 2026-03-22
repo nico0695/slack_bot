@@ -27,16 +27,12 @@ export default class LinksWebController extends GenericController {
     this.registerRoutes()
   }
 
-  /** Links Routes */
-
   protected registerRoutes(): void {
     this.router.get('/', this.getLinks)
     this.router.post('/', this.createLink)
     this.router.put('/:id', this.updateLink)
     this.router.delete('/:id', this.deleteLink)
   }
-
-  /** Links Controllers Methods */
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])

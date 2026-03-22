@@ -8,11 +8,6 @@ import { IPaginationOptions, IPaginationResponse } from '../../../../shared/inte
 export default class ImagesDataSources {
   constructor() {}
 
-  /**
-   * Save user in database
-   * @param data IImage - Data image
-   * @returns
-   */
   public async createImages(data: IImage): Promise<Images> {
     try {
       const newImage = new Images()
@@ -31,11 +26,6 @@ export default class ImagesDataSources {
     }
   }
 
-  /**
-   * Get images by username
-   * @param username string - Username
-   * @returns Images[]
-   */
   public async getImagesByUsername(username: string): Promise<Images[]> {
     try {
       const images = await Images.find({

@@ -27,8 +27,6 @@ export default class UsersController extends GenericController {
     this.registerRoutes()
   }
 
-  /** Users Routes */
-
   protected registerRoutes(): void {
     this.router.get('/', this.getUsers)
     this.router.get('/me', this.getUserMe)
@@ -37,8 +35,6 @@ export default class UsersController extends GenericController {
     this.router.get('/:id', this.getUserById)
     this.router.put('/:id', this.updateUser)
   }
-
-  /** Users Controllers Methods */
 
   @HttpAuth
   @Permission([Profiles.ADMIN])
@@ -49,7 +45,7 @@ export default class UsersController extends GenericController {
       lastName: req.body.lastName,
       email: req.body.email,
       phone: req.body.phone,
-      enabled: false, // ? set enabled to false by default
+      enabled: false,
     }
 
     if (!dataUser.name || !dataUser.email || !dataUser.phone) {

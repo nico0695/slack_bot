@@ -77,7 +77,6 @@ export default class App {
   private qrWebController: QrWebController
 
   constructor() {
-    // Controllers Instances
     this.usersController = container.resolve(UsersController)
 
     this.conversationController = container.resolve(ConversationController)
@@ -99,16 +98,13 @@ export default class App {
     this.qrController = container.resolve(QrController)
     this.qrWebController = container.resolve(QrWebController)
 
-    // Express
     this.app = express()
     this.config()
 
-    // Slack
     this.slackApp = connectionSlackApp
 
     this.router()
 
-    // Error handling
     this.app.use(errorHandler)
   }
 
@@ -120,7 +116,6 @@ export default class App {
     this.app.use(cors())
     this.app.use(express.json())
 
-    // Database Conection
     void connectionSource.initialize()
   }
 
@@ -149,18 +144,15 @@ export default class App {
       }
     }
 
-    // Start slack bot
     void this.slackApp.start(process.env.PORT ?? slackPort).then(() => {
       log.info({ port: slackPort }, 'Slack Bot started')
     })
 
-    // Actions slack bot
     this.slackApp.action(
       /^(?:alert|note|task|link)_actions.*$|^(?:delete|view)_(?:alert|note|task|link)(?:_details)?$/,
       safeHandler(this.conversationController.handleActions)
     )
 
-    // Listener slack bot
     this.slackApp.message(
       slackListenersKey.generateConversation,
       safeHandler(this.conversationController.generateConversation)
@@ -241,7 +233,6 @@ export default class App {
         socketLog.debug({ reason }, 'User disconnected')
       })
 
-      // Assistant
       socket.on('join_assistant_room', async (data) => {
         const { username, channel: channelId }: IJoinRoomData = data
 
@@ -303,7 +294,6 @@ export default class App {
 
       log.info('Cron job started')
 
-      // Iniciar el cron
       cronJob.start()
 
       // Ping Supabase every 3 days to prevent free-tier inactivity pause
@@ -323,7 +313,6 @@ export default class App {
     webpush.setVapidDetails('mailto: test@gmail.com', vapidKeys.publicKey, vapidKeys.privateKey)
   }
 
-  // Start server
   public async start(): Promise<void> {
     process.on('uncaughtException', (err) => {
       logger.fatal({ err }, 'Uncaught exception')
@@ -335,18 +324,14 @@ export default class App {
 
     const server = http.createServer(this.app)
 
-    // Socket io
     this.socketListeners(server)
 
-    // Start express
     server.listen(this.app.get('port'), () => {
       log.info({ port: 4000 }, 'Socket Server started')
     })
 
-    // Slack
     this.slackListeners()
 
-    // Notifications
     this.cronJobs()
     this.webPushConfig()
   }

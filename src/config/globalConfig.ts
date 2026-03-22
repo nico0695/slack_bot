@@ -6,7 +6,6 @@ interface IGlobalConfig {
   [key: string]: GlobalConfigValue
 }
 
-// Global Config
 const GlobalConfig: IGlobalConfig = {
   [GlobalConfigKey.openiaIsActive]: false,
 }

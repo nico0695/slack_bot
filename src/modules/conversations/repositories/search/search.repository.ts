@@ -14,8 +14,7 @@ export default class SearchRepository {
   }
 
   /**
-   * Ejecuta búsqueda externa cruda.
-   * Devuelve arreglo simplificado de { title, url, snippet }.
+   * Run the external search and return normalized results.
    */
   private async rawSearch(query: string): Promise<ISearchResultItem[]> {
     try {
@@ -25,7 +24,7 @@ export default class SearchRepository {
       if (!res.ok) return []
       const data: any = await res.json()
 
-      // Normalización muy básica; adaptar a proveedor real.
+      // Basic normalization; adapt as needed for the provider.
       const items = data?.results || data?.items || []
       return items
         .filter((it: any) => (it?.title || it?.name) && (it?.link || it?.url))
@@ -40,9 +39,6 @@ export default class SearchRepository {
     }
   }
 
-  /**
-   * Public search method returning normalized results (no AI summarization here).
-   */
   async search(query: string): Promise<string> {
     const q = (query || '').trim().slice(0, 180)
     if (!q) return 'No se encontró información relevante.'
@@ -50,18 +46,12 @@ export default class SearchRepository {
     return this.compressResults(raw, q)
   }
 
-  /**
-   * Keep a raw variant (uncompressed) if needed externally later.
-   */
   async searchRaw(query: string): Promise<ISearchResultItem[]> {
     const q = (query || '').trim().slice(0, 180)
     if (!q) return []
     return await this.rawSearch(q)
   }
 
-  /**
-   * Reduce noise: dedupe, shorten, pick most relevant sentence, score & slice.
-   */
   private compressResults(results: ISearchResultItem[], query: string): string {
     let responseSanity = ''
     results.forEach((item) => {
@@ -70,9 +60,6 @@ export default class SearchRepository {
     return responseSanity
   }
 
-  /**
-   * Helper to build condensed context externally if desired.
-   */
   buildCondensedContext(results: ISearchResultItem[]): string {
     return results.map((r, i) => `(${i + 1}) ${r.title}\n${r.snippet}\n${r.url}`).join('\n\n')
   }
