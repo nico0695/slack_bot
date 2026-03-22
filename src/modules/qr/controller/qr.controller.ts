@@ -1,14 +1,18 @@
 import { createModuleLogger } from '../../../config/logger'
+import GenericController from '../../../shared/modules/genericController'
+import { SlackAuth } from '../../../shared/middleware/auth'
 import QrServices from '../services/qr.services'
+import { qrSchema } from '../shared/schemas/qr.schemas'
 
 const log = createModuleLogger('qr.controller')
 
-export default class QrController {
+export default class QrController extends GenericController {
   private static instance: QrController
 
   private qrServices: QrServices
 
   private constructor() {
+    super()
     this.qrServices = QrServices.getInstance()
 
     this.generateQr = this.generateQr.bind(this)
@@ -23,7 +27,8 @@ export default class QrController {
     return this.instance
   }
 
-  public generateQr = async (data: any): Promise<void> => {
+  @SlackAuth
+  public async generateQr(data: any): Promise<void> {
     const { payload, say }: any = data
 
     try {
@@ -34,7 +39,15 @@ export default class QrController {
         return
       }
 
-      const response = await this.qrServices.generateQr(text)
+      const validation = qrSchema.safeParse({ text })
+
+      if (!validation.success) {
+        const messages = validation.error.errors.map((e) => e.message).join(', ')
+        say(`Parámetros inválidos: ${messages}`)
+        return
+      }
+
+      const response = await this.qrServices.generateQr(validation.data.text)
 
       if (response.error) {
         say('No se pudo generar el código QR')
@@ -44,6 +57,7 @@ export default class QrController {
       say(response.data.qrBase64)
     } catch (error) {
       log.error({ err: error }, 'generateQr failed')
+      say('Ups! Ocurrió un error al generar el QR.')
     }
   }
 }
