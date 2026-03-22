@@ -21,14 +21,21 @@ jest.mock('../../../../shared/middleware/auth', () => {
 })
 
 const handleActionMock = jest.fn()
+const processAssistantMessageMock = jest.fn()
+const isFlowActiveMock = jest.fn()
 
 const conversationsServicesMock = {
   handleAction: handleActionMock,
 }
 
-const messageProcessorMock = {}
+const messageProcessorMock = {
+  processAssistantMessage: processAssistantMessageMock,
+  shouldSkipAI: jest.fn().mockReturnValue(false),
+}
 
-const flowManagerMock = {}
+const flowManagerMock = {
+  isFlowActive: isFlowActiveMock,
+}
 
 describe('ConversationsController', () => {
   let controller: ConversationsController
@@ -179,6 +186,107 @@ describe('ConversationsController', () => {
       expect(handleActionMock).not.toHaveBeenCalled()
       expect(say).toHaveBeenCalledWith('Ups! Acción no reconocida 🤷‍♂️')
       expect(ack).toHaveBeenCalled()
+    })
+  })
+
+  describe('handleAssistantMessage (via conversationFlow)', () => {
+    it('uploads file when response content is a data URL', async () => {
+      isFlowActiveMock.mockResolvedValue(false)
+      processAssistantMessageMock.mockResolvedValue({
+        response: {
+          content: 'data:image/png;base64,abc123',
+          provider: 'ASSISTANT',
+        },
+      })
+
+      const say = jest.fn()
+      const uploadV2Mock = jest.fn().mockResolvedValue({})
+      const client = { files: { uploadV2: uploadV2Mock } }
+
+      await controller.conversationFlow({
+        payload: { text: '.qr test', channel: 'C999', channel_type: 'im' },
+        say,
+        body: {},
+        client,
+      })
+
+      expect(uploadV2Mock).toHaveBeenCalledWith({
+        channel_id: 'C999',
+        file: expect.any(Buffer),
+        filename: 'image.png',
+      })
+      expect(say).not.toHaveBeenCalled()
+    })
+
+    it('falls back to say when upload fails', async () => {
+      isFlowActiveMock.mockResolvedValue(false)
+      processAssistantMessageMock.mockResolvedValue({
+        response: {
+          content: 'data:image/png;base64,abc123',
+          provider: 'ASSISTANT',
+        },
+      })
+
+      const say = jest.fn()
+      const uploadV2Mock = jest.fn().mockRejectedValue(new Error('upload failed'))
+      const client = { files: { uploadV2: uploadV2Mock } }
+
+      await controller.conversationFlow({
+        payload: { text: '.qr test', channel: 'C999', channel_type: 'im' },
+        say,
+        body: {},
+        client,
+      })
+
+      expect(uploadV2Mock).toHaveBeenCalled()
+      expect(say).toHaveBeenCalledWith('data:image/png;base64,abc123')
+    })
+
+    it('uses say for non-image responses', async () => {
+      isFlowActiveMock.mockResolvedValue(false)
+      processAssistantMessageMock.mockResolvedValue({
+        response: {
+          content: 'Hello! How can I help you?',
+          provider: 'ASSISTANT',
+        },
+      })
+
+      const say = jest.fn()
+      const client = { files: { uploadV2: jest.fn() } }
+
+      await controller.conversationFlow({
+        payload: { text: 'hello', channel: 'C999', channel_type: 'im' },
+        say,
+        body: {},
+        client,
+      })
+
+      expect(say).toHaveBeenCalledWith('Hello! How can I help you?')
+      expect(client.files.uploadV2).not.toHaveBeenCalled()
+    })
+
+    it('prefers contentBlock over content for non-image responses', async () => {
+      isFlowActiveMock.mockResolvedValue(false)
+      const contentBlock = { blocks: [{ type: 'section', text: { text: 'block' } }] }
+      processAssistantMessageMock.mockResolvedValue({
+        response: {
+          content: 'text fallback',
+          contentBlock,
+          provider: 'ASSISTANT',
+        },
+      })
+
+      const say = jest.fn()
+      const client = { files: { uploadV2: jest.fn() } }
+
+      await controller.conversationFlow({
+        payload: { text: '.alerts', channel: 'C999', channel_type: 'im' },
+        say,
+        body: {},
+        client,
+      })
+
+      expect(say).toHaveBeenCalledWith(contentBlock)
     })
   })
 })
