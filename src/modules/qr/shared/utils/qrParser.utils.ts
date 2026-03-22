@@ -3,6 +3,16 @@ import { QR_SHORTCUTS, QR_DEFAULTS } from '../constants/qr.constants'
 
 const VALID_HEX_COLOR = /^#[0-9A-Fa-f]{6}$/
 const VALID_ERROR_LEVEL = /^[LMQH]$/
+const FG_FLAG_PATTERN = /-fg\s+(#[0-9A-Fa-f]{6})\b/
+const BG_FLAG_PATTERN = /-bg\s+(#[0-9A-Fa-f]{6})\b/
+const ECL_FLAG_PATTERN = /-e\s+([LMQH])\b/
+
+// Pre-compile shortcut patterns
+const SHORTCUT_PATTERNS = Object.entries(QR_SHORTCUTS).map(([key, shortcut]) => ({
+  key,
+  shortcut,
+  pattern: new RegExp(`^-${key}\\s+(.+)$`, 's'),
+}))
 
 /**
  * Parse raw input string for the .qr command.
@@ -15,7 +25,7 @@ export function parseQrInput(raw: string): IQrParsedInput {
   const visualOptions: Partial<IQrVisualOptions> = {}
 
   // Extract -fg flag
-  const fgMatch = input.match(/-fg\s+(#[0-9A-Fa-f]{6})\b/)
+  const fgMatch = input.match(FG_FLAG_PATTERN)
   if (fgMatch) {
     if (VALID_HEX_COLOR.test(fgMatch[1])) {
       visualOptions.foregroundColor = fgMatch[1]
@@ -24,7 +34,7 @@ export function parseQrInput(raw: string): IQrParsedInput {
   }
 
   // Extract -bg flag
-  const bgMatch = input.match(/-bg\s+(#[0-9A-Fa-f]{6})\b/)
+  const bgMatch = input.match(BG_FLAG_PATTERN)
   if (bgMatch) {
     if (VALID_HEX_COLOR.test(bgMatch[1])) {
       visualOptions.backgroundColor = bgMatch[1]
@@ -33,7 +43,7 @@ export function parseQrInput(raw: string): IQrParsedInput {
   }
 
   // Extract -e flag
-  const eMatch = input.match(/-e\s+([LMQH])\b/)
+  const eMatch = input.match(ECL_FLAG_PATTERN)
   if (eMatch) {
     if (VALID_ERROR_LEVEL.test(eMatch[1])) {
       visualOptions.errorCorrectionLevel = eMatch[1] as IQrVisualOptions['errorCorrectionLevel']
@@ -42,9 +52,8 @@ export function parseQrInput(raw: string): IQrParsedInput {
   }
 
   // Check for shortcut flags
-  for (const [key, shortcut] of Object.entries(QR_SHORTCUTS)) {
-    const flagPattern = new RegExp(`^-${key}\\s+(.+)$`, 's')
-    const match = input.match(flagPattern)
+  for (const { shortcut, pattern } of SHORTCUT_PATTERNS) {
+    const match = input.match(pattern)
     if (match) {
       const formatted = shortcut.format(match[1].trim())
       if (formatted) {

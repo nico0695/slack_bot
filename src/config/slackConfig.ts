@@ -19,7 +19,7 @@ export const slackListenersKey = {
 
   generateImages: /^img?\b/i,
 
-  generateQr: /^\.qr?\b/i,
+  generateQr: /^\.qr\b/i,
 
   conversationFlow: /^(?!img|\.qr|cb_clean|cb_show|cb\b)/i,
 }
