@@ -522,8 +522,9 @@ Husky runs automatically on commit:
 
 ```bash
 # Runs:
-# 1. ESLint
-# 2. Jest tests
+# 1. Prettier format
+# 2. ESLint
+# 3. Jest tests
 ```
 
 Skipped in production:
