@@ -24,45 +24,36 @@ const getUserInfoMock = jest.fn()
 
 const addOrUpdateUserSubscriptionMock = jest.fn()
 
-jest.mock('../../repositories/database/users.dataSource', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      existEmail: existEmailMock,
-      createUser: createUserMock,
-      getUserByEmail: getUserByEmailMock,
-      getUserById: getUserByIdMock,
-      getUserBySlackId: getUserBySlackIdMock,
-      getUsersBySlackTeamId: getUsersBySlackTeamIdMock,
-      updateUserById: updateUserByIdMock,
-      getAllUsers: getAllUsersMock,
-    }),
-  },
-}))
+const mockUsersDataSource = {
+  existEmail: existEmailMock,
+  createUser: createUserMock,
+  getUserByEmail: getUserByEmailMock,
+  getUserById: getUserByIdMock,
+  getUserBySlackId: getUserBySlackIdMock,
+  getUsersBySlackTeamId: getUsersBySlackTeamIdMock,
+  updateUserById: updateUserByIdMock,
+  getAllUsers: getAllUsersMock,
+}
 
-jest.mock('../../repositories/slack/slack.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      getTeamMembers: getTeamMembersMock,
-      getUserInfo: getUserInfoMock,
-    }),
-  },
-}))
+const mockSlackRepository = {
+  getTeamMembers: getTeamMembersMock,
+  getUserInfo: getUserInfoMock,
+}
 
-jest.mock('../../repositories/redis/users.redis', () => ({
-  UsersRedis: {
-    getInstance: () => ({
-      addOrUpdateUserSubscription: addOrUpdateUserSubscriptionMock,
-    }),
-  },
-}))
+const mockUsersRedis = {
+  addOrUpdateUserSubscription: addOrUpdateUserSubscriptionMock,
+}
 
 describe('UsersServices', () => {
-  const services = UsersServices.getInstance()
+  let services: UsersServices
 
   beforeEach(() => {
     jest.clearAllMocks()
+    services = new UsersServices(
+      mockUsersDataSource as any,
+      mockSlackRepository as any,
+      mockUsersRedis as any
+    )
   })
 
   describe('createUser', () => {

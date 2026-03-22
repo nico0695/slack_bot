@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
+import { container } from 'tsyringe'
 import UnauthorizedError from '../utils/errors/UnauthorizedError'
 
 import { createClient } from '@supabase/supabase-js'
@@ -35,7 +36,7 @@ export const verifyToken = async (
       return res.status(401).json({ message: 'Token invalido' })
     }
 
-    const userServices = UsersServices.getInstance()
+    const userServices = container.resolve(UsersServices)
 
     await userServices.getOrCreateUserSupabase({
       email: supabaseUser.email,
@@ -70,7 +71,7 @@ export function HttpAuth(target: any, propertyKey: string, descriptor: PropertyD
       throw new UnauthorizedError({ message: 'Unauthorized' })
     }
 
-    const userServices = UsersServices.getInstance()
+    const userServices = container.resolve(UsersServices)
 
     const { data: user } = await userServices.getOrCreateUserSupabase({
       email: supabaseUser.email,
@@ -94,7 +95,7 @@ export function SlackAuth(target: any, propertyKey: string, descriptor: Property
     const [{ payload, say }] = args
 
     try {
-      const userServices = UsersServices.getInstance()
+      const userServices = container.resolve(UsersServices)
 
       const meChannelId = payload.channel_type === 'im' ? payload.channel : undefined
 
@@ -125,7 +126,7 @@ export function SlackAuthActions(
     const [{ body, payload, ack, say }]: any = args
 
     try {
-      const userServices = UsersServices.getInstance()
+      const userServices = container.resolve(UsersServices)
 
       const meChannelId =
         body.channel?.id ?? (payload.channel_type === 'im' ? payload.channel : undefined)

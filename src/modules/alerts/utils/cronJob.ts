@@ -1,4 +1,5 @@
 import webpush from 'web-push'
+import { container } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import { connectionSlackApp as slackApp } from '../../../config/slackConfig'
@@ -13,7 +14,7 @@ const log = createModuleLogger('alerts.cron')
 export const alertCronJob = async (): Promise<void> => {
   try {
     const startTime = Date.now()
-    const alertsServices = AlertsServices.getInstance()
+    const alertsServices = container.resolve(AlertsServices)
 
     const alerts = await alertsServices.getAlertsToNotify()
 
@@ -26,38 +27,40 @@ export const alertCronJob = async (): Promise<void> => {
       return
     }
 
-    alerts?.data.forEach(async (alert) => {
-      const targetChannel = alert.channelId ?? alert.user.slackChannelId
+    await Promise.all(
+      alerts?.data.map(async (alert) => {
+        const targetChannel = alert.channelId ?? alert.user.slackChannelId
 
-      if (targetChannel) {
-        // Send rich message to slack
-        const messageBlock = slackMsgUtils.msgAlertDetail(alert as any)
+        if (targetChannel) {
+          // Send rich message to slack
+          const messageBlock = slackMsgUtils.msgAlertDetail(alert as any)
 
-        // Send rich message to slack
-        await slackApp.client.chat.postMessage({
-          channel: targetChannel,
-          text: `🔔 Alerta: ${alert.message}`,
-          blocks: messageBlock.blocks,
-        })
+          // Send rich message to slack
+          await slackApp.client.chat.postMessage({
+            channel: targetChannel,
+            text: `🔔 Alerta: ${alert.message}`,
+            blocks: messageBlock.blocks,
+          })
 
-        // Send notification to web
-        if (alert.user.pwSubscription) {
-          try {
-            await webpush.sendNotification(
-              alert.user.pwSubscription,
-              JSON.stringify({
-                title: alert.message,
-                body: alert.message,
-                url: 'https://localhost:3000/',
-                tag: `new-alert-${alert.id}`,
-              })
-            )
-          } catch (error) {
-            log.error({ err: error }, 'Failed to send web notification')
+          // Send notification to web
+          if (alert.user.pwSubscription) {
+            try {
+              await webpush.sendNotification(
+                alert.user.pwSubscription,
+                JSON.stringify({
+                  title: alert.message,
+                  body: alert.message,
+                  url: 'https://localhost:3000/',
+                  tag: `new-alert-${alert.id}`,
+                })
+              )
+            } catch (error) {
+              log.error({ err: error }, 'Failed to send web notification')
+            }
           }
         }
-      }
-    })
+      })
+    )
 
     await alertsServices.updateAlertAsNotified(alerts?.data.map((alert) => alert.id))
 

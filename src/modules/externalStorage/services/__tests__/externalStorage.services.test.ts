@@ -19,7 +19,6 @@ jest.mock('../../../../config/logger', () => ({
   }),
 }))
 
-// Mock repositories
 const mockApiStorageRepo = {
   uploadFile: jest.fn(),
   getFile: jest.fn(),
@@ -37,37 +36,12 @@ const mockDataSource = {
   deleteStoredFile: jest.fn(),
 }
 
-jest.mock('../../repositories/apiStorage/apiStorage.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: jest.fn().mockImplementation(() => mockApiStorageRepo),
-  },
-}))
-
-jest.mock('../../repositories/database/externalStorage.dataSource', () => ({
-  __esModule: true,
-  default: {
-    getInstance: jest.fn().mockImplementation(() => mockDataSource),
-  },
-}))
-
 describe('ExternalStorageServices', () => {
   let service: ExternalStorageServices
 
   beforeEach(() => {
     jest.clearAllMocks()
-    // Reset singleton
-    Object.defineProperty(ExternalStorageServices, 'instance', { value: undefined, writable: true })
-    service = ExternalStorageServices.getInstance()
-  })
-
-  describe('Singleton Pattern', () => {
-    it('should return the same instance on multiple calls', () => {
-      const instance1 = ExternalStorageServices.getInstance()
-      const instance2 = ExternalStorageServices.getInstance()
-
-      expect(instance1).toBe(instance2)
-    })
+    service = new ExternalStorageServices(mockApiStorageRepo as any, mockDataSource as any)
   })
 
   describe('uploadFile', () => {

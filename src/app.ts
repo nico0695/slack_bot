@@ -72,12 +72,12 @@ export default class App {
 
   constructor() {
     // Controllers Instances
-    this.usersController = UsersController.getInstance()
+    this.usersController = container.resolve(UsersController)
 
     this.conversationController = ConversationController.getInstance()
     this.conversationWebController = ConversationsWebController.getInstance()
 
-    this.alertsWebController = AlertsWebController.getInstance()
+    this.alertsWebController = container.resolve(AlertsWebController)
     this.tasksWebController = container.resolve(TasksWebController)
     this.notesWebController = container.resolve(NotesWebController)
     this.linksWebController = container.resolve(LinksWebController)

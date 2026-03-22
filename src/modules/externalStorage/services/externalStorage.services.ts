@@ -1,3 +1,5 @@
+import { container, singleton } from 'tsyringe'
+
 import { createModuleLogger } from '../../../config/logger'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import ApiStorageRepository from '../repositories/apiStorage/apiStorage.repository'
@@ -14,24 +16,15 @@ import {
 
 const log = createModuleLogger('externalStorage.service')
 
+@singleton()
 export default class ExternalStorageServices {
-  private static instance: ExternalStorageServices
-
-  private apiStorageRepo: ApiStorageRepository
-  private dataSource: ExternalStorageDataSource
-
-  private constructor() {
-    this.apiStorageRepo = ApiStorageRepository.getInstance()
-    this.dataSource = ExternalStorageDataSource.getInstance()
-  }
+  constructor(
+    private apiStorageRepo: ApiStorageRepository,
+    private dataSource: ExternalStorageDataSource
+  ) {}
 
   static getInstance(): ExternalStorageServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ExternalStorageServices()
-    return this.instance
+    return container.resolve(ExternalStorageServices)
   }
 
   async uploadFile(options: IStorageUploadOptions): Promise<GenericResponse<IStorageUploadResult>> {
