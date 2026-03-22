@@ -38,8 +38,6 @@ import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
 import SystemWebController from './modules/system/controller/systemWeb.controller'
 import TranslateWebController from './modules/translate/controller/translateWeb.controller'
-import QrController from './modules/qr/controller/qr.controller'
-import QrWebController from './modules/qr/controller/qrWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
 dotenv.config()
@@ -70,9 +68,6 @@ export default class App {
   private systemWebController: SystemWebController
   private translateWebController: TranslateWebController
 
-  private qrController: QrController
-  private qrWebController: QrWebController
-
   constructor() {
     // Controllers Instances
     this.usersController = UsersController.getInstance()
@@ -92,9 +87,6 @@ export default class App {
     this.summaryWebController = SummaryWebController.getInstance()
     this.systemWebController = SystemWebController.getInstance()
     this.translateWebController = TranslateWebController.getInstance()
-
-    this.qrController = QrController.getInstance()
-    this.qrWebController = QrWebController.getInstance()
 
     // Express
     this.app = express()
@@ -134,7 +126,6 @@ export default class App {
     this.app.use('/text-to-speech', [this.textToSpeechWebController.router])
     this.app.use('/summary', [this.summaryWebController.router])
     this.app.use('/translate', [this.translateWebController.router])
-    this.app.use('/qr', [this.qrWebController.router])
   }
 
   private slackListeners(): void {
@@ -173,11 +164,6 @@ export default class App {
     this.slackApp.message(
       slackListenersKey.generateImages,
       safeHandler(this.imagesController.generateImages)
-    )
-
-    this.slackApp.message(
-      slackListenersKey.generateQr,
-      safeHandler(this.qrController.generateQr)
     )
 
     this.slackApp.message(
