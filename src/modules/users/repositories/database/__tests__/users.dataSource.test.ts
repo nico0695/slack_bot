@@ -40,7 +40,7 @@ describe('UsersDataSources', () => {
     jest.resetModules()
     const module = await import('../users.dataSource')
     UsersDataSources = module.default
-    dataSource = UsersDataSources.getInstance()
+    dataSource = new UsersDataSources()
   }
 
   beforeEach(async () => {

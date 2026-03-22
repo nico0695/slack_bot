@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import GenericController from '../../../shared/modules/genericController'
@@ -15,36 +16,22 @@ import { rPersonalConversationFlow } from '../repositories/redis/redis.constants
 
 const log = createModuleLogger('conversations.controller')
 
+@injectable()
 export default class ConversationsController extends GenericController {
-  private static instance: ConversationsController
-
   public router: Router
 
-  private conversationServices: ConversationsServices
-  private messageProcessor: MessageProcessor
-  private flowManager: ConversationFlowManager
-
-  private constructor() {
+  constructor(
+    private conversationServices: ConversationsServices,
+    private messageProcessor: MessageProcessor,
+    private flowManager: ConversationFlowManager,
+  ) {
     super()
-
-    this.conversationServices = ConversationsServices.getInstance()
-    this.messageProcessor = MessageProcessor.getInstance()
-    this.flowManager = ConversationFlowManager.getInstance()
 
     this.generateConversation = this.generateConversation.bind(this)
     this.cleanConversation = this.cleanConversation.bind(this)
     this.showConversation = this.showConversation.bind(this)
     this.conversationFlow = this.conversationFlow.bind(this)
     this.handleActions = this.handleActions.bind(this)
-  }
-
-  static getInstance(): ConversationsController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ConversationsController()
-    return this.instance
   }
 
   /** Conversation Controllers Methods */

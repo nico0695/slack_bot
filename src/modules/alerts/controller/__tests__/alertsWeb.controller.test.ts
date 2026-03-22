@@ -1,5 +1,5 @@
 import BadRequestError from '../../../../shared/utils/errors/BadRequestError'
-import AlertsWebController from '../alersWeb.controller'
+import AlertsWebController from '../alertsWeb.controller'
 
 jest.mock('../../../../shared/middleware/auth', () => {
   const identityDecorator = (
@@ -29,20 +29,13 @@ const alertsServicesMock = {
   deleteAlert: deleteAlertMock,
 }
 
-jest.mock('../../services/alerts.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => alertsServicesMock,
-  },
-}))
-
 describe('AlertsWebController', () => {
   let controller: AlertsWebController
   let res: any
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = AlertsWebController.getInstance()
+    controller = new AlertsWebController(alertsServicesMock as any)
     controller.userData = { id: 7 } as any
     res = { send: jest.fn() }
   })

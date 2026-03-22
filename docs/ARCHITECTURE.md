@@ -24,7 +24,7 @@ Multi-layered Node.js application with dual interfaces (Slack + Web) using TypeS
                 │
      ┌──────────▼──────────┐
      │   Controllers       │
-     │   (Singleton)       │
+     │   (TSyringe DI)     │
      └──────────┬──────────┘
                 │
      ┌──────────▼──────────┐
@@ -49,7 +49,7 @@ Multi-layered Node.js application with dual interfaces (Slack + Web) using TypeS
 
 ### Startup Sequence (src/app.ts)
 
-1. **Controllers Instantiation** - All controllers initialized as singletons
+1. **Controllers Instantiation** - All controllers resolved via TSyringe DI container
 2. **Express Configuration** - Port 4000, middleware setup
 3. **Database Connection** - TypeORM auto-sync with entities
 4. **HTTP Server Creation** - Express + Socket.io integration
@@ -59,26 +59,30 @@ Multi-layered Node.js application with dual interfaces (Slack + Web) using TypeS
 
 ## Architectural Patterns
 
-### 1. Singleton Pattern
+### 1. Dependency Injection (TSyringe)
 
-All controllers and services use singleton pattern for single instance per application lifecycle:
+All controllers, services, and repositories use TSyringe for dependency injection. Dependencies arrive via constructor — no manual instantiation.
 
 ```typescript
-class Controller {
-  private static instance: Controller
+import { injectable } from 'tsyringe'
 
-  private constructor() {}
-
-  static getInstance(): Controller {
-    if (!Controller.instance) {
-      Controller.instance = new Controller()
-    }
-    return Controller.instance
+@injectable()
+class FeatureWebController extends GenericController {
+  constructor(private featureServices: FeatureServices) {
+    super()
   }
 }
 ```
 
-**Instantiation Location:** `src/app.ts` constructor
+**Decorator rules:**
+
+- Repositories → `@singleton()` (one instance per app)
+- Services → `@injectable()` (standard), or `@singleton()` if shared across multiple modules
+- Controllers → `@injectable()`
+
+**Composition root:** `src/app.ts` resolves all controllers via `container.resolve()`.
+
+**Factory tokens:** Provider-selected repositories (AI, image) are registered in `src/di-container.ts` and injected with `@inject('TokenName')`.
 
 ### 2. Layered Architecture
 
@@ -91,6 +95,7 @@ Repository Layer  → Data access (DB, Redis, APIs)
 ```
 
 **Benefits:**
+
 - Clear separation of concerns
 - Easy testing and mocking
 - Independent layer scaling
@@ -174,12 +179,15 @@ src/modules/{feature}/
 ### Conversation Management
 
 **Components:**
+
 - `ConversationsServices` - Orchestrates AI interactions
 - `ConversationsRedis` - Caches conversation history
 - `OpenAIRepository` / `GeminiRepository` - AI API clients
 
 **Conversation Types:**
+
 1. **Flow Conversations** - Channel-based, multiple users
+
    - Key: `${conversationFlowPrefix}:${channelId}`
    - Used in: Slack channels, web public rooms
 
@@ -188,10 +196,11 @@ src/modules/{feature}/
    - Used in: Web assistant interface
 
 **AI Switching:**
+
 ```typescript
 enum AIRepositoryType {
   OPENAI = 'OPENAI',
-  GEMINI = 'GEMINI'
+  GEMINI = 'GEMINI',
 }
 ```
 
@@ -200,11 +209,13 @@ Services accept `AIRepositoryType` to switch between AI providers.
 ### Alert System
 
 **Components:**
+
 - `AlertsServices` - Alert management
 - `AlertsDataSource` - Database operations
 - `alertCronJob` - Scheduled checker (runs every minute)
 
 **Flow:**
+
 1. User creates alert with time specification (e.g., "1d14h12m")
 2. Alert stored in database with calculated trigger time
 3. Cron job checks every minute for due alerts
@@ -213,11 +224,13 @@ Services accept `AIRepositoryType` to switch between AI providers.
 ### Socket.io Rooms
 
 **Public Channels:**
+
 - Room name: `channel` (e.g., "general")
 - Users join/leave freely
 - Messages broadcast to all room members
 
 **Assistant Rooms:**
+
 - Room name: `userId.toString().padStart(8, '9')`
 - Private 1-1 conversation
 - Padded ID ensures unique room identification
@@ -225,20 +238,24 @@ Services accept `AIRepositoryType` to switch between AI providers.
 ### TypeORM Configuration
 
 **Database Initialization:**
+
 ```typescript
 connectionSource.initialize()
 ```
 
 **Entity Loading:**
+
 - Path: `src/entities/*{.ts,.js}`
 - Auto-sync: Enabled (development)
 - Decorators: `experimentalDecorators: true`
 
 **Default Database:**
+
 - Type: SQLite
 - Location: `src/database/database.sqlite`
 
 **Production Override:**
+
 - Set `DB_URL` environment variable
 - Compatible with: Supabase, PostgreSQL
 
@@ -247,11 +264,13 @@ connectionSource.initialize()
 **Client:** Singleton pattern via `redisConfig.ts`
 
 **Key Patterns:**
+
 - Conversations: `${conversationFlowPrefix}:${channelId}`
 - User data: `${rConversationKey}:${userId}`
 - User preferences: `rUser:${userId}`
 
 **Purpose:**
+
 - Conversation history caching
 - Temporary user preferences
 - Session management
@@ -262,13 +281,14 @@ Web controllers validate incoming data using **Zod** schemas at the controller b
 
 **Shared Utility:** `src/shared/utils/validation.ts`
 
-| Function | Purpose |
-|----------|---------|
-| `validateBody(schema, data)` | Validate request body |
-| `validateQuery(schema, data)` | Validate query parameters |
-| `validateParams(schema, data)` | Validate route params |
+| Function                       | Purpose                   |
+| ------------------------------ | ------------------------- |
+| `validateBody(schema, data)`   | Validate request body     |
+| `validateQuery(schema, data)`  | Validate query parameters |
+| `validateParams(schema, data)` | Validate route params     |
 
 **Reusable Schemas:**
+
 - `paginationSchema` — `page`/`pageSize` with coercion and defaults
 - `idParamSchema` — coerces `:id` to positive integer
 
@@ -281,12 +301,14 @@ Web controllers validate incoming data using **Zod** schemas at the controller b
 **Global Handler:** `src/shared/middleware/errors.ts`
 
 **Error Types:**
+
 - `CustomError` - Base error class
 - `BadRequestError` - 400 errors (also used by Zod validation)
 - `NotFoundError` - 404 errors
 - `UnauthorizedError` - 401 errors
 
 **Async Error Handling:**
+
 ```typescript
 import 'express-async-errors'
 ```
@@ -296,15 +318,18 @@ Automatically catches async errors in Express routes.
 ## Security Patterns
 
 **Slack Verification:**
+
 - Signing secret validation
 - Socket Mode (no public webhook exposure)
 
 **Environment Variables:**
+
 - All secrets in `.env`
 - No hardcoded credentials
 
 **Private Fields:**
 Use TypeScript access modifiers for encapsulation:
+
 ```typescript
 private privateField: Type
 protected protectedField: Type
@@ -315,12 +340,14 @@ protected protectedField: Type
 **Test Location:** `__tests__/` directories in each layer
 
 **Testing Layers:**
+
 - Controllers (integration tests)
 - Services (unit + integration)
 - Repositories (unit with mocks)
 - Utils (unit tests)
 
 **Test Tools:**
+
 - Jest - Test runner
 - ts-jest - TypeScript preset
 - Manual mocks for external APIs
@@ -328,10 +355,12 @@ protected protectedField: Type
 ## Scalability Considerations
 
 **Current Architecture:**
+
 - Single instance design
 - Suitable for small-to-medium teams
 
 **Scaling Path:**
+
 1. Redis session sharing → Multiple instances
 2. Database migration → SQLite to PostgreSQL
 3. Message queue → Decouple cron jobs
@@ -339,15 +368,15 @@ protected protectedField: Type
 
 ## Configuration Files
 
-| File | Purpose |
-|------|---------|
-| `src/config/ormconfig.ts` | TypeORM configuration |
-| `src/config/slackConfig.ts` | Slack Bolt app setup |
-| `src/config/redisConfig.ts` | Redis client singleton |
-| `src/config/socketConfig.ts` | Socket.io server setup |
-| `.eslintrc.json` | Linting rules |
-| `tsconfig.json` | TypeScript configuration |
-| `jest.config.js` | Test configuration |
+| File                         | Purpose                  |
+| ---------------------------- | ------------------------ |
+| `src/config/ormconfig.ts`    | TypeORM configuration    |
+| `src/config/slackConfig.ts`  | Slack Bolt app setup     |
+| `src/config/redisConfig.ts`  | Redis client singleton   |
+| `src/config/socketConfig.ts` | Socket.io server setup   |
+| `.eslintrc.json`             | Linting rules            |
+| `tsconfig.json`              | TypeScript configuration |
+| `jest.config.js`             | Test configuration       |
 
 ## Module Dependency Graph
 
@@ -377,43 +406,26 @@ app.ts
 
 ## Design Decisions
 
-### Why Singleton Pattern?
-- Simple state management
-- No dependency injection overhead
-- Suitable for single-instance deployment
+### Why Dependency Injection (TSyringe)?
+
+- Dependencies explicit in constructor — easy to test and mock
+- TSyringe manages singleton scoping via `@singleton()` decorator
+- No manual `getInstance()` bookkeeping per class
 
 ### Why Dual Controller Pattern?
+
 - Slack and Web have different concerns
 - Cleaner separation of interface logic
 - Independent testing and development
 
 ### Why Redis for Conversations?
+
 - Fast access for frequent operations
 - TTL support for temporary data
 - Simple key-value model fits conversation storage
 
 ### Why Socket Mode for Slack?
+
 - No public endpoint needed
 - Simpler deployment
 - Better for development environments
-
-## Performance Considerations
-
-**Optimization Points:**
-1. Redis caching reduces DB queries
-2. Singleton pattern minimizes object creation
-3. TypeScript compilation to optimized JavaScript
-4. Express middleware order optimized
-
-**Bottlenecks:**
-1. AI API calls (rate limited)
-2. Cron job frequency (every minute)
-3. SQLite performance (single file)
-
-## Future Architecture Improvements
-
-1. **Repository Abstraction Layer** - Generic repository pattern
-2. **Dependency Injection** - Replace singleton pattern
-3. **Event-Driven Architecture** - Decouple modules with events
-4. **API Gateway** - Centralize REST/Socket routing
-5. **Monitoring** - Add APM and logging infrastructure

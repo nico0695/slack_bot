@@ -20,7 +20,7 @@ describe('RedisRepository', () => {
   let repository: RedisRepository
 
   beforeAll(() => {
-    repository = RedisRepository.getInstance()
+    repository = new RedisRepository()
   })
 
   beforeEach(() => {

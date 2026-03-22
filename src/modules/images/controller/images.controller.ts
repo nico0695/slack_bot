@@ -1,30 +1,21 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import ImagesServices from '../services/images.services'
 
 const log = createModuleLogger('images.controller')
 
+@injectable()
 export default class ImagessController {
-  private static instance: ImagessController
-
   public router: Router
 
   private imagesServices: ImagesServices
 
-  private constructor() {
-    this.imagesServices = ImagesServices.getInstance()
+  constructor(imagesServices: ImagesServices) {
+    this.imagesServices = imagesServices
 
     this.generateImages = this.generateImages.bind(this)
-  }
-
-  static getInstance(): ImagessController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ImagessController()
-    return this.instance
   }
 
   /** Images Controllers Methods */

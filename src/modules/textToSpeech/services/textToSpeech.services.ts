@@ -1,3 +1,5 @@
+import { injectable } from 'tsyringe'
+
 import TransformersRepository from '../repositories/transformers/transformers.repository'
 
 import { GenericResponse } from '../../../shared/interfaces/services'
@@ -8,26 +10,13 @@ import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('textToSpeech.service')
 
+@injectable()
 export default class TextToSpeechServices {
-  private static instance: TextToSpeechServices
-
-  private transformersRepository: TransformersRepository
-  private textToSpeechDataSources: TextToSpeechDataSources
-
-  private constructor() {
-    this.transformersRepository = TransformersRepository.getInstance()
-    this.textToSpeechDataSources = TextToSpeechDataSources.getInstance()
-
+  constructor(
+    private transformersRepository: TransformersRepository,
+    private textToSpeechDataSources: TextToSpeechDataSources
+  ) {
     this.generateSpeech = this.generateSpeech.bind(this)
-  }
-
-  static getInstance(): TextToSpeechServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new TextToSpeechServices()
-    return this.instance
   }
 
   generateSpeech = async (phrase: string): Promise<GenericResponse<string>> => {

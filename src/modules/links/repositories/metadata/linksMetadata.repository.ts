@@ -1,22 +1,14 @@
 import axios from 'axios'
+import { singleton } from 'tsyringe'
+
 import { createModuleLogger } from '../../../../config/logger'
 import { ILinkMetadata } from '../../shared/interfaces/links.interfaces'
 
 const log = createModuleLogger('links.metadata')
 
+@singleton()
 export default class LinksMetadataRepository {
-  private static instance: LinksMetadataRepository
-
-  private constructor() {}
-
-  static getInstance(): LinksMetadataRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new LinksMetadataRepository()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Fetch metadata (title, description) from a URL by parsing the HTML head.

@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
@@ -11,33 +12,19 @@ import { createLinkSchema, updateLinkSchema, getLinkQuerySchema } from '../share
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
+@injectable()
 export default class LinksWebController extends GenericController {
-  private static instance: LinksWebController
-
   public router: Router
 
-  private linksServices: LinksServices
-
-  private constructor() {
+  constructor(private linksServices: LinksServices) {
     super()
     this.createLink = this.createLink.bind(this)
     this.getLinks = this.getLinks.bind(this)
     this.deleteLink = this.deleteLink.bind(this)
     this.updateLink = this.updateLink.bind(this)
 
-    this.linksServices = LinksServices.getInstance()
-
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): LinksWebController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new LinksWebController()
-    return this.instance
   }
 
   /** Links Routes */

@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import ConversationsServices from '../services/conversations.services'
@@ -10,29 +11,16 @@ import UsersServices from '../../users/services/users.services'
 
 const log = createModuleLogger('conversations.webController')
 
+@injectable()
 export default class ConversationsWebController {
-  private static instance: ConversationsWebController
-
   public router: Router
 
-  private conversationServices: ConversationsServices
-  private usersServices: UsersServices
-
-  private constructor() {
-    this.conversationServices = ConversationsServices.getInstance()
-    this.usersServices = UsersServices.getInstance()
-
+  constructor(
+    private conversationServices: ConversationsServices,
+    private usersServices: UsersServices,
+  ) {
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): ConversationsWebController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ConversationsWebController()
-    return this.instance
   }
 
   protected registerRoutes(): void {

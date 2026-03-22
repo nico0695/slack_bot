@@ -1,20 +1,12 @@
+import { singleton } from 'tsyringe'
+
 import { StoredFile } from '../../../../entities/storedFile'
 import { StorageSourceModule } from '../../shared/constants/externalStorage.constants'
 import { IStoredFileInput } from '../../shared/interfaces/externalStorage.interfaces'
 
+@singleton()
 export default class ExternalStorageDataSource {
-  private static instance: ExternalStorageDataSource
-
-  private constructor() {}
-
-  static getInstance(): ExternalStorageDataSource {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ExternalStorageDataSource()
-    return this.instance
-  }
+  constructor() {}
 
   public async createStoredFile(data: IStoredFileInput): Promise<StoredFile> {
     const file = new StoredFile()

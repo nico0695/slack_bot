@@ -1,19 +1,11 @@
+import { singleton } from 'tsyringe'
+
 import { Constants } from '../../../../entities/constants'
 import { GlobalConfigKey } from '../../shared/constants/constants.interfaces'
 
+@singleton()
 export default class ConstantsDataSources {
-  private static instance: ConstantsDataSources
-
-  private constructor() {}
-
-  static getInstance(): ConstantsDataSources {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ConstantsDataSources()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Save user in database

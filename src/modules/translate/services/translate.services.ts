@@ -1,47 +1,21 @@
+import { injectable, inject } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { ITranslateRepository, ITranslateResponse } from '../shared/interfaces/translate.interfaces'
-import {
-  TRANSLATE_SYSTEM_PROMPT,
-  TranslateRepositoryType,
-} from '../shared/constants/translate.constants'
-import OpenaiTranslateRepository from '../repositories/openai/openaiTranslate.repository'
-import GeminiTranslateRepository from '../repositories/gemini/geminiTranslate.repository'
+import { translateSystemPrompt } from '../shared/constants/translate.constants'
 
 const log = createModuleLogger('translate.services')
 
-const TranslateRepositoryByType = {
-  [TranslateRepositoryType.OPENAI]: OpenaiTranslateRepository,
-  [TranslateRepositoryType.GEMINI]: GeminiTranslateRepository,
-}
-
+@injectable()
 export default class TranslateServices {
-  private static instance: TranslateServices
+  constructor(@inject('TranslateRepository') private translateRepository: ITranslateRepository) {}
 
-  private translateRepository: ITranslateRepository
-
-  private constructor(repositoryType = TranslateRepositoryType.OPENAI) {
-    this.translateRepository = TranslateRepositoryByType[repositoryType].getInstance()
-  }
-
-  static getInstance(): TranslateServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new TranslateServices()
-    return this.instance
-  }
-
-  async translate(
-    text: string,
-    targetLang: string
-  ): Promise<GenericResponse<ITranslateResponse>> {
+  async translate(text: string, targetLang: string): Promise<GenericResponse<ITranslateResponse>> {
     try {
       const translatedText = await this.translateRepository.translate(
         text,
         targetLang,
-        TRANSLATE_SYSTEM_PROMPT
+        translateSystemPrompt
       )
 
       if (!translatedText) {

@@ -1,3 +1,5 @@
+import { injectable } from 'tsyringe'
+
 import { Constants } from '../../../entities/constants'
 import ConstantsDataSources from '../repositories/database/constants.dataSource'
 
@@ -7,23 +9,9 @@ import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('constants.service')
 
+@injectable()
 export default class ConstantsServices {
-  private static instance: ConstantsServices
-
-  private constantsDataSources: ConstantsDataSources
-
-  private constructor() {
-    this.constantsDataSources = ConstantsDataSources.getInstance()
-  }
-
-  static getInstance(): ConstantsServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ConstantsServices()
-    return this.instance
-  }
+  constructor(private constantsDataSources: ConstantsDataSources) {}
 
   getAllConstants = async (): Promise<Constants[]> => {
     const constants = await this.constantsDataSources.getAllConstants()

@@ -1,16 +1,16 @@
 import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from 'openai'
+import { singleton } from 'tsyringe'
 
 import { createModuleLogger } from '../../../../config/logger'
 import { IConversation } from '../../shared/interfaces/converstions'
 
 const log = createModuleLogger('openai.conversations')
 
+@singleton()
 export default class OpenaiRepository {
-  private static instance: OpenaiRepository
-
   private openai: OpenAIApi
 
-  private constructor() {
+  constructor() {
     const configuration = new Configuration({
       apiKey: process.env.OPENAI_API_KEY,
       organization: 'org-dlzE8QUXcRrvBN096fSCdHBf',
@@ -19,15 +19,6 @@ export default class OpenaiRepository {
     this.openai = new OpenAIApi(configuration)
 
     this.chatCompletion = this.chatCompletion.bind(this)
-  }
-
-  static getInstance(): OpenaiRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new OpenaiRepository()
-    return this.instance
   }
 
   chatCompletion = async (

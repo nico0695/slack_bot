@@ -1,20 +1,12 @@
+import { singleton } from 'tsyringe'
+
 import { IPaginationOptions, IPaginationResponse } from '../../../../shared/interfaces/pagination'
 import { TextToSpeech } from '../../../../entities/textToSpeech'
 import { ITextToSpeech } from '../../shared/interfaces/textToSpeech.interfaces'
 
+@singleton()
 export default class TextToSpeechDataSources {
-  private static instance: TextToSpeechDataSources
-
-  private constructor() {}
-
-  static getInstance(): TextToSpeechDataSources {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new TextToSpeechDataSources()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Save user in database

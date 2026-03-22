@@ -24,13 +24,6 @@ const dataSourceMock = {
   createConstant: createConstantMock,
 }
 
-jest.mock('../../repositories/database/constants.dataSource', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => dataSourceMock,
-  },
-}))
-
 jest.mock('../../../../config/globalConfig', () => ({
   setGlobalConfigValue: jest.fn(),
 }))
@@ -40,7 +33,7 @@ describe('ConstantsServices', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    service = ConstantsServices.getInstance()
+    service = new ConstantsServices(dataSourceMock as any)
   })
 
   it('returns all constants from datasource', async () => {

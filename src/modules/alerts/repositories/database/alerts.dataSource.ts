@@ -1,23 +1,14 @@
 import { FindOptionsWhere, In, IsNull, LessThan } from 'typeorm'
+import { singleton } from 'tsyringe'
 
 import { Alerts } from '../../../../entities/alerts'
 import { Users } from '../../../../entities/users'
 
 import { IAlertToNotify, IAlert } from '../../shared/interfaces/alerts.interfaces'
 
+@singleton()
 export default class AlertsDataSource {
-  private static instance: AlertsDataSource
-
-  private constructor() {}
-
-  static getInstance(): AlertsDataSource {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new AlertsDataSource()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Save alert in database

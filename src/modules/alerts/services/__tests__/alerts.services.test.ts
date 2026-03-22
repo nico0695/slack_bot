@@ -20,7 +20,11 @@ const deleteAlertsMock = jest.fn()
 const getUsersSubscriptionsMock = jest.fn()
 const formatTextToDateMock = jest.fn()
 
-const alertsDataSourceInstance = {
+jest.mock('../../../../shared/utils/dates.utils', () => ({
+  formatTextToDate: (...args: any[]) => formatTextToDateMock(...args),
+}))
+
+const alertsDataSourceMock = {
   createAlert: createAlertMock,
   getAlertsByUserId: getAlertsByUserIdMock,
   getAlertById: getAlertByIdMock,
@@ -30,33 +34,16 @@ const alertsDataSourceInstance = {
   deleteAlerts: deleteAlertsMock,
 }
 
-const usersRedisInstance = {
+const usersRedisMock = {
   getUsersSubscriptions: getUsersSubscriptionsMock,
 }
 
-jest.mock('../../repositories/database/alerts.dataSource', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => alertsDataSourceInstance,
-  },
-}))
-
-jest.mock('../../../users/repositories/redis/users.redis', () => ({
-  __esModule: true,
-  UsersRedis: {
-    getInstance: () => usersRedisInstance,
-  },
-}))
-
-jest.mock('../../../../shared/utils/dates.utils', () => ({
-  formatTextToDate: (...args: any[]) => formatTextToDateMock(...args),
-}))
-
 describe('AlertsServices', () => {
-  const services = AlertsServices.getInstance()
+  let services: AlertsServices
 
   beforeEach(() => {
     jest.clearAllMocks()
+    services = new AlertsServices(alertsDataSourceMock as any, usersRedisMock as any)
   })
 
   describe('createAssistantAlert', () => {

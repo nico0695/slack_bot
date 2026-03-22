@@ -1,3 +1,5 @@
+import { injectable, inject } from 'tsyringe'
+
 import { createModuleLogger } from '../../../config/logger'
 import { GlobalConstants } from '../../../shared/constants/global'
 import { IoServer } from '../../../config/socketConfig'
@@ -43,47 +45,21 @@ export enum AIRepositoryType {
   GEMINI = 'GEMINI',
 }
 
-const AIRepositoryByType = {
-  [AIRepositoryType.OPENAI]: OpenaiRepository,
-  [AIRepositoryType.GEMINI]: GeminiRepository,
-}
-
+@injectable()
 export default class ConversationsServices {
-  private static instance: ConversationsServices
-
-  private aiRepository: OpenaiRepository | GeminiRepository
-
-  private redisRepository: RedisRepository
-
-  private usersServices: UsersServices
-  private alertsServices: AlertsServices
-  private tasksServices: TasksServices
-  private notesServices: NotesServices
-  private linksServices: LinksServices
-  private messageProcessor: MessageProcessor
   private defaultSnoozeMinutes = 10
   private maxContextMessages = 20
 
-  private constructor(aiToUse = AIRepositoryType.OPENAI) {
-    this.aiRepository = AIRepositoryByType[aiToUse].getInstance()
-    this.redisRepository = RedisRepository.getInstance()
-    this.messageProcessor = MessageProcessor.getInstance()
-
-    this.usersServices = UsersServices.getInstance()
-    this.alertsServices = AlertsServices.getInstance()
-    this.tasksServices = TasksServices.getInstance()
-    this.notesServices = NotesServices.getInstance()
-    this.linksServices = LinksServices.getInstance()
-  }
-
-  static getInstance(): ConversationsServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ConversationsServices()
-    return this.instance
-  }
+  constructor(
+    @inject('AIRepository') private aiRepository: OpenaiRepository | GeminiRepository,
+    private redisRepository: RedisRepository,
+    private usersServices: UsersServices,
+    private alertsServices: AlertsServices,
+    private tasksServices: TasksServices,
+    private notesServices: NotesServices,
+    private linksServices: LinksServices,
+    private messageProcessor: MessageProcessor,
+  ) {}
 
   private generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {
     const requestMessages = conversation.map((message) => {
