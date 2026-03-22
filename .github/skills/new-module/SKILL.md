@@ -56,9 +56,9 @@ See `references/templates.md` → **Web Controller Template**
 
 ### 7. Register in `src/app.ts`
 - Import both controllers
-- Add private fields: `#featureController`, `#featureWebController`
-- Instantiate in constructor with `getInstance()`
-- Add Express route: `this.#app.use('/{feature}s', [this.#featureWebController.router])`
+- Add private fields: `featureController`, `featureWebController`
+- Resolve in constructor: `this.featureWebController = container.resolve({Feature}WebController)`
+- Add Express route: `this.app.use('/{feature}s', [this.featureWebController.router])`
 
 ### 8. Register entity in TypeORM
 Entities are auto-loaded via glob (`src/entities/*{.ts,.js}`). No manual registration needed.
@@ -71,8 +71,9 @@ See `references/templates.md` → **Test Templates**
 
 ## Key Rules
 
-- **Singleton everywhere**: `static #instance`, `private constructor()`, `static getInstance()`
-- **Private fields**: Use `#field` syntax for all instance properties
+- **DI pattern**: Repositories → `@singleton()`, Services → `@injectable()`, Controllers → `@injectable()`
+- **Constructor injection**: Dependencies arrive as constructor parameters — no `getInstance()` calls
+- **Private fields**: Use TypeScript `private` keyword (avoid JS `#` syntax)
 - **Logger**: `const log = createModuleLogger('{feature}.{layer}')` after all imports
 - **GenericResponse<T>**: All service methods return `Promise<GenericResponse<T>>`
 - **Error handling**: Services catch and return `{ error: 'message' }`, never throw to caller

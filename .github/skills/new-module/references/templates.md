@@ -83,6 +83,7 @@ export interface I{Feature} {
 **`src/modules/{feature}/repositories/database/{feature}.dataSource.ts`**
 
 ```typescript
+import { singleton } from 'tsyringe'
 import { createModuleLogger } from '../../../../config/logger'
 import { {Feature}s } from '../../../../entities/{feature}s'
 import { Users } from '../../../../entities/users'
@@ -91,18 +92,9 @@ import { {Feature}Status } from '../../shared/constants/{feature}.constants'
 
 const log = createModuleLogger('{feature}.dataSource')
 
+@singleton()
 export default class {Feature}DataSource {
-  static #instance: {Feature}DataSource
-
-  private constructor() {}
-
-  static getInstance(): {Feature}DataSource {
-    if (this.#instance) {
-      return this.#instance
-    }
-    this.#instance = new {Feature}DataSource()
-    return this.#instance
-  }
+  constructor() {}
 
   async create{Feature}(data: I{Feature}): Promise<{Feature}s> {
     try {
@@ -168,6 +160,7 @@ export default class {Feature}DataSource {
 **`src/modules/{feature}/services/{feature}.services.ts`**
 
 ```typescript
+import { injectable } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import { {Feature}s } from '../../../entities/{feature}s'
 import { GenericResponse } from '../../../shared/interfaces/services'
@@ -176,26 +169,13 @@ import {Feature}DataSource from '../repositories/database/{feature}.dataSource'
 
 const log = createModuleLogger('{feature}.services')
 
+@injectable()
 export default class {Feature}Services {
-  static #instance: {Feature}Services
-
-  #dataSource: {Feature}DataSource
-
-  private constructor() {
-    this.#dataSource = {Feature}DataSource.getInstance()
-  }
-
-  static getInstance(): {Feature}Services {
-    if (this.#instance) {
-      return this.#instance
-    }
-    this.#instance = new {Feature}Services()
-    return this.#instance
-  }
+  constructor(private dataSource: {Feature}DataSource) {}
 
   public async create{Feature}(data: I{Feature}): Promise<GenericResponse<{Feature}s>> {
     try {
-      const response = await this.#dataSource.create{Feature}(data)
+      const response = await this.dataSource.create{Feature}(data)
       log.info({ userId: data.userId, id: response.id }, '{Feature} created')
       return { data: response }
     } catch (error) {
@@ -206,7 +186,7 @@ export default class {Feature}Services {
 
   public async get{Feature}sByUserId(userId: number): Promise<GenericResponse<{Feature}s[]>> {
     try {
-      const response = await this.#dataSource.get{Feature}sByUserId(userId)
+      const response = await this.dataSource.get{Feature}sByUserId(userId)
       return { data: response }
     } catch (error) {
       log.error({ err: error, userId }, 'get{Feature}sByUserId failed')
@@ -216,7 +196,7 @@ export default class {Feature}Services {
 
   public async delete{Feature}({feature}Id: number, userId: number): Promise<GenericResponse<boolean>> {
     try {
-      const affected = await this.#dataSource.delete{Feature}({feature}Id, userId)
+      const affected = await this.dataSource.delete{Feature}({feature}Id, userId)
       return { data: affected > 0 }
     } catch (error) {
       log.error({ err: error, {feature}Id, userId }, 'delete{Feature} failed')
@@ -233,7 +213,7 @@ export default class {Feature}Services {
 **`src/modules/{feature}/controller/{feature}.controller.ts`**
 
 ```typescript
-import { Router } from 'express'
+import { injectable } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import GenericController from '../../../shared/modules/GenericController'
 import { SlackAuth } from '../../../shared/middleware/auth'
@@ -241,24 +221,11 @@ import {Feature}Services from '../services/{feature}.services'
 
 const log = createModuleLogger('{feature}.controller')
 
+@injectable()
 export default class {Feature}Controller extends GenericController {
-  static #instance: {Feature}Controller
-  public router: Router
-
-  #{feature}Services: {Feature}Services
-
-  private constructor() {
+  constructor(private {feature}Services: {Feature}Services) {
     super()
-    this.#{feature}Services = {Feature}Services.getInstance()
     this.create{Feature} = this.create{Feature}.bind(this)
-  }
-
-  static getInstance(): {Feature}Controller {
-    if (this.#instance) {
-      return this.#instance
-    }
-    this.#instance = new {Feature}Controller()
-    return this.#instance
   }
 
   @SlackAuth
@@ -273,7 +240,7 @@ export default class {Feature}Controller extends GenericController {
         return
       }
 
-      const response = await this.#{feature}Services.create{Feature}({
+      const response = await this.{feature}Services.create{Feature}({
         userId: this.userData.id,
         title: text,
         channelId: payload.channel,
@@ -301,6 +268,7 @@ export default class {Feature}Controller extends GenericController {
 
 ```typescript
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import GenericController from '../../../shared/modules/GenericController'
 import { HttpAuth, Permission, Profiles } from '../../../shared/middleware/auth'
@@ -310,25 +278,14 @@ import {Feature}Services from '../services/{feature}.services'
 
 const log = createModuleLogger('{feature}Web.controller')
 
+@injectable()
 export default class {Feature}WebController extends GenericController {
-  static #instance: {Feature}WebController
   public router: Router
 
-  #{feature}Services: {Feature}Services
-
-  private constructor() {
+  constructor(private {feature}Services: {Feature}Services) {
     super()
-    this.#{feature}Services = {Feature}Services.getInstance()
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): {Feature}WebController {
-    if (this.#instance) {
-      return this.#instance
-    }
-    this.#instance = new {Feature}WebController()
-    return this.#instance
   }
 
   protected registerRoutes(): void {
@@ -341,7 +298,7 @@ export default class {Feature}WebController extends GenericController {
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])
   public async get{Feature}s(req: any, res: any): Promise<void> {
     const user = this.userData
-    const response = await this.#{feature}Services.get{Feature}sByUserId(user.id)
+    const response = await this.{feature}Services.get{Feature}sByUserId(user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -364,7 +321,7 @@ export default class {Feature}WebController extends GenericController {
       throw new BadRequestError({ message: 'El título es requerido' })
     }
 
-    const response = await this.#{feature}Services.create{Feature}(data)
+    const response = await this.{feature}Services.create{Feature}(data)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -383,7 +340,7 @@ export default class {Feature}WebController extends GenericController {
       throw new BadRequestError({ message: 'ID inválido' })
     }
 
-    const response = await this.#{feature}Services.delete{Feature}({feature}Id, user.id)
+    const response = await this.{feature}Services.delete{Feature}({feature}Id, user.id)
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -419,16 +376,11 @@ const create{Feature}Mock = jest.fn()
 const get{Feature}sByUserIdMock = jest.fn()
 const delete{Feature}Mock = jest.fn()
 
-jest.mock('../../services/{feature}.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      create{Feature}: create{Feature}Mock,
-      get{Feature}sByUserId: get{Feature}sByUserIdMock,
-      delete{Feature}: delete{Feature}Mock,
-    }),
-  },
-}))
+const mockServices = {
+  create{Feature}: create{Feature}Mock,
+  get{Feature}sByUserId: get{Feature}sByUserIdMock,
+  delete{Feature}: delete{Feature}Mock,
+} as any
 
 describe('{Feature}WebController', () => {
   let controller: {Feature}WebController
@@ -436,7 +388,7 @@ describe('{Feature}WebController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = {Feature}WebController.getInstance()
+    controller = new {Feature}WebController(mockServices)
     controller.userData = { id: 1 } as any
     res = { send: jest.fn() }
   })
@@ -479,21 +431,16 @@ import {Feature}Services from '../{feature}.services'
 
 const create{Feature}Mock = jest.fn()
 
-jest.mock('../../repositories/database/{feature}.dataSource', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      create{Feature}: create{Feature}Mock,
-    }),
-  },
-}))
+const mockDataSource = {
+  create{Feature}: create{Feature}Mock,
+} as any
 
 describe('{Feature}Services', () => {
   let services: {Feature}Services
 
   beforeEach(() => {
     jest.clearAllMocks()
-    services = {Feature}Services.getInstance()
+    services = new {Feature}Services(mockDataSource)
   })
 
   describe('create{Feature}', () => {

@@ -54,14 +54,12 @@ protected registerRoutes(): void {
 }
 ```
 
-Bind each method in `private constructor()`:
+Constructor uses DI injection:
 ```typescript
-private constructor() {
+constructor(private featureServices: FeatureServices) {
   super()
-  this.#services = FeatureServices.getInstance()
   this.router = Router()
   this.registerRoutes()
-  // No need to bind — arrow functions or using class method binding via registerRoutes
 }
 ```
 
@@ -197,15 +195,11 @@ jest.mock('../../../../shared/middleware/auth', () => {
 })
 
 const serviceMock = jest.fn()
-
-jest.mock('../../services/feature.services', () => ({
-  __esModule: true,
-  default: { getInstance: () => ({ myMethod: serviceMock }) },
-}))
+const mockServices = { myMethod: serviceMock } as any
 
 describe('endpoint', () => {
   beforeEach(() => {
-    controller = FeatureWebController.getInstance()
+    controller = new FeatureWebController(mockServices)
     controller.userData = { id: 1 } as any
     res = { send: jest.fn() }
   })

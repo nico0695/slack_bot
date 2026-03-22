@@ -219,22 +219,12 @@ export class Reminder {
 
 ```typescript
 // src/modules/reminders/services/reminders.services.ts
+import { injectable } from 'tsyringe'
 import RemindersDataSource from '../repositories/database/reminders.dataSource'
 
+@injectable()
 export default class RemindersServices {
-  private static instance: RemindersServices
-  private dataSource: RemindersDataSource
-
-  private constructor() {
-    this.dataSource = RemindersDataSource.getInstance()
-  }
-
-  static getInstance(): RemindersServices {
-    if (!this.instance) {
-      this.instance = new RemindersServices()
-    }
-    return this.instance
-  }
+  constructor(private dataSource: RemindersDataSource) {}
 
   async createReminder(data: any) {
     return await this.dataSource.create(data)
@@ -251,24 +241,16 @@ export default class RemindersServices {
 ```typescript
 // src/modules/reminders/controller/remindersWeb.controller.ts
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 import RemindersServices from '../services/reminders.services'
 
+@injectable()
 export default class RemindersWebController {
-  private static instance: RemindersWebController
   public router: Router
-  private service: RemindersServices
 
-  private constructor() {
-    this.service = RemindersServices.getInstance()
+  constructor(private service: RemindersServices) {
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): RemindersWebController {
-    if (!this.instance) {
-      this.instance = new RemindersWebController()
-    }
-    return this.instance
   }
 
   private registerRoutes(): void {
@@ -319,6 +301,7 @@ For pagination, use the shared `paginationSchema`. For route `:id` params, use `
 
 ```typescript
 // src/app.ts
+import { container } from 'tsyringe'
 import RemindersWebController from './modules/reminders/controller/remindersWeb.controller'
 
 export default class App {
@@ -326,7 +309,7 @@ export default class App {
 
   constructor() {
     // ... other controllers
-    this.remindersWebController = RemindersWebController.getInstance()
+    this.remindersWebController = container.resolve(RemindersWebController)
     // ...
   }
 
@@ -343,16 +326,20 @@ export default class App {
 // src/modules/reminders/services/__tests__/reminders.services.test.ts
 import RemindersServices from '../reminders.services'
 
+const createMock = jest.fn()
+const mockDataSource = { create: createMock, findByUserId: jest.fn() } as any
+
 describe('RemindersServices', () => {
   let service: RemindersServices
 
-  beforeAll(() => {
-    service = RemindersServices.getInstance()
+  beforeEach(() => {
+    jest.clearAllMocks()
+    service = new RemindersServices(mockDataSource)
   })
 
   it('should create reminder', async () => {
-    const data = { message: 'Test', date: new Date(), userId: 1 }
-    const result = await service.createReminder(data)
+    createMock.mockResolvedValue({ id: 1, message: 'Test' })
+    const result = await service.createReminder({ message: 'Test', date: new Date(), userId: 1 })
     expect(result).toBeDefined()
   })
 })
@@ -392,54 +379,35 @@ npm test -- reminders.services.test.ts
 
 ### Writing Tests
 
-**Unit test example:**
+**Unit test example (DI pattern — pass mocks via constructor):**
 
 ```typescript
 import TasksServices from '../tasks.services'
 
+const createTaskMock = jest.fn()
+const mockDataSource = { createTask: createTaskMock } as any
+
 describe('TasksServices', () => {
   let service: TasksServices
 
-  beforeAll(() => {
-    service = TasksServices.getInstance()
-  })
-
-  afterEach(() => {
+  beforeEach(() => {
     jest.clearAllMocks()
+    service = new TasksServices(mockDataSource)
   })
 
   describe('createTask', () => {
     it('should create task successfully', async () => {
-      const taskData = {
-        title: 'Test task',
-        userId: 1,
-      }
-
-      const result = await service.createTask(taskData)
-
-      expect(result).toBeDefined()
-      expect(result.title).toBe('Test task')
+      createTaskMock.mockResolvedValue({ id: 1, title: 'Test task' })
+      const result = await service.createTask({ title: 'Test task', userId: 1 })
+      expect(result.data).toBeDefined()
     })
 
-    it('should throw error if title is missing', async () => {
-      const taskData = { userId: 1 }
-
-      await expect(service.createTask(taskData)).rejects.toThrow()
+    it('should return error when dataSource throws', async () => {
+      createTaskMock.mockRejectedValue(new Error('DB error'))
+      const result = await service.createTask({ title: 'Test task', userId: 1 })
+      expect(result.error).toBeDefined()
     })
   })
-})
-```
-
-**Mocking external dependencies:**
-
-```typescript
-jest.mock('../repositories/openai/openai.repository')
-import OpenAIRepository from '../repositories/openai/openai.repository'
-
-const mockOpenAI = OpenAIRepository as jest.MockedClass<typeof OpenAIRepository>
-
-mockOpenAI.prototype.generateConversation.mockResolvedValue({
-  content: 'Mocked response',
 })
 ```
 
@@ -606,7 +574,7 @@ npm run lint
 - [ ] Error handling implemented
 - [ ] Documentation updated
 - [ ] No sensitive data in code
-- [ ] Singleton pattern followed
+- [ ] TSyringe DI pattern followed (`@injectable()`/`@singleton()`, constructor injection)
 - [ ] TypeScript types defined
 
 ---
