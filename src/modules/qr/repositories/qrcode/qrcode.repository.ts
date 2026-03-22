@@ -23,7 +23,7 @@ export default class QrCodeRepository implements IQrRepository {
     try {
       const dataUrl = await QRCode.toDataURL(content, {
         errorCorrectionLevel: QR_OPTIONS.errorCorrectionLevel,
-        type: 'image/png',
+        type: QR_OPTIONS.type,
         width: QR_OPTIONS.width,
         margin: QR_OPTIONS.margin,
       })
@@ -31,7 +31,7 @@ export default class QrCodeRepository implements IQrRepository {
       log.info({ contentLength: content.length }, 'QR code generated successfully')
       return dataUrl
     } catch (error) {
-      log.error({ err: error, content: content.substring(0, 100) }, 'Failed to generate QR code')
+      log.error({ err: error, contentLength: content.length }, 'Failed to generate QR code')
       return null
     }
   }
