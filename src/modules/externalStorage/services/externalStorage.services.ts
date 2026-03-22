@@ -27,15 +27,11 @@ export default class ExternalStorageServices {
     try {
       const path = options.path || StoragePathByModule[options.sourceModule]
 
-      const apiResult = await this.apiStorageRepo.uploadFile(
-        options.fileBuffer,
-        options.fileName,
-        {
-          path,
-          customName: options.customName,
-          metadata: options.metadata,
-        }
-      )
+      const apiResult = await this.apiStorageRepo.uploadFile(options.fileBuffer, options.fileName, {
+        path,
+        customName: options.customName,
+        metadata: options.metadata,
+      })
 
       if (!apiResult) {
         return { error: 'Error uploading file to storage' }
@@ -145,7 +141,9 @@ export default class ExternalStorageServices {
     return { data: result.data.downloadUrl }
   }
 
-  async listFiles(options?: IStorageListOptions): Promise<GenericResponse<IStorageApiListResponse>> {
+  async listFiles(
+    options?: IStorageListOptions
+  ): Promise<GenericResponse<IStorageApiListResponse>> {
     try {
       const result = await this.apiStorageRepo.listFiles(options)
 
@@ -160,9 +158,7 @@ export default class ExternalStorageServices {
     }
   }
 
-  async listFilesByModule(
-    sourceModule: string
-  ): Promise<GenericResponse<IStorageApiListResponse>> {
+  async listFilesByModule(sourceModule: string): Promise<GenericResponse<IStorageApiListResponse>> {
     const path = StoragePathByModule[sourceModule as keyof typeof StoragePathByModule]
 
     return await this.listFiles({ searchPath: path })
@@ -184,10 +180,7 @@ export default class ExternalStorageServices {
 
       await this.dataSource.deleteStoredFile(localId)
 
-      log.info(
-        { localId, storageFileId: storedFile.storageFileId },
-        'File deleted successfully'
-      )
+      log.info({ localId, storageFileId: storedFile.storageFileId }, 'File deleted successfully')
 
       return { data: true }
     } catch (error) {

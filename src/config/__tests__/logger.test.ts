@@ -48,31 +48,39 @@ describe('logger', () => {
 
     const output: string[] = []
     const dest = {
-      write: (msg: string) => { output.push(msg) },
+      write: (msg: string) => {
+        output.push(msg)
+      },
     }
 
-    const testLogger = require('pino')({
-      ...logger,
-      level: 'info',
-      redact: {
-        paths: [
-          'req.headers.authorization',
-          'req.headers["x-slack-signature"]',
-          'req.headers["x-slack-request-timestamp"]',
-          'req.body.token',
-          'req.body.client_secret',
-          'req.body.api_app_id',
-        ],
-        remove: true,
+    const testLogger = require('pino')(
+      {
+        ...logger,
+        level: 'info',
+        redact: {
+          paths: [
+            'req.headers.authorization',
+            'req.headers["x-slack-signature"]',
+            'req.headers["x-slack-request-timestamp"]',
+            'req.body.token',
+            'req.body.client_secret',
+            'req.body.api_app_id',
+          ],
+          remove: true,
+        },
       },
-    }, dest)
+      dest
+    )
 
-    testLogger.info({
-      req: {
-        headers: { authorization: 'Bearer secret-token', 'x-slack-signature': 'v0=abc123' },
-        body: { token: 'xoxb-secret', message: 'hello' },
+    testLogger.info(
+      {
+        req: {
+          headers: { authorization: 'Bearer secret-token', 'x-slack-signature': 'v0=abc123' },
+          body: { token: 'xoxb-secret', message: 'hello' },
+        },
       },
-    }, 'test redaction')
+      'test redaction'
+    )
 
     const logged = JSON.parse(output[0])
     expect(logged.req.headers.authorization).toBeUndefined()

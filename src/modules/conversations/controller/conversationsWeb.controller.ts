@@ -4,7 +4,11 @@ import { injectable } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import ConversationsServices from '../services/conversations.services'
 
-import { IConversation, IUserConversation, ProgressCallback } from '../shared/interfaces/converstions'
+import {
+  IConversation,
+  IUserConversation,
+  ProgressCallback,
+} from '../shared/interfaces/converstions'
 import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
 import { roleTypes } from '../shared/constants/openai'
 import UsersServices from '../../users/services/users.services'
@@ -17,7 +21,7 @@ export default class ConversationsWebController {
 
   constructor(
     private conversationServices: ConversationsServices,
-    private usersServices: UsersServices,
+    private usersServices: UsersServices
   ) {
     this.router = Router()
     this.registerRoutes()
@@ -27,8 +31,6 @@ export default class ConversationsWebController {
     this.router.get('/show-channels', this.showChannels)
     this.router.post('/close-channel', this.closeChannel)
   }
-
-  /** Conversation Controllers Methods */
 
   public joinChannel = async (data: {
     channel: string
@@ -58,9 +60,7 @@ export default class ConversationsWebController {
     conversation: IUserConversation[]
   }> => {
     try {
-      const conversationFlow = await this.conversationServices.showConversationFlowWeb(
-        data.channel
-      )
+      const conversationFlow = await this.conversationServices.showConversationFlowWeb(data.channel)
 
       return {
         message: 'Conversación iniciada',
@@ -71,10 +71,6 @@ export default class ConversationsWebController {
     }
   }
 
-  /**
-   *
-   * @param data { username, channel, message, iaEnabled }
-   */
   public generateConversation = async (data: {
     username: string
     channel: string
@@ -107,10 +103,6 @@ export default class ConversationsWebController {
     }
   }
 
-  /**
-   * Manage assistant conversation (unified with Slack)
-   * Skip AI by prefixing message with "+"
-   */
   public conversationAssistantFlow = async (
     userId: number,
     message: string,
@@ -136,7 +128,6 @@ export default class ConversationsWebController {
         onProgress
       )
 
-      // Return response (null if skipped with "+")
       return result.response
     } catch (error) {
       log.error({ err: error }, 'conversationAssistantFlow failed')
@@ -144,11 +135,8 @@ export default class ConversationsWebController {
     }
   }
 
-  // ROUTES
-
   public showChannels = async (req: any, res: any): Promise<void> => {
     const response = await this.conversationServices.showChannelsConversationFlow()
-
     res.send(response)
   }
 

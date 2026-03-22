@@ -297,7 +297,6 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
   }
 }
 
-/** ALERTS */
 export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
   const message = truncateText(data.message ?? '', 120)
   const tokens = getAlertStatusTokens(data)
@@ -377,8 +376,6 @@ export const msgAlertDetail = (alert: Alerts): { blocks: any[] } => {
   }
 }
 
-/** NOTES */
-
 export const msgNoteCreated = (data: Notes): { blocks: any[] } => {
   const truncatedTitle = truncateText(data.title ?? '', 60)
   const truncatedDescription = truncateText(data.description ?? '', 80)
@@ -402,7 +399,6 @@ export const msgNoteCreated = (data: Notes): { blocks: any[] } => {
 export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
   const blocks = []
 
-  // Encabezado del mensaje
   blocks.push(
     {
       type: 'header',
@@ -438,8 +434,6 @@ export const msgNotesList = (notes: Notes[]): { blocks: any[] } => {
 
   return { blocks }
 }
-
-/** LINKS */
 
 const linkOverflowAccessory = (id: number): any => ({
   type: 'overflow',
@@ -529,8 +523,6 @@ export const msgLinksList = (links: Links[]): { blocks: any[] } => {
 
   return { blocks }
 }
-
-// Tasks
 
 export const msgTaskCreated = (data: Tasks): { blocks: any[] } => {
   const truncatedTitle = truncateText(data.title ?? '', 60)

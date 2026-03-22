@@ -49,8 +49,6 @@ export class RedisRepository {
     }
   }
 
-  /** Conversation Flow */
-
   saveConversationFlow = async (chanelId: string, value: IConversationFlow): Promise<boolean> => {
     try {
       const valueFormated = JSON.stringify(value)
@@ -100,10 +98,7 @@ export class RedisRepository {
     }
   }
 
-  saveAlertSnoozeConfig = async (
-    userId: number,
-    config: AlertSnoozeConfig
-  ): Promise<boolean> => {
+  saveAlertSnoozeConfig = async (userId: number, config: AlertSnoozeConfig): Promise<boolean> => {
     try {
       const key = rAlertSnoozeConfig(userId)
       await this.redisClient.set(key, JSON.stringify(config), {

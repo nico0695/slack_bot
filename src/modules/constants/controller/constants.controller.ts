@@ -14,8 +14,6 @@ export default class ConstantsController {
     this.registerRoutes()
   }
 
-  /** Constants Routes */
-
   protected registerRoutes(): void {
     this.router.get('/', this.getAllConstants)
     this.router.get('/:key', this.getConstantByKey)
@@ -23,14 +21,6 @@ export default class ConstantsController {
     this.router.post('/', this.createConstant)
   }
 
-  /** Constants Controllers Methods */
-
-  /**
-   * Get all constants
-   * @param req Request
-   * @param res Response
-   * @returns
-   */
   public async getAllConstants(req: any, res: any): Promise<void> {
     try {
       const constants = await this.constantsServices.getAllConstants()
@@ -42,12 +32,6 @@ export default class ConstantsController {
     }
   }
 
-  /**
-   * Get constant by key
-   * @param req Request
-   * @param res Response
-   * @returns
-   */
   public async getConstantByKey(req: any, res: any): Promise<void> {
     try {
       const { key } = req.params
@@ -60,12 +44,6 @@ export default class ConstantsController {
     }
   }
 
-  /**
-   * Update constant by key, if constant not exists, create new constant
-   * @param req Request
-   * @param res Response
-   * @returns
-   */
   public async updateConstantByKey(req: any, res: any): Promise<void> {
     try {
       const { key } = req.params
@@ -79,12 +57,6 @@ export default class ConstantsController {
     }
   }
 
-  /**
-   * Create new constant
-   * @param req Request
-   * @param res Response
-   * @returns
-   */
   public async createConstant(req: any, res: any): Promise<void> {
     try {
       const { key, value } = req.body

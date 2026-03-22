@@ -17,11 +17,7 @@ export default class OpenaiTranslateRepository implements ITranslateRepository {
     this.openai = new OpenAIApi(configuration)
   }
 
-  async translate(
-    text: string,
-    targetLang: string,
-    systemPrompt: string
-  ): Promise<string | null> {
+  async translate(text: string, targetLang: string, systemPrompt: string): Promise<string | null> {
     try {
       const messages: ChatCompletionRequestMessage[] = [
         { role: 'system', content: systemPrompt },

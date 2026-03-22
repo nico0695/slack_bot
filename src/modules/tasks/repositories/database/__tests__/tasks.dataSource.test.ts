@@ -11,11 +11,9 @@ describe('TasksDataSource', () => {
 
   describe('createTask', () => {
     it('saves task with default alert date', async () => {
-      jest.spyOn(Tasks.prototype as any, 'save').mockImplementation(
-        async function (this: Tasks) {
-          return this
-        }
-      )
+      jest.spyOn(Tasks.prototype as any, 'save').mockImplementation(async function (this: Tasks) {
+        return this
+      })
 
       const result = await dataSource.createTask({
         userId: 6,

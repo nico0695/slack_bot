@@ -45,7 +45,9 @@ describe('AssistantMessage', () => {
   })
 
   it('collects multi word flag values for notes', () => {
-    const assistantMessage = new AssistantMessage('.note capture ideas -list -listTag important updates only')
+    const assistantMessage = new AssistantMessage(
+      '.note capture ideas -list -listTag important updates only'
+    )
 
     expect(assistantMessage.variable).toBe(AssistantsVariables.NOTE)
     expect(assistantMessage.value).toBe('capture ideas')

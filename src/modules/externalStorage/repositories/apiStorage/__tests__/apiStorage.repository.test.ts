@@ -37,7 +37,9 @@ describe('ApiStorageRepository', () => {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { default: Repo } = require('../apiStorage.repository')
 
-        expect(() => new Repo()).toThrow('STORAGE_API_URL is not defined in the environment variables.')
+        expect(() => new Repo()).toThrow(
+          'STORAGE_API_URL is not defined in the environment variables.'
+        )
       })
     })
 
@@ -49,7 +51,9 @@ describe('ApiStorageRepository', () => {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { default: Repo } = require('../apiStorage.repository')
 
-        expect(() => new Repo()).toThrow('STORAGE_API_KEY is not defined in the environment variables.')
+        expect(() => new Repo()).toThrow(
+          'STORAGE_API_KEY is not defined in the environment variables.'
+        )
       })
     })
   })

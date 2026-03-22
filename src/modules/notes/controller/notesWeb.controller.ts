@@ -27,16 +27,12 @@ export default class NotesWebController extends GenericController {
     this.registerRoutes()
   }
 
-  /** Notes Routes */
-
   protected registerRoutes(): void {
     this.router.get('/', this.getNotes)
     this.router.post('/', this.createNote)
     this.router.put('/:id', this.updateNote)
     this.router.delete('/:id', this.deleteNote)
   }
-
-  /** Notes Controllers Methods */
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])

@@ -27,8 +27,6 @@ export default class ImagesWebController {
     this.router.get('/get-images', this.getImages)
   }
 
-  // ROUTES
-
   @HttpAuth
   public async getImages(req: any, res: any): Promise<void> {
     const { page, pageSize } = validateQuery(paginationSchema, req.query)

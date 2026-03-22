@@ -3,12 +3,21 @@ import { injectable } from 'tsyringe'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
-import { validateBody, validateQuery, validateParams, idParamSchema } from '../../../shared/utils/validation'
+import {
+  validateBody,
+  validateQuery,
+  validateParams,
+  idParamSchema,
+} from '../../../shared/utils/validation'
 
 import LinksServices from '../services/links.services'
 
 import { ILink } from '../shared/interfaces/links.interfaces'
-import { createLinkSchema, updateLinkSchema, getLinkQuerySchema } from '../shared/schemas/links.schemas'
+import {
+  createLinkSchema,
+  updateLinkSchema,
+  getLinkQuerySchema,
+} from '../shared/schemas/links.schemas'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
@@ -27,16 +36,12 @@ export default class LinksWebController extends GenericController {
     this.registerRoutes()
   }
 
-  /** Links Routes */
-
   protected registerRoutes(): void {
     this.router.get('/', this.getLinks)
     this.router.post('/', this.createLink)
     this.router.put('/:id', this.updateLink)
     this.router.delete('/:id', this.deleteLink)
   }
-
-  /** Links Controllers Methods */
 
   @HttpAuth
   @Permission([Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN])

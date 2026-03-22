@@ -100,10 +100,7 @@ describe('alertCronJob', () => {
       text: '🔔 Alerta: Ping',
       blocks: ['block-data'],
     })
-    expect(sendNotificationMock).toHaveBeenCalledWith(
-      alert.user.pwSubscription,
-      expect.any(String)
-    )
+    expect(sendNotificationMock).toHaveBeenCalledWith(alert.user.pwSubscription, expect.any(String))
     expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([1])
   })
 

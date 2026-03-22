@@ -23,7 +23,7 @@ const createAlert = (data: Partial<Alerts>): Alerts =>
     createdAt: new Date(),
     deletedAt: null,
     ...data,
-  }) as unknown as Alerts
+  } as unknown as Alerts)
 
 const createTask = (data: Partial<Tasks>): Tasks =>
   ({
@@ -38,7 +38,7 @@ const createTask = (data: Partial<Tasks>): Tasks =>
     createdAt: new Date(),
     deletedAt: null,
     ...data,
-  }) as unknown as Tasks
+  } as unknown as Tasks)
 
 const createNote = (data: Partial<Notes>): Notes =>
   ({
@@ -52,7 +52,7 @@ const createNote = (data: Partial<Notes>): Notes =>
     updatedAt: new Date(),
     deletedAt: null,
     ...data,
-  }) as unknown as Notes
+  } as unknown as Notes)
 
 const createMessage = (role: roleTypes, content: string): IUserConversation => ({
   role,

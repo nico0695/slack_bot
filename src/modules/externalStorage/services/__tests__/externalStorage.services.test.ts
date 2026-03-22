@@ -131,7 +131,11 @@ describe('ExternalStorageServices', () => {
       }
 
       mockApiStorageRepo.uploadFile.mockResolvedValue(apiResult)
-      mockDataSource.createStoredFile.mockResolvedValue({ id: 1, ...apiResult, mimeType: 'image/png' })
+      mockDataSource.createStoredFile.mockResolvedValue({
+        id: 1,
+        ...apiResult,
+        mimeType: 'image/png',
+      })
 
       await service.uploadFile(uploadOptions)
 

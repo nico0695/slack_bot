@@ -155,7 +155,9 @@ export default class LeapRepository implements IImageRepository {
   /**
    * Ask for inference status and images by inference ID (private method)
    */
-  private getInferenceJobPrivate = async (inferenceId: string): Promise<IInferaceJobResponse | null> => {
+  private getInferenceJobPrivate = async (
+    inferenceId: string
+  ): Promise<IInferaceJobResponse | null> => {
     try {
       const url = `https://api.tryleap.ai/api/v1/images/models/${this.modelId}/inferences/${inferenceId}`
 

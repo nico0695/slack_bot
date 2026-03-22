@@ -29,11 +29,7 @@ describe('TranslateServices', () => {
 
       const result = await services.translate('Hola mundo', 'english')
 
-      expect(translateMock).toHaveBeenCalledWith(
-        'Hola mundo',
-        'english',
-        expect.any(String)
-      )
+      expect(translateMock).toHaveBeenCalledWith('Hola mundo', 'english', expect.any(String))
       expect(result).toEqual({
         data: {
           translatedText: 'Hello world',

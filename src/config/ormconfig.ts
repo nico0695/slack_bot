@@ -3,7 +3,6 @@ import { DataSource, LoggerOptions } from 'typeorm'
 const basePath = process.env.BASE_PATH
 const dbUrl = process.env.DB_URL
 
-/** DataSource Config */
 const connectionSource = new DataSource({
   type: 'sqlite',
 

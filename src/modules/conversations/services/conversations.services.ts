@@ -14,7 +14,6 @@ import { Notes } from '../../../entities/notes'
 import { Links } from '../../../entities/links'
 import { LinkStatus } from '../../links/shared/constants/links.constants'
 
-// AI
 import GeminiRepository from '../repositories/gemini/gemini.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import { roleTypes } from '../shared/constants/openai'
@@ -58,7 +57,7 @@ export default class ConversationsServices {
     private tasksServices: TasksServices,
     private notesServices: NotesServices,
     private linksServices: LinksServices,
-    private messageProcessor: MessageProcessor,
+    private messageProcessor: MessageProcessor
   ) {}
 
   private generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {
@@ -83,7 +82,7 @@ export default class ConversationsServices {
   private withDateContext = (prompt: string): string => {
     if (!prompt.includes('<fecha>')) return prompt
     const now = new Date()
-    // Obtener fecha en timezone AR en formato estable YYYY-MM-DD
+    // Format Argentina time as stable YYYY-MM-DD.
     const formatted = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Argentina/Buenos_Aires',
       year: 'numeric',
@@ -97,7 +96,6 @@ export default class ConversationsServices {
   private getTeamMembers = async (teamId: string): Promise<TMembersNames> => {
     const membersNames: TMembersNames = {}
 
-    /** Get team members */
     if (teamId) {
       const teamMembers = await this.usersServices.getUsersByTeamId(teamId)
       if (teamMembers?.data) {
@@ -142,25 +140,17 @@ export default class ConversationsServices {
     try {
       const conversationKey = rConversationKey(userId, channelId)
 
-      /** Get conversation */
-      const conversationStored = await this.redisRepository.getConversationMessages(
-        conversationKey
-      )
+      const conversationStored = await this.redisRepository.getConversationMessages(conversationKey)
 
       const newConversation = [...(conversationStored ?? []), conversation]
 
       const promptGenerated = await this.generatePrompt(newConversation)
 
-      /** Generate conversation */
       const messageResponse = await this.aiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated = [...newConversation, messageResponse]
 
-      /** Save conversation */
-      await this.redisRepository.saveConversationMessages(
-        conversationKey,
-        newConversationGenerated
-      )
+      await this.redisRepository.saveConversationMessages(conversationKey, newConversationGenerated)
 
       return messageResponse.content
     } catch (error) {
@@ -170,7 +160,6 @@ export default class ConversationsServices {
   }
 
   private getOrInitConversationFlow = async (channelId?: string): Promise<IConversationFlow> => {
-    /** Get conversation */
     let conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
     if (conversationFlow === null) {
@@ -192,7 +181,7 @@ export default class ConversationsServices {
       conversationFlow = newConversation
     }
 
-    // TODO: change to update socketChanel when join in
+    // TODO: update socketChannel when the user joins.
     if (!conversationFlow.socketChannel) {
       const newConversation: IConversationFlow = {
         ...conversationFlow,
@@ -216,11 +205,9 @@ export default class ConversationsServices {
     onProgress?: ProgressCallback
   ): Promise<IAssistantResponse> => {
     try {
-      // Check skip FIRST (message starts with "+")
+      // Check the skip flag before any other processing.
       const shouldSkip = this.messageProcessor.shouldSkipAI(message)
-      const cleanMessage = shouldSkip
-        ? this.messageProcessor.cleanSkipFlag(message)
-        : message
+      const cleanMessage = shouldSkip ? this.messageProcessor.cleanSkipFlag(message) : message
 
       const conversationFlow = await this.getOrInitConversationFlow(channelId)
 
@@ -240,7 +227,7 @@ export default class ConversationsServices {
 
       const { conversation: conversationStored } = conversationFlow
 
-      // If skip requested, save message and return without processing
+      // Save skipped messages without generating a response.
       if (shouldSkip) {
         const updatedConversation = [
           ...conversationStored.slice(-(this.maxContextMessages - 1)),
@@ -268,7 +255,7 @@ export default class ConversationsServices {
       )
       const responseMessage = result.response
 
-      // Add messages to conversation history (limit to last N)
+      // Keep only the last N messages in history.
       const updatedConversation = [
         ...conversationStored.slice(-(this.maxContextMessages - 1)),
         newConversation,
@@ -284,7 +271,6 @@ export default class ConversationsServices {
         updatedAt: new Date(),
       }
 
-      /** Save conversation */
       await this.redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
       return { response: responseMessage, skipped: false }
@@ -322,10 +308,7 @@ export default class ConversationsServices {
     try {
       const conversationKey = rConversationKey(userId, channelId)
 
-      /** Get conversation */
-      const conversationStored = await this.redisRepository.getConversationMessages(
-        conversationKey
-      )
+      const conversationStored = await this.redisRepository.getConversationMessages(conversationKey)
 
       if (conversationStored.length === 0) return null
 
@@ -345,8 +328,6 @@ export default class ConversationsServices {
       return null
     }
   }
-
-  // Conversation flow
 
   conversationFlowStarted = async (channelId?: string): Promise<boolean> => {
     const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
@@ -421,7 +402,6 @@ export default class ConversationsServices {
     channelId: string
   ): Promise<IConversation | null> => {
     try {
-      /** Get conversation */
       const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
@@ -442,9 +422,8 @@ export default class ConversationsServices {
 
       const newConversationUser = [...conversationStored, newConversation]
 
-      // save message and skip generation with open ia
+      // Save the message without generating an AI reply.
       if (skipGeneration) {
-        /** Save conversation */
         await this.redisRepository.saveConversationFlow(channelId, {
           ...conversationFlow,
           conversation: newConversationUser,
@@ -454,7 +433,7 @@ export default class ConversationsServices {
         return null
       }
 
-      // Limit context sent to AI to last N messages to avoid overwhelming the model
+      // Limit AI context to the last N messages.
       const limitedConversation = conversationStored.slice(-this.maxContextMessages)
       const contextForAI = [...limitedConversation, newConversation]
 
@@ -466,7 +445,6 @@ export default class ConversationsServices {
         }))
       )
 
-      /** Generate conversation */
       const messageResponse = await this.aiRepository.chatCompletion(promptGenerated)
 
       const newConversationGenerated: IConversationFlow = {
@@ -475,7 +453,6 @@ export default class ConversationsServices {
         updatedAt: new Date(),
       }
 
-      /** Save conversation */
       await this.redisRepository.saveConversationFlow(channelId, newConversationGenerated)
 
       return messageResponse
@@ -491,7 +468,6 @@ export default class ConversationsServices {
     channelId: string
   ): Promise<IConversation | null> => {
     try {
-      /** Get conversation */
       const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
@@ -509,7 +485,6 @@ export default class ConversationsServices {
 
       const newConversationUser = [...conversationStored, newConversation]
 
-      /** Save conversation */
       await this.redisRepository.saveConversationFlow(channelId, {
         ...conversationFlow,
         conversation: newConversationUser,
@@ -525,7 +500,6 @@ export default class ConversationsServices {
 
   showConversationFlow = async (channelId: string, teamId?: string): Promise<string[] | null> => {
     try {
-      /** Get conversation */
       const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
@@ -551,7 +525,6 @@ export default class ConversationsServices {
 
   showConversationFlowWeb = async (channelId: string): Promise<IConversationFlow | null> => {
     try {
-      /** Get conversation */
       const conversationFlow = await this.redisRepository.getConversationFlow(channelId)
 
       if (conversationFlow === null) {
@@ -567,7 +540,6 @@ export default class ConversationsServices {
 
   showChannelsConversationFlow = async (): Promise<string[] | null> => {
     try {
-      /** Get conversation */
       const channels = await this.redisRepository.getChannelsConversationFlow()
 
       return channels.map((channel) => channel.replace(conversationFlowPrefix, ''))
@@ -577,7 +549,6 @@ export default class ConversationsServices {
     }
   }
 
-  // Slack actions
   handleAction = async (
     data: {
       entity: string
@@ -994,9 +965,13 @@ export default class ConversationsServices {
       }
 
       case 'read': {
-        const updateRes = await this.linksServices.updateLink(targetId, {
-          status: LinkStatus.READ,
-        }, userId)
+        const updateRes = await this.linksServices.updateLink(
+          targetId,
+          {
+            status: LinkStatus.READ,
+          },
+          userId
+        )
 
         if (updateRes.error || !updateRes.data) {
           return `Error al actualizar el link con Id: ${targetId}`

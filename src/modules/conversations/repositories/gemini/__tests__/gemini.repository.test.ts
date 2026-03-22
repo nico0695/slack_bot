@@ -40,9 +40,7 @@ describe('GeminiRepository', () => {
     const generateContent = getGenerateContentMock()
     generateContent.mockResolvedValue({ text: 'hello' })
 
-    const result = await repository.chatCompletion([
-      { role: 'user', content: 'hola' } as any,
-    ])
+    const result = await repository.chatCompletion([{ role: 'user', content: 'hola' } as any])
 
     expect(generateContent).toHaveBeenCalled()
     expect(result).toEqual({
@@ -56,10 +54,9 @@ describe('GeminiRepository', () => {
     const generateContent = getGenerateContentMock()
     generateContent.mockResolvedValue({ text: 'classified' })
 
-    await repository.chatCompletion(
-      [{ role: 'user', content: 'hi' } as any],
-      { mode: 'classification' }
-    )
+    await repository.chatCompletion([{ role: 'user', content: 'hi' } as any], {
+      mode: 'classification',
+    })
 
     const lastCallArgs = generateContent.mock.calls[0][0]
     expect(lastCallArgs.model).toBe('gemini-2.5-flash-lite')

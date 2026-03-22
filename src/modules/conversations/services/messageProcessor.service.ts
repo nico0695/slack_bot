@@ -23,6 +23,8 @@ import LinksServices from '../../links/services/links.services'
 import ImagesServices from '../../images/services/images.services'
 import TranslateServices from '../../translate/services/translate.services'
 import { translateSchema } from '../../translate/shared/schemas/translate.schemas'
+import QrServices from '../../qr/services/qr.services'
+import { qrSchema } from '../../qr/shared/schemas/qr.schemas'
 import SearchRepository from '../repositories/search/search.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
@@ -55,6 +57,7 @@ export default class MessageProcessor {
     private imagesServices: ImagesServices,
     private searchRepository: SearchRepository,
     private translateServices: TranslateServices,
+    private qrServices: QrServices
   ) {}
 
   processAssistantMessage = async (
@@ -759,7 +762,6 @@ export default class MessageProcessor {
       }
 
       case AssistantsVariables.IMAGE: {
-        // Handle list command (.img -l)
         if (assistantMessage.flags[AssistantsFlags.LIST]) {
           const images = await this.imagesServices.getImages(1, 10)
 
@@ -790,19 +792,16 @@ export default class MessageProcessor {
           break
         }
 
-        // Validate prompt
         if (!assistantMessage.value && !assistantMessage.cleanMessage) {
           throw new Error('Ups! Necesito una descripción de la imagen que quieres generar. 😅')
         }
 
-        // Extract prompt
         const imagePrompt = (assistantMessage.value as string) || assistantMessage.cleanMessage
 
         if (!imagePrompt.trim()) {
           throw new Error('Ups! La descripción de la imagen no puede estar vacía. 😅')
         }
 
-        // Parse options from flags
         const imageOptions: any = {}
 
         if (assistantMessage.flags[AssistantsFlags.SIZE]) {
@@ -835,7 +834,6 @@ export default class MessageProcessor {
           }
         }
 
-        // Generate image
         onProgress?.('Generando imagen...')
         try {
           const response = await this.imagesServices.generateImageForAssistant(
@@ -848,7 +846,6 @@ export default class MessageProcessor {
             throw new Error('No se pudo generar la imagen')
           }
 
-          // Build response with images
           responseMessage = this.buildImageResponse(
             response.images,
             response.provider,
@@ -934,6 +931,33 @@ export default class MessageProcessor {
         responseMessage = {
           role: roleTypes.assistant,
           content: translateResult.data.translatedText,
+          provider: ConversationProviders.ASSISTANT,
+        }
+        break
+      }
+
+      case AssistantsVariables.QR: {
+        const qrValue = (assistantMessage.value as string) || ''
+        if (!qrValue.trim()) {
+          throw new Error('Uso: .qr <texto o URL>')
+        }
+
+        const qrValidation = qrSchema.safeParse({ text: qrValue })
+
+        if (!qrValidation.success) {
+          const messages = qrValidation.error.errors.map((e) => e.message).join(', ')
+          throw new Error(`Parámetros inválidos: ${messages}`)
+        }
+
+        const qrResult = await this.qrServices.generateQr(qrValidation.data.text)
+
+        if (qrResult.error) {
+          throw new Error(qrResult.error)
+        }
+
+        responseMessage = {
+          role: roleTypes.assistant,
+          content: qrResult.data.qrBase64,
           provider: ConversationProviders.ASSISTANT,
         }
         break
@@ -1205,7 +1229,6 @@ export default class MessageProcessor {
           }
         }
         case 'image.create': {
-          // Validate required fields
           if (!parsed.prompt || typeof parsed.prompt !== 'string') {
             return null
           }
@@ -1216,7 +1239,6 @@ export default class MessageProcessor {
             return null
           }
 
-          // Parse options
           const imageOptions: any = {}
 
           if (parsed.size && typeof parsed.size === 'string') {
@@ -1245,7 +1267,6 @@ export default class MessageProcessor {
             }
           }
 
-          // Generate image
           onProgress?.('Generando imagen...')
           try {
             const response = await this.imagesServices.generateImageForAssistant(
@@ -1258,7 +1279,6 @@ export default class MessageProcessor {
               return null
             }
 
-            // Build and return response
             return this.buildImageResponse(response.images, response.provider, imagePrompt, {
               size: imageOptions.size,
               quality: imageOptions.quality,
@@ -1270,7 +1290,6 @@ export default class MessageProcessor {
           }
         }
         case 'image.list': {
-          // Get recent images
           const images = await this.imagesServices.getImages(1, 10)
 
           if (images.error || !images.data?.data?.length) {
@@ -1328,6 +1347,27 @@ export default class MessageProcessor {
           return {
             role: roleTypes.assistant,
             content: translateResult.data.translatedText,
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'qr.generate': {
+          if (!parsed.text) return null
+          const qrValidation = qrSchema.safeParse({ text: parsed.text })
+          if (!qrValidation.success) {
+            log.warn(
+              { errors: qrValidation.error.errors },
+              'Intent fallback router - qr.generate validation failed'
+            )
+            return null
+          }
+          const qrResult = await this.qrServices.generateQr(qrValidation.data.text)
+          if (qrResult.error) {
+            log.error({ error: qrResult.error }, 'Intent fallback router - qr.generate failed')
+            return null
+          }
+          return {
+            role: roleTypes.assistant,
+            content: qrResult.data.qrBase64,
             provider: ConversationProviders.ASSISTANT,
           }
         }

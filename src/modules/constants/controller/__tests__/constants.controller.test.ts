@@ -76,10 +76,7 @@ describe('ConstantsController', () => {
       const updated = { key: 'mode', value: 'off' }
       updateConstantByKeyMock.mockResolvedValue(updated)
 
-      await controller.updateConstantByKey(
-        { params: { key: 'mode' }, body: { value: 'off' } },
-        res
-      )
+      await controller.updateConstantByKey({ params: { key: 'mode' }, body: { value: 'off' } }, res)
 
       expect(updateConstantByKeyMock).toHaveBeenCalledWith('mode', 'off')
       expect(res.status).toHaveBeenCalledWith(200)
@@ -90,10 +87,7 @@ describe('ConstantsController', () => {
       const error = new Error('fail')
       updateConstantByKeyMock.mockRejectedValue(error)
 
-      await controller.updateConstantByKey(
-        { params: { key: 'mode' }, body: { value: 'off' } },
-        res
-      )
+      await controller.updateConstantByKey({ params: { key: 'mode' }, body: { value: 'off' } }, res)
 
       expect(res.status).toHaveBeenCalledWith(500)
       expect(res.json).toHaveBeenCalledWith(error)

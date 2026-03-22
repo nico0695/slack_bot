@@ -17,12 +17,6 @@ export interface IUserContextOptions {
   maxItems?: number
 }
 
-/**
- * Output example:
- * [A:3] #15"Revisar servidor"2h #12"Deploy prod"venc1h
- * [T:2] #5"Refactor auth"[trabajo] #8"Comprar regalo"
- * [N:1] #3"Ideas sprint"[dev]
- */
 export const buildUserDataContext = (
   data: IUserContextData,
   options: IUserContextOptions = {}
@@ -100,7 +94,6 @@ export const formatCompactLinks = (links: Links[], maxItems: number): string => 
   return `[L:${String(links.length)}] ${items.join(' ')}`
 }
 
-// Output: "U:mensaje usuario\nA:respuesta asistente\nU:otro mensaje"
 export const formatConversationHistory = (
   messages: IUserConversation[],
   maxMessages = 3

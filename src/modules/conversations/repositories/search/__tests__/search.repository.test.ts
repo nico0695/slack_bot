@@ -49,9 +49,7 @@ describe('SearchRepository', () => {
   })
 
   it('builds condensed context string', () => {
-    const context = repository.buildCondensedContext([
-      { title: 'A', snippet: 'B', url: 'C' },
-    ])
+    const context = repository.buildCondensedContext([{ title: 'A', snippet: 'B', url: 'C' }])
 
     expect(context).toContain('(1) A')
     expect(context).toContain('B')

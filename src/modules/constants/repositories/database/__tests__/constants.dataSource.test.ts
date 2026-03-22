@@ -46,10 +46,7 @@ describe('ConstantsDataSources', () => {
   })
 
   it('creates a constant and persists it', async () => {
-    const result = await repository.createConstant(
-      GlobalConfigKey.openiaIsActive,
-      'enabled'
-    )
+    const result = await repository.createConstant(GlobalConfigKey.openiaIsActive, 'enabled')
 
     expect(constantsMocks.instances).toHaveLength(1)
     const instance = constantsMocks.instances[0]
@@ -104,10 +101,7 @@ describe('ConstantsDataSources', () => {
     const existing = { id: 1, key: GlobalConfigKey.openiaIsActive, value: 'true', save: saveMock }
     constantsMocks.findOne.mockResolvedValue(existing)
 
-    const result = await repository.updateConstantByKey(
-      GlobalConfigKey.openiaIsActive,
-      'false'
-    )
+    const result = await repository.updateConstantByKey(GlobalConfigKey.openiaIsActive, 'false')
 
     expect(existing.value).toBe('false')
     expect(saveMock).toHaveBeenCalled()
@@ -117,10 +111,7 @@ describe('ConstantsDataSources', () => {
   it('creates constant when updateConstantByKey finds nothing', async () => {
     constantsMocks.findOne.mockResolvedValue(null)
 
-    const result = await repository.updateConstantByKey(
-      GlobalConfigKey.openiaIsActive,
-      'false'
-    )
+    const result = await repository.updateConstantByKey(GlobalConfigKey.openiaIsActive, 'false')
 
     expect(constantsMocks.instances).toHaveLength(1)
     const instance = constantsMocks.instances[0]
@@ -134,10 +125,7 @@ describe('ConstantsDataSources', () => {
     const error = new Error('update failed')
     constantsMocks.findOne.mockRejectedValue(error)
 
-    const result = await repository.updateConstantByKey(
-      GlobalConfigKey.openiaIsActive,
-      'false'
-    )
+    const result = await repository.updateConstantByKey(GlobalConfigKey.openiaIsActive, 'false')
 
     expect(result).toBe(error)
   })
