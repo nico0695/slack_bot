@@ -922,7 +922,10 @@ export default class MessageProcessor {
 
         const { text: textToTranslate, targetLang } = validation.data
 
-        const translateResult = await this.translateServices.translate(textToTranslate, targetLang)
+        const translateResult = await this.translateServices.translate(
+          textToTranslate,
+          targetLang.toLowerCase()
+        )
 
         if (translateResult.error) {
           throw new Error(translateResult.error)
@@ -1314,10 +1317,12 @@ export default class MessageProcessor {
           return messageResponse
         }
         case 'translate': {
-          if (!parsed.text || !parsed.targetLang) return null
+          const translateText = parsed.text ?? parsed.parameters?.text
+          const translateLang = parsed.targetLang ?? parsed.parameters?.targetLang
+          if (!translateText || !translateLang) return null
           const translateResult = await this.translateServices.translate(
-            parsed.text,
-            parsed.targetLang
+            String(translateText),
+            String(translateLang).toLowerCase().trim()
           )
           if (translateResult.error) return null
           return {

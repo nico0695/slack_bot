@@ -64,7 +64,7 @@ describe('TranslateServices', () => {
       await services.translate('text', 'spanish')
 
       const systemPrompt = translateMock.mock.calls[0][2]
-      expect(systemPrompt).toContain('technical translator')
+      expect(systemPrompt).toContain('You are a translator')
       expect(systemPrompt).toContain('JSON keys')
     })
   })
