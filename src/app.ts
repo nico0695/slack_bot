@@ -40,6 +40,7 @@ import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
 import SystemWebController from './modules/system/controller/systemWeb.controller'
 import ConstantsController from './modules/constants/controller/constants.controller'
+import TranslateWebController from './modules/translate/controller/translateWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
 dotenv.config()
@@ -69,6 +70,7 @@ export default class App {
   private textToSpeechWebController: TextToSpeechWebController
   private summaryWebController: SummaryWebController
   private systemWebController: SystemWebController
+  private translateWebController: TranslateWebController
 
   constructor() {
     // Controllers Instances
@@ -89,6 +91,7 @@ export default class App {
     this.textToSpeechWebController = container.resolve(TextToSpeechWebController)
     this.summaryWebController = container.resolve(SummaryWebController)
     this.systemWebController = container.resolve(SystemWebController)
+    this.translateWebController = TranslateWebController.getInstance()
 
     // Express
     this.app = express()
@@ -128,6 +131,7 @@ export default class App {
     this.app.use('/images', [this.imagesWebController.router])
     this.app.use('/text-to-speech', [this.textToSpeechWebController.router])
     this.app.use('/summary', [this.summaryWebController.router])
+    this.app.use('/translate', [this.translateWebController.router])
   }
 
   private slackListeners(): void {
@@ -258,12 +262,11 @@ export default class App {
           io.in(channel).emit('receive_assistant_progress', progressMessage)
         }
 
-        const conversationResponse =
-          await this.conversationWebController.conversationAssistantFlow(
-            userId,
-            message,
-            onProgress
-          )
+        const conversationResponse = await this.conversationWebController.conversationAssistantFlow(
+          userId,
+          message,
+          onProgress
+        )
 
         if (conversationResponse) {
           io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender
