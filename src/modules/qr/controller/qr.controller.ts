@@ -1,3 +1,4 @@
+import { injectable } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import GenericController from '../../../shared/modules/genericController'
 import { SlackAuth } from '../../../shared/middleware/auth'
@@ -6,25 +7,11 @@ import { qrSchema } from '../shared/schemas/qr.schemas'
 
 const log = createModuleLogger('qr.controller')
 
+@injectable()
 export default class QrController extends GenericController {
-  private static instance: QrController
-
-  private qrServices: QrServices
-
-  private constructor() {
+  constructor(private qrServices: QrServices) {
     super()
-    this.qrServices = QrServices.getInstance()
-
     this.generateQr = this.generateQr.bind(this)
-  }
-
-  static getInstance(): QrController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new QrController()
-    return this.instance
   }
 
   @SlackAuth

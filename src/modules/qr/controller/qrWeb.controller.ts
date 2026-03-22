@@ -1,3 +1,4 @@
+import { injectable } from 'tsyringe'
 import { Router } from 'express'
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
@@ -7,26 +8,15 @@ import { qrSchema } from '../shared/schemas/qr.schemas'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
+@injectable()
 export default class QrWebController extends GenericController {
-  private static instance: QrWebController
   public router: Router
-  private qrServices: QrServices
 
-  private constructor() {
+  constructor(private qrServices: QrServices) {
     super()
     this.generate = this.generate.bind(this)
-
-    this.qrServices = QrServices.getInstance()
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): QrWebController {
-    if (this.instance) {
-      return this.instance
-    }
-    this.instance = new QrWebController()
-    return this.instance
   }
 
   protected registerRoutes(): void {

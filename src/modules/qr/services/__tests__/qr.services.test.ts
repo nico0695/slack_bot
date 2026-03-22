@@ -17,7 +17,7 @@ jest.mock('qrcode', () => ({
 }))
 
 describe('QrServices', () => {
-  const services = QrServices.getInstance()
+  const services = new QrServices()
 
   beforeEach(() => {
     jest.clearAllMocks()

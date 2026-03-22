@@ -28,20 +28,13 @@ const qrServicesMock = {
   generateQr: generateQrMock,
 }
 
-jest.mock('../../services/qr.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => qrServicesMock,
-  },
-}))
-
 describe('QrController', () => {
   let controller: QrController
   let sayMock: jest.Mock
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = QrController.getInstance()
+    controller = new QrController(qrServicesMock as any)
     sayMock = jest.fn()
   })
 

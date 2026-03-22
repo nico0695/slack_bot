@@ -25,20 +25,13 @@ const qrServicesMock = {
   generateQr: generateQrMock,
 }
 
-jest.mock('../../services/qr.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => qrServicesMock,
-  },
-}))
-
 describe('QrWebController', () => {
   let controller: QrWebController
   let res: any
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = QrWebController.getInstance()
+    controller = new QrWebController(qrServicesMock as any)
     controller.userData = { id: 11 } as any
     res = { send: jest.fn() }
   })

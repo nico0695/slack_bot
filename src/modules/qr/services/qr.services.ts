@@ -1,3 +1,4 @@
+import { singleton } from 'tsyringe'
 import QRCode from 'qrcode'
 import { createModuleLogger } from '../../../config/logger'
 import { GenericResponse } from '../../../shared/interfaces/services'
@@ -6,20 +7,8 @@ import { QR_ERROR_CORRECTION_LEVEL, QR_IMAGE_WIDTH, QR_TEXT_MAX_LENGTH } from '.
 
 const log = createModuleLogger('qr.services')
 
+@singleton()
 export default class QrServices {
-  private static instance: QrServices
-
-  private constructor() {}
-
-  static getInstance(): QrServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new QrServices()
-    return this.instance
-  }
-
   async generateQr(text: string): Promise<GenericResponse<IQrResponse>> {
     if (!text || text.length > QR_TEXT_MAX_LENGTH) {
       return { error: 'El texto debe tener entre 1 y 2000 caracteres' }

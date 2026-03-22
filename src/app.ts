@@ -96,8 +96,8 @@ export default class App {
     this.summaryWebController = container.resolve(SummaryWebController)
     this.systemWebController = container.resolve(SystemWebController)
     this.translateWebController = container.resolve(TranslateWebController)
-    this.qrController = QrController.getInstance()
-    this.qrWebController = QrWebController.getInstance()
+    this.qrController = container.resolve(QrController)
+    this.qrWebController = container.resolve(QrWebController)
 
     // Express
     this.app = express()
