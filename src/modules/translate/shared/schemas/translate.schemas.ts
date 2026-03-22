@@ -11,5 +11,5 @@ export const translateSchema = z.object({
     .trim()
     .min(1)
     .max(50)
-    .regex(/^[\p{L}][\p{L}\s\-+()\\/.,]*$/u, 'Invalid target language format'),
+    .regex(/^[\p{L}][\p{L} \-+()\\/.,]*$/u, 'Invalid target language format'),
 })
