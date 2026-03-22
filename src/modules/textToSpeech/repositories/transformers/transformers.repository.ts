@@ -1,4 +1,6 @@
 import fs from 'fs'
+import { singleton } from 'tsyringe'
+
 import { createModuleLogger } from '../../../../config/logger'
 import { transformerApi } from '../../../../config/xenovaImport'
 import { generateRandomFileName } from '../../../../shared/utils/generators.utils'
@@ -8,19 +10,9 @@ const log = createModuleLogger('tts.transformers')
 const EMBED =
   'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin'
 
+@singleton()
 export default class TransformersRepository {
-  private static instance: TransformersRepository
-
-  private constructor() {}
-
-  static getInstance(): TransformersRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new TransformersRepository()
-    return this.instance
-  }
+  constructor() {}
 
   generateSpeech = async (
     phrase: string

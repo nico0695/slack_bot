@@ -4,7 +4,14 @@
     "es2021": true
   },
   "extends": ["standard-with-typescript"],
-  "overrides": [],
+  "overrides": [
+    {
+      "files": ["**/__tests__/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-extraneous-class": "off"
+      }
+    }
+  ],
   "ignorePatterns": ["scripts/**"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
@@ -23,6 +30,7 @@
     "@typescript-eslint/consistent-indexed-object-style": "off",
     "@typescript-eslint/no-misused-promises": "off",
     "@typescript-eslint/member-delimiter-style": "off",
+    "@typescript-eslint/no-useless-constructor": "off",
     "no-console": "warn",
 
     "@typescript-eslint/prefer-readonly": "off"

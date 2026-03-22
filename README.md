@@ -70,6 +70,8 @@ APP_TOKEN=
 OPENAI_API_KEY=
 GEMINI_API_KEY=
 LEAP_API_KEY=
+AI_REPOSITORY_TYPE=OPENAI       # OPENAI | GEMINI (conversations provider)
+IMAGE_REPOSITORY_TYPE=OPENAI    # OPENAI | GEMINI | LEAP (image generation provider)
 
 # Database (optional, defaults to SQLite)
 DB_URL=

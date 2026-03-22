@@ -27,15 +27,7 @@ describe('LinksMetadataRepository', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    repository = LinksMetadataRepository.getInstance()
-  })
-
-  describe('Singleton Pattern', () => {
-    it('should return the same instance on multiple calls', () => {
-      const instance1 = LinksMetadataRepository.getInstance()
-      const instance2 = LinksMetadataRepository.getInstance()
-      expect(instance1).toBe(instance2)
-    })
+    repository = new LinksMetadataRepository()
   })
 
   describe('fetchMetadata', () => {

@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { injectable } from 'tsyringe'
 
 import fs from 'fs'
 import path from 'path'
@@ -15,31 +16,17 @@ const generateSpeechSchema = z.object({
   phrase: z.string().min(1),
 })
 
+@injectable()
 export default class TextToSpeechWebController {
-  private static instance: TextToSpeechWebController
-
   public router: Router
 
-  private textToSpeechServices: TextToSpeechServices
-
-  private constructor() {
+  constructor(private textToSpeechServices: TextToSpeechServices) {
     this.generateTextoToSpeech = this.generateTextoToSpeech.bind(this)
     this.getTextToSpeechList = this.getTextToSpeechList.bind(this)
     this.getAudio = this.getAudio.bind(this)
 
-    this.textToSpeechServices = TextToSpeechServices.getInstance()
-
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): TextToSpeechWebController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new TextToSpeechWebController()
-    return this.instance
   }
 
   protected registerRoutes(): void {

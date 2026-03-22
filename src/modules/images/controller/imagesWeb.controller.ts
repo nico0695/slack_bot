@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 import { validateQuery, paginationSchema } from '../../../shared/utils/validation'
@@ -7,29 +8,19 @@ import { HttpAuth } from '../../../shared/middleware/auth'
 
 import ImagesServices from '../services/images.services'
 
+@injectable()
 export default class ImagesWebController {
-  private static instance: ImagesWebController
-
   public router: Router
 
   private imagesServices: ImagesServices
 
-  private constructor() {
+  constructor(imagesServices: ImagesServices) {
     this.getImages = this.getImages.bind(this)
 
-    this.imagesServices = ImagesServices.getInstance()
+    this.imagesServices = imagesServices
 
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): ImagesWebController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ImagesWebController()
-    return this.instance
   }
 
   protected registerRoutes(): void {

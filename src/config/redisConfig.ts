@@ -3,6 +3,19 @@ import { createModuleLogger } from './logger'
 
 const log = createModuleLogger('redis')
 
+/**
+ * RedisConfig — infrastructure singleton, NOT managed by TSyringe.
+ *
+ * This class manages the Redis client lifecycle (connect/disconnect/reset).
+ * It is intentionally kept outside the DI container because:
+ * - It manages an async connection that must be established at startup
+ * - It exposes static utility methods (getClient, disconnect, reset) used
+ *   directly by repository constructors and tests
+ * - Converting it to TSyringe would require an async factory or InjectionToken
+ *   with no meaningful gain
+ *
+ * Callers: RedisRepository, UsersRedis, SystemWebController
+ */
 export class RedisConfig {
   private static instance: RedisConfig | null
 
@@ -40,19 +53,12 @@ export class RedisConfig {
     }
   }
 
-  static getInstance(): RedisConfig {
-    if (this.instance) {
-      return this.instance
+  static getClient(): any {
+    if (!this.instance) {
+      this.instance = new RedisConfig()
     }
 
-    this.instance = new RedisConfig()
-    return this.instance
-  }
-
-  static getClient(): any {
-    const instance = RedisConfig.getInstance()
-
-    return instance.redisClient
+    return this.instance.redisClient
   }
 
   static async disconnect(): Promise<void> {

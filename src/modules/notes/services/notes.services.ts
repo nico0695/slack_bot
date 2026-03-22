@@ -1,3 +1,5 @@
+import { injectable } from 'tsyringe'
+
 import { Notes } from '../../../entities/notes'
 import { GenericResponse } from '../../../shared/interfaces/services'
 
@@ -8,23 +10,9 @@ import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('notes.service')
 
+@injectable()
 export default class NotesServices {
-  private static instance: NotesServices
-
-  private notesDataSource: NotesDataSource
-
-  private constructor() {
-    this.notesDataSource = NotesDataSource.getInstance()
-  }
-
-  static getInstance(): NotesServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new NotesServices()
-    return this.instance
-  }
+  constructor(private notesDataSource: NotesDataSource) {}
 
   /**
    * Create note with user assistant data

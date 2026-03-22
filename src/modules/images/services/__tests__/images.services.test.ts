@@ -38,35 +38,6 @@ const mockUsersServices = {
   getUserById: jest.fn(),
 }
 
-jest.mock('../../shared/constants/imageRepository', () => ({
-  ImageRepositoryType: { OPENAI: 'OPENAI' },
-  ImageRepositoryByType: {
-    OPENAI: { getInstance: () => mockImageRepository },
-  },
-  getDefaultImageRepositoryType: () => 'OPENAI',
-}))
-
-jest.mock('../../repositories/database/images.dataSource', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => mockImagesDataSource,
-  },
-}))
-
-jest.mock('../../../externalStorage/services/externalStorage.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => mockExternalStorageServices,
-  },
-}))
-
-jest.mock('../../../users/services/users.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => mockUsersServices,
-  },
-}))
-
 const MOCK_PROVIDER_URL = 'https://oaidalleapi.com/temp-img.png'
 const MOCK_STORAGE_URL = 'https://f005.backblazeb2.com/persistent-img.png'
 const MOCK_STORAGE_FILE_ID = 'storage-abc-123'
@@ -104,9 +75,12 @@ describe('ImagesServices', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    // Reset singleton
-    ;(ImagesServices as any).instance = undefined
-    service = ImagesServices.getInstance()
+    service = new ImagesServices(
+      mockImageRepository as any,
+      mockImagesDataSource as any,
+      mockExternalStorageServices as any,
+      mockUsersServices as any,
+    )
   })
 
   describe('generateImages (Slack flow)', () => {

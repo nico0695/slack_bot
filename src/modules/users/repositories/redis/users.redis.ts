@@ -1,4 +1,5 @@
 import { PushSubscription } from 'web-push'
+import { singleton } from 'tsyringe'
 
 import { createModuleLogger } from '../../../../config/logger'
 import { usersPushSubscriptionsKey } from './redis.constants'
@@ -6,22 +7,12 @@ import { RedisConfig } from '../../../../config/redisConfig'
 
 const log = createModuleLogger('users.redis')
 
+@singleton()
 export class UsersRedis {
-  private static instance: UsersRedis
-
   private redisClient
 
-  private constructor() {
+  constructor() {
     this.redisClient = RedisConfig.getClient()
-  }
-
-  static getInstance(): UsersRedis {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new UsersRedis()
-    return this.instance
   }
 
   addOrUpdateUserSubscription = async (

@@ -22,31 +22,24 @@ jest.mock('../../../../shared/middleware/auth', () => {
 
 const handleActionMock = jest.fn()
 
-jest.mock('../../services/conversations.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      handleAction: handleActionMock,
-    }),
-  },
-}))
+const conversationsServicesMock = {
+  handleAction: handleActionMock,
+}
 
-jest.mock('../../services/messageProcessor.service', () => ({
-  __esModule: true,
-  default: { getInstance: () => ({}) },
-}))
+const messageProcessorMock = {}
 
-jest.mock('../../services/conversationFlowManager.service', () => ({
-  __esModule: true,
-  default: { getInstance: () => ({}) },
-}))
+const flowManagerMock = {}
 
 describe('ConversationsController', () => {
   let controller: ConversationsController
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = ConversationsController.getInstance()
+    controller = new ConversationsController(
+      conversationsServicesMock as any,
+      messageProcessorMock as any,
+      flowManagerMock as any,
+    )
     controller.userData = { id: 123 } as any
   })
 

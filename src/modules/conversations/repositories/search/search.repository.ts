@@ -1,22 +1,16 @@
+import { singleton } from 'tsyringe'
 export interface ISearchResultItem {
   title: string
   url: string
   snippet: string
 }
 
+@singleton()
 export default class SearchRepository {
-  private static instance: SearchRepository
-
   private apiUrl: string
 
-  private constructor() {
+  constructor() {
     this.apiUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.SEARCH_API_KEY}&cx=${process.env.SEARCH_API_KEY_CX}&q=`
-  }
-
-  static getInstance(): SearchRepository {
-    if (this.instance) return this.instance
-    this.instance = new SearchRepository()
-    return this.instance
   }
 
   /**

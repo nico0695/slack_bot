@@ -1,3 +1,4 @@
+import { injectable } from 'tsyringe'
 import { Router } from 'express'
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
@@ -7,26 +8,15 @@ import { translateSchema } from '../shared/schemas/translate.schemas'
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
+@injectable()
 export default class TranslateWebController extends GenericController {
-  private static instance: TranslateWebController
   public router: Router
-  private translateServices: TranslateServices
 
-  private constructor() {
+  constructor(private translateServices: TranslateServices) {
     super()
     this.translate = this.translate.bind(this)
-
-    this.translateServices = TranslateServices.getInstance()
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): TranslateWebController {
-    if (this.instance) {
-      return this.instance
-    }
-    this.instance = new TranslateWebController()
-    return this.instance
   }
 
   protected registerRoutes(): void {

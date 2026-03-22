@@ -1,29 +1,17 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
+
 import ConstantsServices from '../services/constants.services'
 
+@injectable()
 export default class ConstantsController {
-  private static instance: ConstantsController
-
   public router: Router
 
-  private constantsServices: ConstantsServices
-
-  private constructor() {
+  constructor(private constantsServices: ConstantsServices) {
     this.getAllConstants = this.getAllConstants.bind(this)
-
-    this.constantsServices = ConstantsServices.getInstance()
 
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): ConstantsController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ConstantsController()
-    return this.instance
   }
 
   /** Constants Routes */

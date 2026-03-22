@@ -31,20 +31,13 @@ const usersServicesMock = {
   subscribeNotifications: subscribeNotificationsMock,
 }
 
-jest.mock('../../services/users.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => usersServicesMock,
-  },
-}))
-
 describe('UsersController', () => {
   let controller: UsersController
   let res: any
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = UsersController.getInstance()
+    controller = new UsersController(usersServicesMock as any)
     controller.userData = { id: 99, email: 'test@example.com' } as any
     res = {
       send: jest.fn(),

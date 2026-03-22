@@ -1,23 +1,14 @@
 import { FindOptionsWhere, IsNull } from 'typeorm'
+import { singleton } from 'tsyringe'
 
 import { Notes } from '../../../../entities/notes'
 import { Users } from '../../../../entities/users'
 
 import { INote } from '../../shared/interfaces/notes.interfaces'
 
+@singleton()
 export default class NotesDataSource {
-  private static instance: NotesDataSource
-
-  private constructor() {}
-
-  static getInstance(): NotesDataSource {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new NotesDataSource()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Save note in database

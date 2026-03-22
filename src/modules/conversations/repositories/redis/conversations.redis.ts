@@ -1,3 +1,4 @@
+import { singleton } from 'tsyringe'
 import { createModuleLogger } from '../../../../config/logger'
 import { IConversation, IConversationFlow } from '../../shared/interfaces/converstions'
 import { rConversationFlow, rAlertSnoozeConfig } from './redis.constants'
@@ -9,25 +10,15 @@ export interface AlertSnoozeConfig {
   defaultSnoozeMinutes: number
 }
 
+@singleton()
 export class RedisRepository {
-  private static instance: RedisRepository
-
   private redisClient
 
   // TTL constants (in seconds)
   private readonly TTL_SNOOZE_CONFIG = 365 * 24 * 60 * 60 // 1 year
 
-  private constructor() {
+  constructor() {
     this.redisClient = RedisConfig.getClient()
-  }
-
-  static getInstance(): RedisRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new RedisRepository()
-    return this.instance
   }
 
   saveConversationMessages = async (key: string, value: IConversation[]): Promise<boolean> => {

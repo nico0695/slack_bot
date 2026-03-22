@@ -29,7 +29,7 @@ describe('SlackRepository', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    slackRepository = SlackRepository.getInstance()
+    slackRepository = new SlackRepository()
   })
 
   it('fetches team members', async () => {

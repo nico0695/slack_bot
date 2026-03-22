@@ -1,4 +1,5 @@
 import { FindOptionsWhere, IsNull } from 'typeorm'
+import { singleton } from 'tsyringe'
 
 import { Links } from '../../../../entities/links'
 import { Users } from '../../../../entities/users'
@@ -6,19 +7,9 @@ import { Users } from '../../../../entities/users'
 import { ILink } from '../../shared/interfaces/links.interfaces'
 import { LinkStatus } from '../../shared/constants/links.constants'
 
+@singleton()
 export default class LinksDataSource {
-  private static instance: LinksDataSource
-
-  private constructor() {}
-
-  static getInstance(): LinksDataSource {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new LinksDataSource()
-    return this.instance
-  }
+  constructor() {}
 
   /**
    * Save link in database

@@ -25,20 +25,13 @@ const translateServicesMock = {
   translate: translateMock,
 }
 
-jest.mock('../../services/translate.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => translateServicesMock,
-  },
-}))
-
 describe('TranslateWebController', () => {
   let controller: TranslateWebController
   let res: any
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = TranslateWebController.getInstance()
+    controller = new TranslateWebController(translateServicesMock as any)
     controller.userData = { id: 11 } as any
     res = { send: jest.fn() }
   })

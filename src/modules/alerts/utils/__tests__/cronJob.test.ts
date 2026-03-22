@@ -1,22 +1,30 @@
 import { alertCronJob } from '../cronJob'
 
-const getAlertsToNotifyMock = jest.fn()
-const updateAlertAsNotifiedMock = jest.fn()
-const postMessageMock = jest.fn()
-const sendNotificationMock = jest.fn()
-const msgAlertDetailMock = jest.fn()
-
-const alertsServicesInstance = {
-  getAlertsToNotify: getAlertsToNotifyMock,
-  updateAlertAsNotified: updateAlertAsNotifiedMock,
+const mockAlertsFns = {
+  getAlertsToNotify: jest.fn(),
+  updateAlertAsNotified: jest.fn(),
 }
 
 jest.mock('../../services/alerts.services', () => ({
   __esModule: true,
-  default: {
-    getInstance: () => alertsServicesInstance,
-  },
+  default: class MockAlertsServices {},
 }))
+
+jest.mock('tsyringe', () => ({
+  container: {
+    resolve: jest.fn().mockReturnValue({
+      getAlertsToNotify: (...args: any[]) => mockAlertsFns.getAlertsToNotify(...args),
+      updateAlertAsNotified: (...args: any[]) => mockAlertsFns.updateAlertAsNotified(...args),
+    }),
+  },
+  singleton: () => (cls: any) => cls,
+}))
+
+const getAlertsToNotifyMock = mockAlertsFns.getAlertsToNotify
+const updateAlertAsNotifiedMock = mockAlertsFns.updateAlertAsNotified
+const postMessageMock = jest.fn()
+const sendNotificationMock = jest.fn()
+const msgAlertDetailMock = jest.fn()
 
 jest.mock('../../../../config/slackConfig', () => ({
   connectionSlackApp: {

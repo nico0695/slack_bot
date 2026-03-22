@@ -12,26 +12,12 @@ jest.mock('../../../../config/logger', () => ({
 
 const translateMock = jest.fn()
 
-const openaiTranslateInstance = {
+const mockRepo = {
   translate: translateMock,
 }
 
-jest.mock('../../repositories/openai/openaiTranslate.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => openaiTranslateInstance,
-  },
-}))
-
-jest.mock('../../repositories/gemini/geminiTranslate.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({}),
-  },
-}))
-
 describe('TranslateServices', () => {
-  const services = TranslateServices.getInstance()
+  const services = new TranslateServices(mockRepo as any)
 
   beforeEach(() => {
     jest.clearAllMocks()

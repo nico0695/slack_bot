@@ -27,7 +27,7 @@ describe('UsersRedis', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    usersRedis = UsersRedis.getInstance()
+    usersRedis = new UsersRedis()
   })
 
   it('adds or updates subscription', async () => {

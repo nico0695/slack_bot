@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { singleton } from 'tsyringe'
 import { createModuleLogger } from '../../../../config/logger'
 import {
   IImageRepository,
@@ -16,13 +17,12 @@ const log = createModuleLogger('openai.images')
  * Uses REST API via axios (similar to LeapRepository) to maintain consistency
  * and avoid breaking changes in the legacy openai v3.2.1 package used by conversations
  */
+@singleton()
 export default class OpenaiImagesRepository implements IImageRepository {
-  private static instance: OpenaiImagesRepository
-
   private apiKey: string
   private baseUrl = 'https://api.openai.com/v1'
 
-  private constructor() {
+  constructor() {
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY is not defined in the environment variables.')
@@ -30,15 +30,6 @@ export default class OpenaiImagesRepository implements IImageRepository {
 
     this.apiKey = apiKey
     this.generateImage = this.generateImage.bind(this)
-  }
-
-  static getInstance(): OpenaiImagesRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new OpenaiImagesRepository()
-    return this.instance
   }
 
   /**

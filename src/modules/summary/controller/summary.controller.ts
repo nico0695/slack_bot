@@ -1,29 +1,17 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
+
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
 
 import SummaryServices from '../services/summary.services'
 
+@injectable()
 export default class SummaryWebController {
-  private static instance: SummaryWebController
-
   public router: Router
 
-  private summaryServices: SummaryServices
-
-  private constructor() {
-    this.summaryServices = SummaryServices.getInstance()
-
+  constructor(private summaryServices: SummaryServices) {
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): SummaryWebController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new SummaryWebController()
-    return this.instance
   }
 
   // ROUTES

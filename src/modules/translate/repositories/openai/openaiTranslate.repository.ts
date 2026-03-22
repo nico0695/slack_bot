@@ -1,29 +1,20 @@
+import { singleton } from 'tsyringe'
 import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from 'openai'
 import { createModuleLogger } from '../../../../config/logger'
 import { ITranslateRepository } from '../../shared/interfaces/translate.interfaces'
 
 const log = createModuleLogger('openai.translate')
 
+@singleton()
 export default class OpenaiTranslateRepository implements ITranslateRepository {
-  private static instance: OpenaiTranslateRepository
-
   private openai: OpenAIApi
 
-  private constructor() {
+  constructor() {
     const configuration = new Configuration({
       apiKey: process.env.OPENAI_API_KEY,
     })
 
     this.openai = new OpenAIApi(configuration)
-  }
-
-  static getInstance(): OpenaiTranslateRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new OpenaiTranslateRepository()
-    return this.instance
   }
 
   async translate(
