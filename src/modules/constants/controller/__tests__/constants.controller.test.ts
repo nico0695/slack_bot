@@ -12,20 +12,13 @@ const serviceMock = {
   createConstant: createConstantMock,
 }
 
-jest.mock('../../services/constants.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => serviceMock,
-  },
-}))
-
 describe('ConstantsController', () => {
   let controller: ConstantsController
   let res: any
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = ConstantsController.getInstance()
+    controller = new ConstantsController(serviceMock as any)
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),

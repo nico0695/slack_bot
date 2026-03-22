@@ -27,7 +27,7 @@ describe('OpenaiTranslateRepository', () => {
 
   beforeAll(() => {
     process.env.OPENAI_API_KEY = 'openai-token'
-    repository = OpenaiTranslateRepository.getInstance()
+    repository = new OpenaiTranslateRepository()
   })
 
   beforeEach(() => {

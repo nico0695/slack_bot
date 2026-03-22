@@ -1,4 +1,6 @@
 import axios, { AxiosInstance } from 'axios'
+import { singleton } from 'tsyringe'
+
 import { createModuleLogger } from '../../../../config/logger'
 import {
   IStorageApiFile,
@@ -8,12 +10,11 @@ import {
 
 const log = createModuleLogger('apiStorage.repository')
 
+@singleton()
 export default class ApiStorageRepository {
-  private static instance: ApiStorageRepository
-
   private client: AxiosInstance
 
-  private constructor() {
+  constructor() {
     const baseURL = process.env.STORAGE_API_URL
     const apiKey = process.env.STORAGE_API_KEY
 
@@ -30,15 +31,6 @@ export default class ApiStorageRepository {
         'X-API-Key': apiKey,
       },
     })
-  }
-
-  static getInstance(): ApiStorageRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ApiStorageRepository()
-    return this.instance
   }
 
   async uploadFile(

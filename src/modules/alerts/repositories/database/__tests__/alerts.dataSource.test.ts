@@ -2,7 +2,7 @@ import { Alerts } from '../../../../../entities/alerts'
 import AlertsDataSource from '../alerts.dataSource'
 
 describe('AlertsDataSource', () => {
-  const dataSource = AlertsDataSource.getInstance()
+  const dataSource = new AlertsDataSource()
 
   afterEach(() => {
     jest.restoreAllMocks()

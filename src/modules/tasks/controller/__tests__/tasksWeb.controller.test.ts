@@ -31,20 +31,13 @@ const tasksServicesMock = {
   deleteTask: deleteTaskMock,
 }
 
-jest.mock('../../services/tasks.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => tasksServicesMock,
-  },
-}))
-
 describe('TasksWebController', () => {
   let controller: TasksWebController
   let res: any
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = TasksWebController.getInstance()
+    controller = new TasksWebController(tasksServicesMock as any)
     controller.userData = { id: 15 } as any
     res = { send: jest.fn() }
   })

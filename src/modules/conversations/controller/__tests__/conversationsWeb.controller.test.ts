@@ -24,26 +24,15 @@ const usersServicesMock = {
   getUserById: getUserByIdMock,
 }
 
-jest.mock('../../services/conversations.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => conversationServicesMock,
-  },
-}))
-
-jest.mock('../../../users/services/users.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => usersServicesMock,
-  },
-}))
-
 describe('ConversationsWebController', () => {
   let controller: ConversationsWebController
 
   beforeEach(() => {
     jest.clearAllMocks()
-    controller = ConversationsWebController.getInstance()
+    controller = new ConversationsWebController(
+      conversationServicesMock as any,
+      usersServicesMock as any,
+    )
   })
 
   it('joins channel returning conversation flow', async () => {

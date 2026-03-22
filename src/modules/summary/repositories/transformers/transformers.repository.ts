@@ -1,21 +1,13 @@
+import { singleton } from 'tsyringe'
+
 import { createModuleLogger } from '../../../../config/logger'
 import { transformerApi } from '../../../../config/xenovaImport'
 
 const log = createModuleLogger('summary.transformers')
 
+@singleton()
 export default class TransformersRepository {
-  private static instance: TransformersRepository
-
-  private constructor() {}
-
-  static getInstance(): TransformersRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new TransformersRepository()
-    return this.instance
-  }
+  constructor() {}
 
   generateSummary = async (text: string): Promise<string | null> => {
     try {

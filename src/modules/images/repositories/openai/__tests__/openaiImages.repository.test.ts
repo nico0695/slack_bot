@@ -31,39 +31,24 @@ describe('OpenaiImagesRepository', () => {
   describe('Environment Variables', () => {
     it('should throw error if OPENAI_API_KEY is not defined', () => {
       const originalKey = process.env.OPENAI_API_KEY
-
-      if (originalKey) {
-        expect(true).toBe(true)
-        return
-      }
-
       delete process.env.OPENAI_API_KEY
 
-      expect(() => {
-        OpenaiImagesRepository.getInstance()
-      }).toThrow('OPENAI_API_KEY is not defined in the environment variables.')
+      expect(() => new OpenaiImagesRepository()).toThrow(
+        'OPENAI_API_KEY is not defined in the environment variables.'
+      )
 
-      process.env.OPENAI_API_KEY = originalKey
+      if (originalKey) process.env.OPENAI_API_KEY = originalKey
     })
   })
 
   beforeEach(() => {
     jest.clearAllMocks()
     process.env.OPENAI_API_KEY = 'test-key'
-    repository = OpenaiImagesRepository.getInstance()
+    repository = new OpenaiImagesRepository()
   })
 
   afterEach(() => {
     delete process.env.OPENAI_API_KEY
-  })
-
-  describe('Singleton Pattern', () => {
-    it('should return the same instance on multiple calls', () => {
-      const instance1 = OpenaiImagesRepository.getInstance()
-      const instance2 = OpenaiImagesRepository.getInstance()
-
-      expect(instance1).toBe(instance2)
-    })
   })
 
   describe('generateImage', () => {

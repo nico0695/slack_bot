@@ -1,3 +1,5 @@
+import { singleton } from 'tsyringe'
+
 import { GenericResponse } from '../../../shared/interfaces/services'
 
 import UsersDataSource from '../repositories/database/users.dataSource'
@@ -11,28 +13,14 @@ import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('users.service')
 
+@singleton()
 export default class UsersServices {
-  private static instance: UsersServices
-
-  private usersDataSource: UsersDataSource
-  private slackRepository: SlackRepository
-  private userRedis: UsersRedis
-
-  private constructor() {
-    this.usersDataSource = UsersDataSource.getInstance()
-    this.slackRepository = SlackRepository.getInstance()
-    this.userRedis = UsersRedis.getInstance()
-
+  constructor(
+    private usersDataSource: UsersDataSource,
+    private slackRepository: SlackRepository,
+    private userRedis: UsersRedis
+  ) {
     this.createUser = this.createUser.bind(this)
-  }
-
-  static getInstance(): UsersServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new UsersServices()
-    return this.instance
   }
 
   /**

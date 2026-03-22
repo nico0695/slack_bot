@@ -36,6 +36,10 @@ const imagesServicesMock = {
   generateImageForAssistant: jest.fn(),
 }
 
+const searchRepositoryMock = {
+  search: jest.fn(),
+}
+
 const translateServicesMock = {
   translate: jest.fn(),
 }
@@ -43,84 +47,6 @@ const translateServicesMock = {
 const qrServicesMock = {
   generateQr: jest.fn(),
 }
-
-jest.mock('../../repositories/redis/conversations.redis', () => ({
-  RedisRepository: {
-    getInstance: () => redisRepositoryMock,
-  },
-}))
-
-jest.mock('../../repositories/openai/openai.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => aiRepositoryMock,
-  },
-}))
-
-jest.mock('../../repositories/gemini/gemini.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => aiRepositoryMock,
-  },
-}))
-
-jest.mock('../../../alerts/services/alerts.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => alertsServicesMock,
-  },
-}))
-
-jest.mock('../../../tasks/services/tasks.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => tasksServicesMock,
-  },
-}))
-
-jest.mock('../../../notes/services/notes.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => notesServicesMock,
-  },
-}))
-
-jest.mock('../../../links/services/links.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => linksServicesMock,
-  },
-}))
-
-jest.mock('../../../images/services/images.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => imagesServicesMock,
-  },
-}))
-
-jest.mock('../../../translate/services/translate.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => translateServicesMock,
-  },
-}))
-
-jest.mock('../../../qr/services/qr.services', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => qrServicesMock,
-  },
-}))
-
-jest.mock('../../repositories/search/search.repository', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      search: jest.fn(),
-    }),
-  },
-}))
 
 const buildBlocksMock = (): { blocks: any[] } => ({ blocks: [] as any[] })
 
@@ -136,13 +62,27 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgLinkCreated: jest.fn(() => buildBlocksMock()),
 }))
 
+const buildProcessor = (): MessageProcessor =>
+  new MessageProcessor(
+    aiRepositoryMock as any,
+    redisRepositoryMock as any,
+    alertsServicesMock as any,
+    tasksServicesMock as any,
+    notesServicesMock as any,
+    linksServicesMock as any,
+    imagesServicesMock as any,
+    searchRepositoryMock as any,
+    translateServicesMock as any,
+    qrServicesMock as any
+  )
+
 describe('MessageProcessor - channel scoped lookups', () => {
   let processor: MessageProcessor
 
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('requests channel-specific alerts when running inside a channel', async () => {
@@ -185,7 +125,7 @@ describe('MessageProcessor - image handling', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('lists images when using .img -l variable', async () => {
@@ -282,7 +222,7 @@ describe('MessageProcessor - skip AI flag', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('returns shouldSkipAI true when message starts with +', async () => {
@@ -304,7 +244,7 @@ describe('MessageProcessor - link handling', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('creates a link with .link <url>', async () => {
@@ -330,7 +270,13 @@ describe('MessageProcessor - link handling', () => {
 
   it('creates a link with flags -tt -d -t', async () => {
     linksServicesMock.createAssistantLink.mockResolvedValue({
-      data: { id: 2, url: 'https://example.com', title: 'My Title', tag: 'dev', description: 'Desc' },
+      data: {
+        id: 2,
+        url: 'https://example.com',
+        title: 'My Title',
+        tag: 'dev',
+        description: 'Desc',
+      },
     })
 
     const result = await processor.processAssistantMessage(
@@ -350,9 +296,7 @@ describe('MessageProcessor - link handling', () => {
 
   it('lists links with .link -l', async () => {
     linksServicesMock.getLinksByUserId.mockResolvedValue({
-      data: [
-        { id: 1, url: 'https://example.com', title: 'Test', tag: '', status: 'unread' },
-      ],
+      data: [{ id: 1, url: 'https://example.com', title: 'Test', tag: '', status: 'unread' }],
     })
 
     const result = await processor.processAssistantMessage('.link -l', 99, undefined, false)
@@ -363,9 +307,7 @@ describe('MessageProcessor - link handling', () => {
 
   it('lists links by tag with .link -lt dev', async () => {
     linksServicesMock.getLinksByUserId.mockResolvedValue({
-      data: [
-        { id: 1, url: 'https://example.com', title: 'Test', tag: 'dev', status: 'unread' },
-      ],
+      data: [{ id: 1, url: 'https://example.com', title: 'Test', tag: 'dev', status: 'unread' }],
     })
 
     const result = await processor.processAssistantMessage('.link -lt dev', 99, undefined, false)
@@ -379,9 +321,9 @@ describe('MessageProcessor - link handling', () => {
   })
 
   it('throws when URL is missing in .link', async () => {
-    await expect(
-      processor.processAssistantMessage('.link', 99, undefined, false)
-    ).rejects.toThrow('debes ingresar una URL')
+    await expect(processor.processAssistantMessage('.link', 99, undefined, false)).rejects.toThrow(
+      'debes ingresar una URL'
+    )
   })
 
   it('returns empty list message when no links exist', async () => {
@@ -400,7 +342,7 @@ describe('MessageProcessor - onProgress callback', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('calls onProgress with "Generando imagen..." before image generation via .img', async () => {
@@ -467,7 +409,7 @@ describe('MessageProcessor - translate handling', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('translates text successfully with .translate command', async () => {
@@ -477,7 +419,7 @@ describe('MessageProcessor - translate handling', () => {
 
     const result = await processor.processAssistantMessage('.translate Spanish Hello world', 99)
 
-    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'Spanish')
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello world', 'spanish')
     expect(result.response.content).toBe('Hola mundo')
   })
 
@@ -488,20 +430,20 @@ describe('MessageProcessor - translate handling', () => {
 
     const result = await processor.processAssistantMessage('.tr French Hello', 99)
 
-    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello', 'French')
+    expect(translateServicesMock.translate).toHaveBeenCalledWith('Hello', 'french')
     expect(result.response.content).toBe('Bonjour')
   })
 
   it('throws a usage error when no language and text provided', async () => {
-    await expect(
-      processor.processAssistantMessage('.translate', 99)
-    ).rejects.toThrow('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
+    await expect(processor.processAssistantMessage('.translate', 99)).rejects.toThrow(
+      'Uso: .translate <idioma> <texto> o .tr <idioma> <texto>'
+    )
   })
 
   it('throws a usage error when only language is provided without text', async () => {
-    await expect(
-      processor.processAssistantMessage('.translate Spanish', 99)
-    ).rejects.toThrow('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
+    await expect(processor.processAssistantMessage('.translate Spanish', 99)).rejects.toThrow(
+      'Uso: .translate <idioma> <texto> o .tr <idioma> <texto>'
+    )
   })
 
   it('throws a validation error when targetLang contains invalid characters', async () => {
@@ -541,7 +483,7 @@ describe('MessageProcessor - QR handling', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
-    processor = MessageProcessor.getInstance()
+    processor = buildProcessor()
   })
 
   it('generates QR code successfully with .qr command', async () => {

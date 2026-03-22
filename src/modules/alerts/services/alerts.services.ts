@@ -1,3 +1,5 @@
+import { singleton } from 'tsyringe'
+
 import { Alerts } from '../../../entities/alerts'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { IAlertToNotify, IAlert } from '../shared/interfaces/alerts.interfaces'
@@ -10,25 +12,12 @@ import { createModuleLogger } from '../../../config/logger'
 
 const log = createModuleLogger('alerts.service')
 
+@singleton()
 export default class AlertsServices {
-  private static instance: AlertsServices
-
-  private alertsDataSource: AlertsDataSource
-  private usersRedis: UsersRedis
-
-  private constructor() {
-    this.alertsDataSource = AlertsDataSource.getInstance()
-    this.usersRedis = UsersRedis.getInstance()
-  }
-
-  static getInstance(): AlertsServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new AlertsServices()
-    return this.instance
-  }
+  constructor(
+    private alertsDataSource: AlertsDataSource,
+    private usersRedis: UsersRedis
+  ) {}
 
   /**
    * Create alert with user assistant data

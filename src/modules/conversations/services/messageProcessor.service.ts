@@ -1,3 +1,5 @@
+import { injectable, inject } from 'tsyringe'
+
 import { createModuleLogger } from '../../../config/logger'
 import {
   IConversation,
@@ -36,55 +38,27 @@ import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 const log = createModuleLogger('conversations.messageProcessor')
 
-export enum AIRepositoryType {
-  OPENAI = 'OPENAI',
-  GEMINI = 'GEMINI',
-}
-
-const AIRepositoryByType = {
-  [AIRepositoryType.OPENAI]: OpenaiRepository,
-  [AIRepositoryType.GEMINI]: GeminiRepository,
-}
-
 interface IProcessMessageResult {
   response: IConversation | null
   shouldSkipAI: boolean
 }
 
+@injectable()
 export default class MessageProcessor {
-  private static instance: MessageProcessor
-
-  private aiRepository: OpenaiRepository | GeminiRepository
-  private redisRepository: RedisRepository
-  private alertsServices: AlertsServices
-  private tasksServices: TasksServices
-  private notesServices: NotesServices
-  private linksServices: LinksServices
-  private imagesServices: ImagesServices
-  private translateServices: TranslateServices
-  private qrServices: QrServices
   private defaultSnoozeMinutes = 10
 
-  private constructor(aiToUse = AIRepositoryType.OPENAI) {
-    this.aiRepository = AIRepositoryByType[aiToUse].getInstance()
-    this.redisRepository = RedisRepository.getInstance()
-    this.alertsServices = AlertsServices.getInstance()
-    this.tasksServices = TasksServices.getInstance()
-    this.notesServices = NotesServices.getInstance()
-    this.linksServices = LinksServices.getInstance()
-    this.imagesServices = ImagesServices.getInstance()
-    this.translateServices = TranslateServices.getInstance()
-    this.qrServices = QrServices.getInstance()
-  }
-
-  static getInstance(): MessageProcessor {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new MessageProcessor()
-    return this.instance
-  }
+  constructor(
+    @inject('AIRepository') private aiRepository: OpenaiRepository | GeminiRepository,
+    private redisRepository: RedisRepository,
+    private alertsServices: AlertsServices,
+    private tasksServices: TasksServices,
+    private notesServices: NotesServices,
+    private linksServices: LinksServices,
+    private imagesServices: ImagesServices,
+    private searchRepository: SearchRepository,
+    private translateServices: TranslateServices,
+    private qrServices: QrServices
+  ) {}
 
   processAssistantMessage = async (
     message: string,
@@ -929,18 +903,14 @@ export default class MessageProcessor {
         const translateValue = (assistantMessage.value as string) || ''
         const firstSpace = translateValue.indexOf(' ')
         if (firstSpace === -1 || !translateValue.trim()) {
-          throw new Error(
-            'Uso: .translate <idioma> <texto> o .tr <idioma> <texto>'
-          )
+          throw new Error('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
         }
 
         const rawTargetLang = translateValue.substring(0, firstSpace).trim()
         const rawTextToTranslate = translateValue.substring(firstSpace + 1).trim()
 
         if (!rawTextToTranslate) {
-          throw new Error(
-            'Uso: .translate <idioma> <texto> o .tr <idioma> <texto>'
-          )
+          throw new Error('Uso: .translate <idioma> <texto> o .tr <idioma> <texto>')
         }
 
         const validation = translateSchema.safeParse({
@@ -955,7 +925,10 @@ export default class MessageProcessor {
 
         const { text: textToTranslate, targetLang } = validation.data
 
-        const translateResult = await this.translateServices.translate(textToTranslate, targetLang)
+        const translateResult = await this.translateServices.translate(
+          textToTranslate,
+          targetLang.toLowerCase()
+        )
 
         if (translateResult.error) {
           throw new Error(translateResult.error)
@@ -1374,10 +1347,12 @@ export default class MessageProcessor {
           return messageResponse
         }
         case 'translate': {
-          if (!parsed.text || !parsed.targetLang) return null
+          const translateText = parsed.text ?? parsed.parameters?.text
+          const translateLang = parsed.targetLang ?? parsed.parameters?.targetLang
+          if (!translateText || !translateLang) return null
           const translateResult = await this.translateServices.translate(
-            parsed.text,
-            parsed.targetLang
+            String(translateText),
+            String(translateLang).toLowerCase().trim()
           )
           if (translateResult.error) return null
           return {
@@ -1424,8 +1399,7 @@ export default class MessageProcessor {
     const trimmed = (query || '').trim()
     if (!trimmed) return null
 
-    const searchRepo = SearchRepository.getInstance()
-    const results = await searchRepo.search(trimmed)
+    const results = await this.searchRepository.search(trimmed)
 
     if (!results.length) {
       return {

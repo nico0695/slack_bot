@@ -1,3 +1,4 @@
+import { injectable, inject } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import ImagesDataSources from '../repositories/database/images.dataSource'
 import {
@@ -12,11 +13,6 @@ import {
 import { IPaginationOptions, IPaginationResponse } from '../../../shared/interfaces/pagination'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { Images } from '../../../entities/images'
-import {
-  ImageRepositoryType,
-  ImageRepositoryByType,
-  getDefaultImageRepositoryType,
-} from '../shared/constants/imageRepository'
 import UsersServices from '../../users/services/users.services'
 import ExternalStorageServices from '../../externalStorage/services/externalStorage.services'
 import { StorageSourceModule } from '../../externalStorage/shared/constants/externalStorage.constants'
@@ -28,29 +24,15 @@ const log = createModuleLogger('images.service')
  * Handles business logic for image generation using repository abstraction
  * Follows the same pattern as ConversationsServices (AIRepositoryType pattern)
  */
+@injectable()
 export default class ImagesServices {
-  private static instance: ImagesServices
-
-  private imageRepository: IImageRepository // Interface, not concrete class
-  private imagesDataSources: ImagesDataSources
-  private externalStorageServices: ExternalStorageServices
-
-  private constructor(repositoryType: ImageRepositoryType = getDefaultImageRepositoryType()) {
-    // Factory pattern: select repository based on type
-    this.imageRepository = ImageRepositoryByType[repositoryType].getInstance()
-    this.imagesDataSources = ImagesDataSources.getInstance()
-    this.externalStorageServices = ExternalStorageServices.getInstance()
-
+  constructor(
+    @inject('ImageRepository') private imageRepository: IImageRepository,
+    private imagesDataSources: ImagesDataSources,
+    private externalStorageServices: ExternalStorageServices,
+    private usersServices: UsersServices,
+  ) {
     this.generateImages = this.generateImages.bind(this)
-  }
-
-  static getInstance(repositoryType?: ImageRepositoryType): ImagesServices {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new ImagesServices(repositoryType)
-    return this.instance
   }
 
   /**
@@ -202,8 +184,7 @@ export default class ImagesServices {
       }
 
       // Get user info for database storage
-      const userService = UsersServices.getInstance()
-      const user = await userService.getUserById(userId)
+      const user = await this.usersServices.getUserById(userId)
 
       if (!user?.data) {
         log.warn({ userId }, 'User not found for image storage')

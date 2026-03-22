@@ -1,5 +1,6 @@
 import { ChatCompletionRequestMessage } from 'openai'
 import { GoogleGenAI } from '@google/genai'
+import { singleton } from 'tsyringe'
 import { createModuleLogger } from '../../../../config/logger'
 import { IConversation } from '../../shared/interfaces/converstions'
 import { roleTypes } from '../../shared/constants/openai'
@@ -7,24 +8,14 @@ import { ConversationProviders } from '../../shared/constants/conversationFlow'
 
 const log = createModuleLogger('gemini.conversations')
 
+@singleton()
 export default class GeminiRepository {
-  private static instance: GeminiRepository
-
   private geminiApi
 
-  private constructor() {
+  constructor() {
     this.geminiApi = this.initializeGeminiApi()
 
     this.chatCompletion = this.chatCompletion.bind(this)
-  }
-
-  static getInstance(): GeminiRepository {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new GeminiRepository()
-    return this.instance
   }
 
   private initializeGeminiApi(): any {

@@ -9,7 +9,7 @@ describe('SearchRepository', () => {
     global.fetch = fetchMock as any
     process.env.SEARCH_API_KEY = 'api'
     process.env.SEARCH_API_KEY_CX = 'cx'
-    repository = SearchRepository.getInstance()
+    repository = new SearchRepository()
   })
 
   beforeEach(() => {

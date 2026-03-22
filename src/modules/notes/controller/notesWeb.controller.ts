@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { injectable } from 'tsyringe'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
@@ -11,33 +12,19 @@ import { createNoteSchema, updateNoteSchema } from '../shared/schemas/notes.sche
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 
+@injectable()
 export default class NotesWebController extends GenericController {
-  private static instance: NotesWebController
-
   public router: Router
 
-  private notesServices: NotesServices
-
-  private constructor() {
+  constructor(private notesServices: NotesServices) {
     super()
     this.createNote = this.createNote.bind(this)
     this.getNotes = this.getNotes.bind(this)
     this.deleteNote = this.deleteNote.bind(this)
     this.updateNote = this.updateNote.bind(this)
 
-    this.notesServices = NotesServices.getInstance()
-
     this.router = Router()
     this.registerRoutes()
-  }
-
-  static getInstance(): NotesWebController {
-    if (this.instance) {
-      return this.instance
-    }
-
-    this.instance = new NotesWebController()
-    return this.instance
   }
 
   /** Notes Routes */
