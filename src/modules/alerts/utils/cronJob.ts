@@ -35,12 +35,15 @@ export const alertCronJob = async (): Promise<void> => {
           // Send rich message to slack
           const messageBlock = slackMsgUtils.msgAlertDetail(alert as any)
 
-          // Send rich message to slack
-          await slackApp.client.chat.postMessage({
-            channel: targetChannel,
-            text: `🔔 Alerta: ${alert.message}`,
-            blocks: messageBlock.blocks,
-          })
+          try {
+            await slackApp.client.chat.postMessage({
+              channel: targetChannel,
+              text: `🔔 Alerta: ${alert.message}`,
+              blocks: messageBlock.blocks,
+            })
+          } catch (error) {
+            log.error({ err: error, alertId: alert.id }, 'Failed to send slack notification')
+          }
 
           // Send notification to web
           if (alert.user.pwSubscription) {
