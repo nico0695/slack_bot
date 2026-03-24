@@ -64,7 +64,8 @@ const getAlertStatusTokens = (alert: Alerts): AlertStatusTokens => {
   const now = new Date()
   const alertDate = new Date(alert.date)
   const resolved = Boolean(alert.sent)
-  const overdue = !resolved && alertDate.getTime() < now.getTime() + 2 * 60 * 1000
+  const GRACE_PERIOD_MS = 90 * 1000
+  const overdue = !resolved && alertDate.getTime() < now.getTime() - GRACE_PERIOD_MS
 
   const icon = resolved ? ':white_check_mark:' : overdue ? ':warning:' : ':rotating_light:'
   const scheduledAt = formatShortDate(alertDate)
