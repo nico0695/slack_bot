@@ -253,10 +253,14 @@ export default class ConversationsController extends GenericController {
       return
     }
 
-    const rawChannelId = String(body?.channel?.id ?? '')
+    const rawChannelId = String(body?.channel?.id ?? '').trim()
     const channelType = String(body?.channel?.type ?? '')
-    const isChannelContext = channelType !== 'im' && rawChannelId.trim().length > 0
-    const scopedChannelId = isChannelContext ? rawChannelId.trim() : undefined
+      .trim()
+      .toLowerCase()
+    const hasChannelId = rawChannelId.length > 0
+    const isDirectMessage = channelType === 'im'
+    const isChannelContext = hasChannelId && !isDirectMessage
+    const scopedChannelId = isChannelContext ? rawChannelId : undefined
 
     const response = await this.conversationServices.handleAction(parsedAction, userData.id, {
       channelId: scopedChannelId,
