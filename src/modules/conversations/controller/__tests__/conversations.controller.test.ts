@@ -158,6 +158,35 @@ describe('ConversationsController', () => {
       expect(say).toHaveBeenCalledWith('ok')
     })
 
+    it('uses channel context when channel id exists and type is missing', async () => {
+      handleActionMock.mockResolvedValue('ok')
+      const say = jest.fn()
+      const ack = jest.fn()
+
+      await controller.handleActions({
+        ack,
+        say,
+        body: {
+          channel: {
+            id: 'C123',
+          },
+          actions: [
+            {
+              action_id: 'task_actions:detail:15',
+            },
+          ],
+        },
+      })
+
+      expect(ack).toHaveBeenCalled()
+      expect(handleActionMock).toHaveBeenCalledWith(
+        { entity: 'task', operation: 'detail', targetId: 15 },
+        123,
+        { channelId: 'C123', isChannelContext: true }
+      )
+      expect(say).toHaveBeenCalledWith('ok')
+    })
+
     it('responds with fallback when action not recognized', async () => {
       handleActionMock.mockResolvedValue('handled')
       const say = jest.fn()
