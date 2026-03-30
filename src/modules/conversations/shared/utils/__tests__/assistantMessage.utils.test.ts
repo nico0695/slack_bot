@@ -57,4 +57,31 @@ describe('AssistantMessage', () => {
     })
     expect(assistantMessage.cleanMessage).toBe('')
   })
+
+  it('parses reminder creation with recurrence flags and alias', () => {
+    const assistantMessage = new AssistantMessage(
+      '.r team sync -rt weekly -wd mon,wed,fri -at 10:30'
+    )
+
+    expect(assistantMessage.variable).toBe(AssistantsVariables.REMINDER)
+    expect(assistantMessage.value).toBe('team sync')
+    expect(assistantMessage.flags).toEqual({
+      [AssistantsFlags.RECURRENCE_TYPE]: 'weekly',
+      [AssistantsFlags.WEEK_DAYS]: 'mon,wed,fri',
+      [AssistantsFlags.TIME_OF_DAY]: '10:30',
+    })
+    expect(assistantMessage.cleanMessage).toBe('')
+  })
+
+  it('parses reminder lifecycle actions with id flag', () => {
+    const assistantMessage = new AssistantMessage('.reminder -check -id 12')
+
+    expect(assistantMessage.variable).toBe(AssistantsVariables.REMINDER)
+    expect(assistantMessage.value).toBe('')
+    expect(assistantMessage.flags).toEqual({
+      [AssistantsFlags.CHECK]: true,
+      [AssistantsFlags.ID]: '12',
+    })
+    expect(assistantMessage.cleanMessage).toBe('')
+  })
 })

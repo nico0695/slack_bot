@@ -1,4 +1,10 @@
 import MessageProcessor from '../messageProcessor.service'
+import {
+  ReminderRecurrenceType,
+  ReminderScope,
+  ReminderStatus,
+  ReminderWeekDay,
+} from '../../../reminders/shared/constants/reminders.constants'
 
 const redisRepositoryMock = {
   getAlertSnoozeConfig: jest.fn(),
@@ -31,6 +37,15 @@ const linksServicesMock = {
   createAssistantLink: jest.fn(),
 }
 
+const remindersServicesMock = {
+  createReminder: jest.fn(),
+  getRemindersByScope: jest.fn(),
+  pauseReminder: jest.fn(),
+  resumeReminder: jest.fn(),
+  deleteReminder: jest.fn(),
+  checkReminderOccurrence: jest.fn(),
+}
+
 const imagesServicesMock = {
   getImages: jest.fn(),
   generateImageForAssistant: jest.fn(),
@@ -60,6 +75,19 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgNoteCreated: jest.fn(() => buildBlocksMock()),
   msgLinksList: jest.fn(() => buildBlocksMock()),
   msgLinkCreated: jest.fn(() => buildBlocksMock()),
+  msgReminderCreated: jest.fn(() => buildBlocksMock()),
+  msgRemindersList: jest.fn(() => buildBlocksMock()),
+  msgReminderDetail: jest.fn(() => buildBlocksMock()),
+}))
+
+jest.mock('../../../../config/slackConfig', () => ({
+  connectionSlackApp: {
+    client: {
+      chat: {
+        postMessage: jest.fn(),
+      },
+    },
+  },
 }))
 
 const buildProcessor = (): MessageProcessor =>
@@ -70,6 +98,7 @@ const buildProcessor = (): MessageProcessor =>
     tasksServicesMock as any,
     notesServicesMock as any,
     linksServicesMock as any,
+    remindersServicesMock as any,
     imagesServicesMock as any,
     searchRepositoryMock as any,
     translateServicesMock as any,
@@ -333,6 +362,226 @@ describe('MessageProcessor - link handling', () => {
 
     expect(result.response).toBeTruthy()
     expect(result.response?.content).toContain('No tienes links')
+  })
+})
+
+describe('MessageProcessor - reminder handling', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = buildProcessor()
+  })
+
+  it('creates a personal daily reminder with .reminder', async () => {
+    remindersServicesMock.createReminder.mockResolvedValue({
+      data: {
+        id: 12,
+        message: 'drink water',
+        recurrenceType: ReminderRecurrenceType.DAILY,
+        timeOfDay: '09:00',
+        status: ReminderStatus.ACTIVE,
+        channelId: null,
+      },
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.reminder drink water -rt daily -at 09:00',
+      99,
+      'D123',
+      false
+    )
+
+    expect(remindersServicesMock.createReminder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'drink water',
+        recurrenceType: ReminderRecurrenceType.DAILY,
+        timeOfDay: '09:00',
+        status: ReminderStatus.ACTIVE,
+        userId: 99,
+        channelId: null,
+      })
+    )
+    expect(result.response?.content).toContain('#12')
+  })
+
+  it('creates a channel weekly reminder with normalized channel scope', async () => {
+    remindersServicesMock.createReminder.mockResolvedValue({
+      data: {
+        id: 22,
+        message: 'team sync',
+        recurrenceType: ReminderRecurrenceType.WEEKLY,
+        timeOfDay: '10:30',
+        weekDays: [ReminderWeekDay.MONDAY, ReminderWeekDay.WEDNESDAY, ReminderWeekDay.FRIDAY],
+        status: ReminderStatus.ACTIVE,
+        channelId: 'C123',
+      },
+    })
+
+    await processor.processAssistantMessage(
+      '.r team sync -rt weekly -wd mon,wed,fri -at 10:30',
+      99,
+      'C123',
+      true
+    )
+
+    expect(remindersServicesMock.createReminder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'team sync',
+        recurrenceType: ReminderRecurrenceType.WEEKLY,
+        timeOfDay: '10:30',
+        weekDays: [ReminderWeekDay.MONDAY, ReminderWeekDay.WEDNESDAY, ReminderWeekDay.FRIDAY],
+        status: ReminderStatus.ACTIVE,
+        userId: 99,
+        channelId: 'C123',
+      })
+    )
+  })
+
+  it('lists personal reminders with personal scope', async () => {
+    remindersServicesMock.getRemindersByScope.mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          message: 'Drink water',
+          recurrenceType: ReminderRecurrenceType.DAILY,
+          timeOfDay: '09:00',
+          status: ReminderStatus.ACTIVE,
+          channelId: null,
+        },
+      ],
+    })
+
+    const result = await processor.processAssistantMessage('.r -list', 99, undefined, false)
+
+    expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(99, {
+      scope: ReminderScope.PERSONAL,
+      channelId: null,
+    })
+    expect(result.response?.content).toContain('#1')
+    expect(result.response?.content).toContain('personal')
+  })
+
+  it('lists channel reminders with channel scope', async () => {
+    remindersServicesMock.getRemindersByScope.mockResolvedValue({
+      data: [
+        {
+          id: 2,
+          message: 'Standup',
+          recurrenceType: ReminderRecurrenceType.DAILY,
+          timeOfDay: '10:00',
+          status: ReminderStatus.ACTIVE,
+          channelId: 'C555',
+        },
+      ],
+    })
+
+    const result = await processor.processAssistantMessage('.r -list', 99, 'C555', true)
+
+    expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(99, {
+      scope: ReminderScope.CHANNEL,
+      channelId: 'C555',
+    })
+    expect(result.response?.content).toContain('channel')
+  })
+
+  it('checks reminder occurrence by id', async () => {
+    remindersServicesMock.checkReminderOccurrence.mockResolvedValue({
+      data: { id: 70, occurrenceDate: '2026-03-29' },
+    })
+
+    const result = await processor.processAssistantMessage('.r -check -id 12', 99, undefined, false)
+
+    expect(remindersServicesMock.checkReminderOccurrence).toHaveBeenCalledWith(12, {
+      userId: 99,
+    })
+    expect(result.response?.content).toContain('2026-03-29')
+  })
+
+  it('pauses reminder by id', async () => {
+    remindersServicesMock.pauseReminder.mockResolvedValue({
+      data: {
+        id: 12,
+        message: 'Drink water',
+        recurrenceType: ReminderRecurrenceType.DAILY,
+        timeOfDay: '09:00',
+        status: ReminderStatus.PAUSED,
+        channelId: null,
+      },
+    })
+
+    const result = await processor.processAssistantMessage('.r -pause -id 12', 99, undefined, false)
+
+    expect(remindersServicesMock.pauseReminder).toHaveBeenCalledWith(12, { userId: 99 })
+    expect(result.response?.content).toContain('pausado')
+  })
+
+  it('resumes reminder by id', async () => {
+    remindersServicesMock.resumeReminder.mockResolvedValue({
+      data: {
+        id: 12,
+        message: 'Drink water',
+        recurrenceType: ReminderRecurrenceType.DAILY,
+        timeOfDay: '09:00',
+        status: ReminderStatus.ACTIVE,
+        channelId: null,
+      },
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.r -resume -id 12',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.resumeReminder).toHaveBeenCalledWith(12, { userId: 99 })
+    expect(result.response?.content).toContain('reanudado')
+  })
+
+  it('deletes reminder by id', async () => {
+    remindersServicesMock.deleteReminder.mockResolvedValue({
+      data: true,
+    })
+
+    const result = await processor.processAssistantMessage(
+      '.r -delete -id 12',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.deleteReminder).toHaveBeenCalledWith(12, { userId: 99 })
+    expect(result.response?.content).toContain('eliminado')
+  })
+
+  it('returns usage guidance when required reminder create flags are missing', async () => {
+    const result = await processor.processAssistantMessage(
+      '.r drink water -at 09:00',
+      99,
+      undefined,
+      false
+    )
+
+    expect(result.response?.content).toBe(
+      'Uso: .reminder <mensaje> -rt daily|weekly|monthly -at HH:mm [-wd mon,wed] [-md 1,15]'
+    )
+  })
+
+  it('returns validation error when reminder weekdays are invalid', async () => {
+    const result = await processor.processAssistantMessage(
+      '.r team sync -rt weekly -wd foo -at 10:30',
+      99
+    )
+
+    expect(result.response?.content).toBe('Día de semana inválido: foo')
+  })
+
+  it('returns an error when multiple reminder actions are combined', async () => {
+    const result = await processor.processAssistantMessage('.r -list -pause -id 12', 99)
+
+    expect(result.response?.content).toBe('Usa una sola acción por comando de reminder.')
   })
 })
 
