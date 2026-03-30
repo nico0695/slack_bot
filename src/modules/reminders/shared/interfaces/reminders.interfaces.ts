@@ -4,6 +4,7 @@ import {
   ReminderStatus,
   ReminderWeekDay,
 } from '../constants/reminders.constants'
+import { Profiles } from '../../../../shared/constants/auth.constants'
 
 export interface IReminder {
   id?: number
@@ -37,6 +38,11 @@ export interface IReminderCheck {
 export interface IReminderValidationResult {
   isValid: boolean
   error?: string
+}
+
+export interface IReminderAccessContext {
+  userId: number
+  profile?: Profiles
 }
 
 export interface IReminderTriggerResult {

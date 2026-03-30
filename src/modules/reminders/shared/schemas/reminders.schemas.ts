@@ -153,9 +153,4 @@ export const getRemindersQuerySchema = paginationSchema
     }
   })
 
-export const checkReminderSchema = z.object({
-  occurrenceDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-})
+export const checkReminderSchema = z.object({}).strict()

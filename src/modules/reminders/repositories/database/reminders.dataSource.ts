@@ -124,12 +124,17 @@ export default class RemindersDataSource {
     }
   }
 
-  async deleteReminder(reminderId: number, userId: number): Promise<number> {
+  async deleteReminder(reminderId: number, userId?: number): Promise<number> {
     try {
-      const result = await Reminders.delete({
+      const where: FindOptionsWhere<Reminders> = {
         id: reminderId,
-        user: { id: userId },
-      })
+      }
+
+      if (userId) {
+        where.user = { id: userId }
+      }
+
+      const result = await Reminders.delete(where)
       return result.affected ?? 0
     } catch (error) {
       throw new Error(error as string)

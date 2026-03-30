@@ -95,7 +95,10 @@ export default class RemindersWebController extends GenericController {
   public async getReminder(req: any, res: any): Promise<void> {
     const { id: reminderId } = validateParams(idParamSchema, req.params)
     const user = this.userData
-    const response = await this.remindersServices.getReminderById(reminderId, user.id)
+    const response = await this.remindersServices.getReminderById(reminderId, {
+      userId: user.id,
+      profile: user.profile,
+    })
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -109,7 +112,10 @@ export default class RemindersWebController extends GenericController {
   public async pauseReminder(req: any, res: any): Promise<void> {
     const { id: reminderId } = validateParams(idParamSchema, req.params)
     const user = this.userData
-    const response = await this.remindersServices.pauseReminder(reminderId, user.id)
+    const response = await this.remindersServices.pauseReminder(reminderId, {
+      userId: user.id,
+      profile: user.profile,
+    })
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -123,7 +129,10 @@ export default class RemindersWebController extends GenericController {
   public async resumeReminder(req: any, res: any): Promise<void> {
     const { id: reminderId } = validateParams(idParamSchema, req.params)
     const user = this.userData
-    const response = await this.remindersServices.resumeReminder(reminderId, user.id)
+    const response = await this.remindersServices.resumeReminder(reminderId, {
+      userId: user.id,
+      profile: user.profile,
+    })
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -137,13 +146,12 @@ export default class RemindersWebController extends GenericController {
   public async checkReminder(req: any, res: any): Promise<void> {
     const { id: reminderId } = validateParams(idParamSchema, req.params)
     const user = this.userData
-    const parsed = validateBody(checkReminderSchema, req.body)
+    validateBody(checkReminderSchema, req.body ?? {})
 
-    const response = await this.remindersServices.checkReminderOccurrence(
-      reminderId,
-      user.id,
-      parsed.occurrenceDate
-    )
+    const response = await this.remindersServices.checkReminderOccurrence(reminderId, {
+      userId: user.id,
+      profile: user.profile,
+    })
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })
@@ -158,7 +166,10 @@ export default class RemindersWebController extends GenericController {
     const { id: reminderId } = validateParams(idParamSchema, req.params)
     const user = this.userData
 
-    const response = await this.remindersServices.deleteReminder(reminderId, user.id)
+    const response = await this.remindersServices.deleteReminder(reminderId, {
+      userId: user.id,
+      profile: user.profile,
+    })
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

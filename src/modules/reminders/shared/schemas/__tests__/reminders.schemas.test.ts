@@ -84,17 +84,15 @@ describe('reminders.schemas', () => {
   })
 
   describe('checkReminderSchema', () => {
-    it('accepts valid occurrence date', () => {
-      const result = checkReminderSchema.parse({
-        occurrenceDate: '2026-03-29',
-      })
+    it('accepts an empty body', () => {
+      const result = checkReminderSchema.parse({})
 
-      expect(result.occurrenceDate).toBe('2026-03-29')
+      expect(result).toEqual({})
     })
 
-    it('rejects invalid occurrence date', () => {
+    it('rejects occurrenceDate in request body', () => {
       const result = checkReminderSchema.safeParse({
-        occurrenceDate: '29-03-2026',
+        occurrenceDate: '2026-03-29',
       })
 
       expect(result.success).toBe(false)

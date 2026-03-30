@@ -1,3 +1,4 @@
+import { Profiles } from '../../../../shared/constants/auth.constants'
 import RemindersServices from '../reminders.services'
 import {
   ReminderRecurrenceType,
@@ -33,6 +34,8 @@ const deleteReminderMock = jest.fn()
 const getDueRemindersMock = jest.fn()
 
 const createReminderCheckMock = jest.fn()
+const getReminderCheckByOccurrenceMock = jest.fn()
+const deleteReminderChecksByReminderMock = jest.fn()
 
 const remindersDataSourceMock = {
   createReminder: createReminderMock,
@@ -45,6 +48,8 @@ const remindersDataSourceMock = {
 
 const reminderChecksDataSourceMock = {
   createReminderCheck: createReminderCheckMock,
+  getReminderCheckByOccurrence: getReminderCheckByOccurrenceMock,
+  deleteReminderChecksByReminder: deleteReminderChecksByReminderMock,
 }
 
 describe('RemindersServices', () => {
@@ -118,18 +123,18 @@ describe('RemindersServices', () => {
     it('queries reminder by id and user ownership', async () => {
       getReminderByIdMock.mockResolvedValue({ id: 44 })
 
-      const result = await services.getReminderById(44, 9)
+      const result = await services.getReminderById(44, { userId: 9 })
 
       expect(getReminderByIdMock).toHaveBeenCalledWith(44, 9)
       expect(result).toEqual({ data: { id: 44 } })
     })
 
-    it('returns not found when reminder does not belong to user', async () => {
-      getReminderByIdMock.mockResolvedValue(null)
+    it('allows admins to fetch reminders outside ownership', async () => {
+      getReminderByIdMock.mockResolvedValue({ id: 44 })
 
-      const result = await services.getReminderById(44, 9)
+      await services.getReminderById(44, { userId: 9, profile: Profiles.ADMIN })
 
-      expect(result.error).toBe('Reminder not found')
+      expect(getReminderByIdMock).toHaveBeenCalledWith(44, undefined)
     })
   })
 
@@ -137,15 +142,15 @@ describe('RemindersServices', () => {
     it('pauses existing reminder', async () => {
       getReminderByIdMock
         .mockResolvedValueOnce({ id: 8 })
-        .mockResolvedValueOnce({ id: 8, status: 'paused' })
+        .mockResolvedValueOnce({ id: 8, status: ReminderStatus.PAUSED })
       updateReminderMock.mockResolvedValue(undefined)
 
-      const result = await services.pauseReminder(8, 3)
+      const result = await services.pauseReminder(8, { userId: 3 })
 
       expect(getReminderByIdMock).toHaveBeenNthCalledWith(1, 8, 3)
       expect(getReminderByIdMock).toHaveBeenNthCalledWith(2, 8, 3)
       expect(updateReminderMock).toHaveBeenCalledWith(8, { status: ReminderStatus.PAUSED })
-      expect(result).toEqual({ data: { id: 8, status: 'paused' } })
+      expect(result).toEqual({ data: { id: 8, status: ReminderStatus.PAUSED } })
     })
   })
 
@@ -164,10 +169,8 @@ describe('RemindersServices', () => {
         .mockResolvedValueOnce({ id: 12, status: ReminderStatus.ACTIVE, nextTriggerAt })
       updateReminderMock.mockResolvedValue(undefined)
 
-      const result = await services.resumeReminder(12, 4)
+      const result = await services.resumeReminder(12, { userId: 4 })
 
-      expect(getReminderByIdMock).toHaveBeenNthCalledWith(1, 12, 4)
-      expect(getReminderByIdMock).toHaveBeenNthCalledWith(2, 12, 4)
       expect(updateReminderMock).toHaveBeenCalledWith(12, {
         status: ReminderStatus.ACTIVE,
         nextTriggerAt,
@@ -177,26 +180,39 @@ describe('RemindersServices', () => {
   })
 
   describe('deleteReminder', () => {
-    it('maps affected rows to boolean', async () => {
-      deleteReminderMock.mockResolvedValueOnce(1).mockResolvedValueOnce(0)
+    it('deletes reminder after cleaning reminder checks', async () => {
+      getReminderByIdMock.mockResolvedValue({ id: 11 })
+      deleteReminderChecksByReminderMock.mockResolvedValue(1)
+      deleteReminderMock.mockResolvedValue(1)
 
-      const success = await services.deleteReminder(11, 3)
-      const failure = await services.deleteReminder(11, 3)
+      const result = await services.deleteReminder(11, { userId: 3 })
 
-      expect(success).toEqual({ data: true })
-      expect(failure).toEqual({ data: false })
+      expect(deleteReminderChecksByReminderMock).toHaveBeenCalledWith(11)
+      expect(deleteReminderMock).toHaveBeenCalledWith(11, 3)
+      expect(result).toEqual({ data: true })
+    })
+
+    it('lets admins delete reminders outside ownership', async () => {
+      getReminderByIdMock.mockResolvedValue({ id: 11 })
+      deleteReminderChecksByReminderMock.mockResolvedValue(1)
+      deleteReminderMock.mockResolvedValue(1)
+
+      await services.deleteReminder(11, { userId: 3, profile: Profiles.ADMIN })
+
+      expect(deleteReminderMock).toHaveBeenCalledWith(11, undefined)
     })
   })
 
   describe('checkReminderOccurrence', () => {
-    it('creates reminder check for occurrence date', async () => {
-      getReminderByIdMock.mockResolvedValue({ id: 20 })
+    it('creates reminder check for personal reminder owner', async () => {
+      getReminderByIdMock.mockResolvedValue({ id: 20, user: { id: 5 }, channelId: null })
+      getReminderCheckByOccurrenceMock.mockResolvedValue(null)
       createReminderCheckMock.mockResolvedValue({ id: 99 })
       getOccurrenceDateKeyMock.mockReturnValue('2026-03-29')
 
-      const result = await services.checkReminderOccurrence(20, 5)
+      const result = await services.checkReminderOccurrence(20, { userId: 5 })
 
-      expect(getReminderByIdMock).toHaveBeenCalledWith(20, 5)
+      expect(getReminderByIdMock).toHaveBeenCalledWith(20)
       expect(createReminderCheckMock).toHaveBeenCalledWith({
         reminderId: 20,
         checkedByUserId: 5,
@@ -205,16 +221,62 @@ describe('RemindersServices', () => {
       expect(result).toEqual({ data: { id: 99 } })
     })
 
-    it('returns duplicate-day error for unique index collisions', async () => {
-      getReminderByIdMock.mockResolvedValue({ id: 20 })
-      createReminderCheckMock.mockResolvedValue(
-        new Error('SQLITE_CONSTRAINT: UNIQUE constraint failed')
+    it('allows checking channel reminders for non-owner users', async () => {
+      getReminderByIdMock.mockResolvedValue({ id: 20, user: { id: 5 }, channelId: 'C123' })
+      getReminderCheckByOccurrenceMock.mockResolvedValue(null)
+      createReminderCheckMock.mockResolvedValue({ id: 99 })
+      getOccurrenceDateKeyMock.mockReturnValue('2026-03-29')
+
+      const result = await services.checkReminderOccurrence(20, { userId: 8 })
+
+      expect(result).toEqual({ data: { id: 99 } })
+    })
+
+    it('returns existing reminder check when same day was already checked', async () => {
+      const existingCheck = { id: 55 }
+      getReminderByIdMock.mockResolvedValue({ id: 20, user: { id: 5 }, channelId: null })
+      getReminderCheckByOccurrenceMock.mockResolvedValue(existingCheck)
+      getOccurrenceDateKeyMock.mockReturnValue('2026-03-29')
+
+      const result = await services.checkReminderOccurrence(20, { userId: 5 })
+
+      expect(createReminderCheckMock).not.toHaveBeenCalled()
+      expect(result).toEqual({ data: existingCheck })
+    })
+
+    it('returns reminder not found when non-owner checks personal reminder', async () => {
+      getReminderByIdMock.mockResolvedValue({ id: 20, user: { id: 5 }, channelId: null })
+      getOccurrenceDateKeyMock.mockReturnValue('2026-03-29')
+
+      const result = await services.checkReminderOccurrence(20, { userId: 8 })
+
+      expect(result.error).toBe('Reminder not found')
+    })
+  })
+
+  describe('refreshReminderSchedule', () => {
+    it('recomputes next trigger without changing status or last trigger', async () => {
+      const nextTriggerAt = new Date('2026-03-29T09:00:00.000Z')
+      computeNextTriggerAtMock.mockReturnValue(nextTriggerAt)
+      getReminderByIdMock
+        .mockResolvedValueOnce({
+          id: 12,
+          recurrenceType: ReminderRecurrenceType.DAILY,
+          timeOfDay: '09:00',
+          weekDays: null,
+          monthDays: null,
+        })
+        .mockResolvedValueOnce({ id: 12, nextTriggerAt })
+
+      const result = await services.refreshReminderSchedule(
+        12,
+        new Date('2026-03-29T08:00:00.000Z')
       )
 
-      const result = await services.checkReminderOccurrence(20, 5, '2026-03-29')
-
-      expect(getReminderByIdMock).toHaveBeenCalledWith(20, 5)
-      expect(result.error).toBe('Reminder occurrence is already checked for this day')
+      expect(updateReminderMock).toHaveBeenCalledWith(12, {
+        nextTriggerAt,
+      })
+      expect(result).toEqual({ data: { id: 12, nextTriggerAt } })
     })
   })
 

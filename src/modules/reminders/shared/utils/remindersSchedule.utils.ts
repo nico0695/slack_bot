@@ -13,6 +13,14 @@ function parseTimeOfDay(timeOfDay: string): { hour: number; minute: number } {
   return { hour, minute }
 }
 
+function buildScheduledDate(baseDate: Date, timeOfDay: string): Date {
+  const { hour, minute } = parseTimeOfDay(timeOfDay)
+  const scheduledDate = new Date(baseDate)
+  scheduledDate.setHours(hour, minute, 0, 0)
+
+  return scheduledDate
+}
+
 export function validateRecurrenceConfig(
   reminderInput: Pick<IReminder, 'recurrenceType' | 'weekDays' | 'monthDays'>
 ): IReminderValidationResult {
@@ -67,9 +75,7 @@ export function computeNextTriggerAt(
   reminder: Pick<IReminder, 'recurrenceType' | 'timeOfDay' | 'weekDays' | 'monthDays'>,
   fromDate: Date
 ): Date {
-  const { hour, minute } = parseTimeOfDay(reminder.timeOfDay)
-  const candidate = new Date(fromDate)
-  candidate.setHours(hour, minute, 0, 0)
+  const candidate = buildScheduledDate(fromDate, reminder.timeOfDay)
 
   if (reminder.recurrenceType === ReminderRecurrenceType.DAILY) {
     if (candidate <= fromDate) {
@@ -83,35 +89,33 @@ export function computeNextTriggerAt(
     const weekDays = [...(reminder.weekDays ?? [])].sort((a, b) => a - b)
 
     if (weekDays.length === 0) {
-      return candidate
+      throw new Error('Weekly reminders require at least one week day')
     }
 
-    const currentDay = candidate.getDay()
-    for (const weekDay of weekDays) {
-      if (weekDay > currentDay || (weekDay === currentDay && candidate > fromDate)) {
-        candidate.setDate(candidate.getDate() + (weekDay - currentDay))
-        return candidate
+    for (let dayOffset = 0; dayOffset < 14; dayOffset += 1) {
+      const weeklyCandidate = new Date(candidate)
+      weeklyCandidate.setDate(candidate.getDate() + dayOffset)
+
+      if (!weekDays.includes(weeklyCandidate.getDay())) {
+        continue
+      }
+
+      if (weeklyCandidate > fromDate) {
+        return weeklyCandidate
       }
     }
-
-    const daysToAdd = 7 - currentDay + weekDays[0]
-    candidate.setDate(candidate.getDate() + daysToAdd)
-    return candidate
   }
 
   const monthDays = [...(reminder.monthDays ?? [])].sort((a, b) => a - b)
 
   if (monthDays.length === 0) {
-    if (candidate <= fromDate) {
-      candidate.setDate(candidate.getDate() + 1)
-    }
-    return candidate
+    throw new Error('Monthly reminders require at least one month day')
   }
 
   for (let monthOffset = 0; monthOffset <= 24; monthOffset += 1) {
     const monthCursor = new Date(fromDate)
     monthCursor.setMonth(fromDate.getMonth() + monthOffset, 1)
-    monthCursor.setHours(hour, minute, 0, 0)
+    monthCursor.setHours(candidate.getHours(), candidate.getMinutes(), 0, 0)
     const expectedMonth = monthCursor.getMonth()
 
     for (const monthDay of monthDays) {
@@ -128,7 +132,7 @@ export function computeNextTriggerAt(
     }
   }
 
-  return candidate
+  throw new Error('Unable to compute next trigger date')
 }
 
 export function getOccurrenceDateKey(triggerAt: Date): string {
@@ -143,16 +147,19 @@ export function matchesOccurrenceDate(
   reminder: Pick<IReminder, 'timeOfDay' | 'recurrenceType' | 'weekDays' | 'monthDays'>,
   localDate: Date
 ): boolean {
-  const localDateKey = getOccurrenceDateKey(localDate)
-  const candidate = computeNextTriggerAt(reminder, new Date(localDate))
+  if (reminder.recurrenceType === ReminderRecurrenceType.DAILY) {
+    return true
+  }
 
-  return getOccurrenceDateKey(candidate) === localDateKey
+  if (reminder.recurrenceType === ReminderRecurrenceType.WEEKLY) {
+    return (reminder.weekDays ?? []).includes(localDate.getDay())
+  }
+
+  return (reminder.monthDays ?? []).includes(localDate.getDate())
 }
 
 export function isBeforeScheduledTime(localNow: Date, timeOfDay: string): boolean {
-  const { hour, minute } = parseTimeOfDay(timeOfDay)
-  const scheduledDate = new Date(localNow)
-  scheduledDate.setHours(hour, minute, 0, 0)
+  const scheduledDate = buildScheduledDate(localNow, timeOfDay)
 
   return localNow < scheduledDate
 }

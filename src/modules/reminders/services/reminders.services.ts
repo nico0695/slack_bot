@@ -4,11 +4,13 @@ import { Reminders } from '../../../entities/reminders'
 import { ReminderChecks } from '../../../entities/reminderChecks'
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { createModuleLogger } from '../../../config/logger'
+import { Profiles } from '../../../shared/constants/auth.constants'
 
 import RemindersDataSource from '../repositories/database/reminders.dataSource'
 import ReminderChecksDataSource from '../repositories/database/reminderChecks.dataSource'
 import { ReminderStatus } from '../shared/constants/reminders.constants'
 import {
+  IReminderAccessContext,
   IReminder,
   IReminderScopeFilter,
   IReminderTriggerResult,
@@ -27,6 +29,32 @@ export default class RemindersServices {
     private remindersDataSource: RemindersDataSource,
     private reminderChecksDataSource: ReminderChecksDataSource
   ) {}
+
+  private isAdmin(actor: IReminderAccessContext): boolean {
+    return actor.profile === Profiles.ADMIN
+  }
+
+  private async getManagedReminder(
+    reminderId: number,
+    actor: IReminderAccessContext
+  ): Promise<Reminders | null | Error> {
+    return await this.remindersDataSource.getReminderById(
+      reminderId,
+      this.isAdmin(actor) ? undefined : actor.userId
+    )
+  }
+
+  private canCheckReminder(reminder: Reminders, actor: IReminderAccessContext): boolean {
+    if (this.isAdmin(actor)) {
+      return true
+    }
+
+    if (reminder.channelId) {
+      return true
+    }
+
+    return reminder.user?.id === actor.userId
+  }
 
   public async createReminder(data: IReminder): Promise<GenericResponse<Reminders>> {
     try {
@@ -85,10 +113,10 @@ export default class RemindersServices {
 
   public async getReminderById(
     reminderId: number,
-    userId: number
+    actor: IReminderAccessContext
   ): Promise<GenericResponse<Reminders>> {
     try {
-      const response = await this.remindersDataSource.getReminderById(reminderId, userId)
+      const response = await this.getManagedReminder(reminderId, actor)
 
       if (response instanceof Error) {
         throw response
@@ -102,7 +130,7 @@ export default class RemindersServices {
 
       return { data: response }
     } catch (error) {
-      log.error({ err: error, reminderId, userId }, 'getReminderById failed')
+      log.error({ err: error, reminderId, userId: actor.userId }, 'getReminderById failed')
       return {
         error: 'Failed to get reminder',
       }
@@ -111,10 +139,10 @@ export default class RemindersServices {
 
   public async pauseReminder(
     reminderId: number,
-    userId: number
+    actor: IReminderAccessContext
   ): Promise<GenericResponse<Reminders>> {
     try {
-      const reminderResponse = await this.remindersDataSource.getReminderById(reminderId, userId)
+      const reminderResponse = await this.getManagedReminder(reminderId, actor)
       if (reminderResponse instanceof Error) {
         throw reminderResponse
       }
@@ -127,7 +155,7 @@ export default class RemindersServices {
 
       await this.remindersDataSource.updateReminder(reminderId, { status: ReminderStatus.PAUSED })
 
-      const refreshedReminder = await this.remindersDataSource.getReminderById(reminderId, userId)
+      const refreshedReminder = await this.getManagedReminder(reminderId, actor)
       if (refreshedReminder instanceof Error) {
         throw refreshedReminder
       }
@@ -142,7 +170,7 @@ export default class RemindersServices {
         data: refreshedReminder,
       }
     } catch (error) {
-      log.error({ err: error, reminderId, userId }, 'pauseReminder failed')
+      log.error({ err: error, reminderId, userId: actor.userId }, 'pauseReminder failed')
       return {
         error: 'Failed to pause reminder',
       }
@@ -151,10 +179,10 @@ export default class RemindersServices {
 
   public async resumeReminder(
     reminderId: number,
-    userId: number
+    actor: IReminderAccessContext
   ): Promise<GenericResponse<Reminders>> {
     try {
-      const reminderResponse = await this.remindersDataSource.getReminderById(reminderId, userId)
+      const reminderResponse = await this.getManagedReminder(reminderId, actor)
       if (reminderResponse instanceof Error) {
         throw reminderResponse
       }
@@ -180,7 +208,7 @@ export default class RemindersServices {
         nextTriggerAt,
       })
 
-      const refreshedReminder = await this.remindersDataSource.getReminderById(reminderId, userId)
+      const refreshedReminder = await this.getManagedReminder(reminderId, actor)
       if (refreshedReminder instanceof Error) {
         throw refreshedReminder
       }
@@ -195,7 +223,7 @@ export default class RemindersServices {
         data: refreshedReminder,
       }
     } catch (error) {
-      log.error({ err: error, reminderId, userId }, 'resumeReminder failed')
+      log.error({ err: error, reminderId, userId: actor.userId }, 'resumeReminder failed')
       return {
         error: 'Failed to resume reminder',
       }
@@ -204,31 +232,10 @@ export default class RemindersServices {
 
   public async deleteReminder(
     reminderId: number,
-    userId: number
+    actor: IReminderAccessContext
   ): Promise<GenericResponse<boolean>> {
     try {
-      const deletedRows = await this.remindersDataSource.deleteReminder(reminderId, userId)
-
-      log.info({ reminderId, userId }, 'Reminder deleted')
-
-      return {
-        data: deletedRows > 0,
-      }
-    } catch (error) {
-      log.error({ err: error, reminderId, userId }, 'deleteReminder failed')
-      return {
-        error: 'Failed to delete reminder',
-      }
-    }
-  }
-
-  public async checkReminderOccurrence(
-    reminderId: number,
-    checkedByUserId: number,
-    occurrenceDate?: string
-  ): Promise<GenericResponse<ReminderChecks>> {
-    try {
-      const reminder = await this.remindersDataSource.getReminderById(reminderId, checkedByUserId)
+      const reminder = await this.getManagedReminder(reminderId, actor)
       if (reminder instanceof Error) {
         throw reminder
       }
@@ -239,17 +246,85 @@ export default class RemindersServices {
         }
       }
 
-      const resolvedOccurrenceDate = occurrenceDate ?? getOccurrenceDateKey(new Date())
+      await this.reminderChecksDataSource.deleteReminderChecksByReminder(reminderId)
+
+      const deletedRows = await this.remindersDataSource.deleteReminder(
+        reminderId,
+        this.isAdmin(actor) ? undefined : actor.userId
+      )
+
+      log.info({ reminderId, userId: actor.userId }, 'Reminder deleted')
+
+      return {
+        data: deletedRows > 0,
+      }
+    } catch (error) {
+      log.error({ err: error, reminderId, userId: actor.userId }, 'deleteReminder failed')
+      return {
+        error: 'Failed to delete reminder',
+      }
+    }
+  }
+
+  public async checkReminderOccurrence(
+    reminderId: number,
+    actor: IReminderAccessContext
+  ): Promise<GenericResponse<ReminderChecks>> {
+    try {
+      const reminder = await this.remindersDataSource.getReminderById(reminderId)
+      if (reminder instanceof Error) {
+        throw reminder
+      }
+
+      if (!reminder) {
+        return {
+          error: 'Reminder not found',
+        }
+      }
+
+      if (!this.canCheckReminder(reminder, actor)) {
+        return {
+          error: 'Reminder not found',
+        }
+      }
+
+      const resolvedOccurrenceDate = getOccurrenceDateKey(new Date())
+      const existingCheck = await this.reminderChecksDataSource.getReminderCheckByOccurrence(
+        reminderId,
+        resolvedOccurrenceDate
+      )
+
+      if (existingCheck instanceof Error) {
+        throw existingCheck
+      }
+
+      if (existingCheck) {
+        return {
+          data: existingCheck,
+        }
+      }
+
       const response = await this.reminderChecksDataSource.createReminderCheck({
         reminderId,
-        checkedByUserId,
+        checkedByUserId: actor.userId,
         occurrenceDate: resolvedOccurrenceDate,
       })
 
       if (response instanceof Error) {
         if (response.message.includes('UNIQUE constraint failed')) {
-          return {
-            error: 'Reminder occurrence is already checked for this day',
+          const duplicatedCheck = await this.reminderChecksDataSource.getReminderCheckByOccurrence(
+            reminderId,
+            resolvedOccurrenceDate
+          )
+
+          if (duplicatedCheck instanceof Error) {
+            throw duplicatedCheck
+          }
+
+          if (duplicatedCheck) {
+            return {
+              data: duplicatedCheck,
+            }
           }
         }
 
@@ -260,7 +335,10 @@ export default class RemindersServices {
         data: response,
       }
     } catch (error) {
-      log.error({ err: error, reminderId, checkedByUserId }, 'checkReminderOccurrence failed')
+      log.error(
+        { err: error, reminderId, checkedByUserId: actor.userId },
+        'checkReminderOccurrence failed'
+      )
       return {
         error: 'Failed to check reminder occurrence',
       }
@@ -282,6 +360,58 @@ export default class RemindersServices {
       log.error({ err: error }, 'getDueReminders failed')
       return {
         error: 'Failed to get due reminders',
+      }
+    }
+  }
+
+  public async refreshReminderSchedule(
+    reminderId: number,
+    fromDate: Date = new Date()
+  ): Promise<GenericResponse<Reminders>> {
+    try {
+      const reminder = await this.remindersDataSource.getReminderById(reminderId)
+      if (reminder instanceof Error) {
+        throw reminder
+      }
+
+      if (!reminder) {
+        return {
+          error: 'Reminder not found',
+        }
+      }
+
+      const nextTriggerAt = computeNextTriggerAt(
+        {
+          recurrenceType: reminder.recurrenceType as any,
+          timeOfDay: reminder.timeOfDay,
+          weekDays: reminder.weekDays as any,
+          monthDays: reminder.monthDays,
+        },
+        fromDate
+      )
+
+      await this.remindersDataSource.updateReminder(reminderId, {
+        nextTriggerAt,
+      })
+
+      const refreshedReminder = await this.remindersDataSource.getReminderById(reminderId)
+      if (refreshedReminder instanceof Error) {
+        throw refreshedReminder
+      }
+
+      if (!refreshedReminder) {
+        return {
+          error: 'Reminder not found',
+        }
+      }
+
+      return {
+        data: refreshedReminder,
+      }
+    } catch (error) {
+      log.error({ err: error, reminderId }, 'refreshReminderSchedule failed')
+      return {
+        error: 'Failed to refresh reminder schedule',
       }
     }
   }
