@@ -8,6 +8,7 @@ export enum AssistantsVariables {
   TASK = 'task',
   NOTE = 'note',
   LINK = 'link',
+  REMINDER = 'reminder',
   QUESTION = 'question',
   IMAGE = 'image',
   TRANSLATE = 'translate',
@@ -29,6 +30,9 @@ export const assistantsVariablesKey: {
   link: AssistantsVariables.LINK,
   lk: AssistantsVariables.LINK,
 
+  reminder: AssistantsVariables.REMINDER,
+  r: AssistantsVariables.REMINDER,
+
   question: AssistantsVariables.QUESTION,
   q: AssistantsVariables.QUESTION,
 
@@ -48,6 +52,15 @@ export enum AssistantsFlags {
   LIST_TAG = 'list_tag',
   TAG = 'tag',
   TITLE = 'title',
+  RECURRENCE_TYPE = 'recurrence_type',
+  TIME_OF_DAY = 'time_of_day',
+  WEEK_DAYS = 'week_days',
+  MONTH_DAYS = 'month_days',
+  ID = 'id',
+  CHECK = 'check',
+  PAUSE = 'pause',
+  RESUME = 'resume',
+  DELETE = 'delete',
   SIZE = 'size',
   QUALITY = 'quality',
   STYLE = 'style',
@@ -71,6 +84,24 @@ export const assistantFlagsKey: {
 
   title: AssistantsFlags.TITLE,
   tt: AssistantsFlags.TITLE,
+
+  recurrence: AssistantsFlags.RECURRENCE_TYPE,
+  rt: AssistantsFlags.RECURRENCE_TYPE,
+
+  at: AssistantsFlags.TIME_OF_DAY,
+
+  weekDays: AssistantsFlags.WEEK_DAYS,
+  wd: AssistantsFlags.WEEK_DAYS,
+
+  monthDays: AssistantsFlags.MONTH_DAYS,
+  md: AssistantsFlags.MONTH_DAYS,
+
+  id: AssistantsFlags.ID,
+
+  check: AssistantsFlags.CHECK,
+  pause: AssistantsFlags.PAUSE,
+  resume: AssistantsFlags.RESUME,
+  delete: AssistantsFlags.DELETE,
 
   size: AssistantsFlags.SIZE,
   s: AssistantsFlags.SIZE,
@@ -161,6 +192,42 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
       },
       [AssistantsFlags.TITLE]: {
         defaultValue: null,
+      },
+    },
+  },
+  [AssistantsVariables.REMINDER]: {
+    defaultValue: null,
+    manyWords: true,
+    flags: {
+      [AssistantsFlags.RECURRENCE_TYPE]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.TIME_OF_DAY]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.WEEK_DAYS]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.MONTH_DAYS]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.ID]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.LIST]: {
+        defaultValue: true,
+      },
+      [AssistantsFlags.CHECK]: {
+        defaultValue: true,
+      },
+      [AssistantsFlags.PAUSE]: {
+        defaultValue: true,
+      },
+      [AssistantsFlags.RESUME]: {
+        defaultValue: true,
+      },
+      [AssistantsFlags.DELETE]: {
+        defaultValue: true,
       },
     },
   },

@@ -2,7 +2,12 @@ import { Tasks } from '../../entities/tasks'
 import { Alerts } from '../../entities/alerts'
 import { Notes } from '../../entities/notes'
 import { Links } from '../../entities/links'
+import { Reminders } from '../../entities/reminders'
 import { formatDateToText, formatTimeLeft } from './dates.utils'
+import {
+  ReminderStatus,
+  ReminderWeekDay,
+} from '../../modules/reminders/shared/constants/reminders.constants'
 
 interface AlertStatusTokens {
   icon: string
@@ -11,6 +16,12 @@ interface AlertStatusTokens {
 }
 
 interface TaskStatusTokens {
+  icon: string
+  statusLine: string
+  helper: string
+}
+
+interface ReminderTokens {
   icon: string
   statusLine: string
   helper: string
@@ -116,6 +127,47 @@ const getTaskStatusTokens = (task: Tasks): TaskStatusTokens => {
     icon,
     statusLine: label,
     helper: reminderLabel,
+  }
+}
+
+const reminderWeekDayLabels: Record<number, string> = {
+  [ReminderWeekDay.SUNDAY]: 'Sun',
+  [ReminderWeekDay.MONDAY]: 'Mon',
+  [ReminderWeekDay.TUESDAY]: 'Tue',
+  [ReminderWeekDay.WEDNESDAY]: 'Wed',
+  [ReminderWeekDay.THURSDAY]: 'Thu',
+  [ReminderWeekDay.FRIDAY]: 'Fri',
+  [ReminderWeekDay.SATURDAY]: 'Sat',
+}
+
+const getReminderRecurrenceLabel = (reminder: Reminders): string => {
+  if (reminder.recurrenceType === 'weekly') {
+    const days = (reminder.weekDays ?? [])
+      .map((day) => reminderWeekDayLabels[day] ?? day)
+      .join(', ')
+    return `Weekly • ${days || 'No days'} • ${reminder.timeOfDay}`
+  }
+
+  if (reminder.recurrenceType === 'monthly') {
+    return `Monthly • days ${(reminder.monthDays ?? []).join(', ') || '-'} • ${reminder.timeOfDay}`
+  }
+
+  return `Daily • ${reminder.timeOfDay}`
+}
+
+const getReminderTokens = (reminder: Reminders): ReminderTokens => {
+  const isPaused = reminder.status === ReminderStatus.PAUSED
+  const icon = isPaused ? ':pause_button:' : ':repeat:'
+  const scopeLabel = reminder.channelId ? 'Channel' : 'Personal'
+  const recurrenceLabel = getReminderRecurrenceLabel(reminder)
+  const nextTriggerLabel = reminder.nextTriggerAt
+    ? `Next: ${formatShortDate(new Date(reminder.nextTriggerAt))}`
+    : 'Next trigger pending'
+
+  return {
+    icon,
+    statusLine: `${isPaused ? 'Paused' : 'Active'} • ${scopeLabel}`,
+    helper: `${recurrenceLabel}\n> ${nextTriggerLabel}`,
   }
 }
 
@@ -581,6 +633,83 @@ export const msgTasksList = (tasks: Tasks[]): { blocks: any[] } => {
   })
 
   return { blocks }
+}
+
+export const msgReminderCreated = (data: Reminders): { blocks: any[] } => {
+  const tokens = getReminderTokens(data)
+  const message = truncateText(data.message ?? '', 120)
+
+  return {
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${tokens.icon} *Reminder created*\n*#${data.id}* ${message || '_No message_'}\n> ${
+            tokens.statusLine
+          }\n> ${tokens.helper}`,
+        },
+      },
+    ],
+  }
+}
+
+export const msgRemindersList = (reminders: Reminders[]): { blocks: any[] } => {
+  const blocks: any[] = []
+
+  blocks.push(
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `Reminders (${reminders.length})`,
+        emoji: true,
+      },
+    },
+    {
+      type: 'divider',
+    }
+  )
+
+  reminders.forEach((reminder) => {
+    const tokens = getReminderTokens(reminder)
+    const truncatedMessage = truncateText(reminder.message ?? '', 60)
+
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `${tokens.icon} *#${reminder.id}* ${truncatedMessage || '_No message_'}\n> ${
+          tokens.statusLine
+        }\n> ${tokens.helper}`,
+      },
+    })
+
+    blocks.push({
+      type: 'divider',
+    })
+  })
+
+  return { blocks }
+}
+
+export const msgReminderDetail = (reminder: Reminders): { blocks: any[] } => {
+  const tokens = getReminderTokens(reminder)
+  const truncatedMessage = truncateText(reminder.message ?? '', 80)
+
+  return {
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${tokens.icon} *Reminder #${reminder.id}* ${
+            truncatedMessage || '_No message_'
+          }\n> ${tokens.statusLine}\n> ${tokens.helper}`,
+        },
+      },
+    ],
+  }
 }
 
 export const msgAssistantDigest = (payload: {

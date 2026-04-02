@@ -33,8 +33,10 @@ import { IJoinRoomData } from './modules/conversations/shared/interfaces/convers
 import { ProgressCallback } from './modules/conversations/shared/interfaces/converstions'
 import SummaryWebController from './modules/summary/controller/summary.controller'
 import { alertCronJob } from './modules/alerts/utils/cronJob'
+import { reminderCronJob } from './modules/reminders/utils/cronJob'
 import { supabaseKeepAlive } from './modules/system/utils/supabaseKeepAlive'
 import AlertsWebController from './modules/alerts/controller/alertsWeb.controller'
+import RemindersWebController from './modules/reminders/controller/remindersWeb.controller'
 import TasksWebController from './modules/tasks/controller/tasksWeb.controller'
 import NotesWebController from './modules/notes/controller/notesWeb.controller'
 import LinksWebController from './modules/links/controller/linksWeb.controller'
@@ -61,6 +63,7 @@ export default class App {
   private conversationWebController: ConversationsWebController
 
   private alertsWebController: AlertsWebController
+  private remindersWebController: RemindersWebController
   private tasksWebController: TasksWebController
   private notesWebController: NotesWebController
   private linksWebController: LinksWebController
@@ -83,6 +86,7 @@ export default class App {
     this.conversationWebController = container.resolve(ConversationsWebController)
 
     this.alertsWebController = container.resolve(AlertsWebController)
+    this.remindersWebController = container.resolve(RemindersWebController)
     this.tasksWebController = container.resolve(TasksWebController)
     this.notesWebController = container.resolve(NotesWebController)
     this.linksWebController = container.resolve(LinksWebController)
@@ -125,6 +129,7 @@ export default class App {
     this.app.use('/users', [this.usersController.router])
     this.app.use('/conversations', [this.conversationWebController.router])
     this.app.use('/alerts', [this.alertsWebController.router])
+    this.app.use('/reminders', [this.remindersWebController.router])
     this.app.use('/tasks', [this.tasksWebController.router])
     this.app.use('/notes', [this.notesWebController.router])
     this.app.use('/links', [this.linksWebController.router])
@@ -290,11 +295,13 @@ export default class App {
 
   private cronJobs(): void {
     try {
-      const cronJob = cron.schedule('* * * * *', alertCronJob)
+      const alertJob = cron.schedule('* * * * *', alertCronJob)
+      const reminderJob = cron.schedule('* * * * *', reminderCronJob)
 
       log.info('Cron job started')
 
-      cronJob.start()
+      alertJob.start()
+      reminderJob.start()
 
       // Ping Supabase every 3 days to prevent free-tier inactivity pause
       const keepAliveCron = cron.schedule('0 0 */3 * *', supabaseKeepAlive)

@@ -20,8 +20,16 @@ import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
 import LinksServices from '../../links/services/links.services'
+import RemindersServices from '../../reminders/services/reminders.services'
 import ImagesServices from '../../images/services/images.services'
 import TranslateServices from '../../translate/services/translate.services'
+import {
+  ReminderRecurrenceType,
+  ReminderScope,
+  ReminderStatus,
+  ReminderWeekDay,
+} from '../../reminders/shared/constants/reminders.constants'
+import { createReminderSchema } from '../../reminders/shared/schemas/reminders.schemas'
 import { translateSchema } from '../../translate/shared/schemas/translate.schemas'
 import QrServices from '../../qr/services/qr.services'
 import { qrSchema } from '../../qr/shared/schemas/qr.schemas'
@@ -43,6 +51,75 @@ interface IProcessMessageResult {
   shouldSkipAI: boolean
 }
 
+const reminderWeekDayMap: Record<string, ReminderWeekDay> = {
+  sun: ReminderWeekDay.SUNDAY,
+  sunday: ReminderWeekDay.SUNDAY,
+  dom: ReminderWeekDay.SUNDAY,
+  domingo: ReminderWeekDay.SUNDAY,
+  mon: ReminderWeekDay.MONDAY,
+  monday: ReminderWeekDay.MONDAY,
+  lun: ReminderWeekDay.MONDAY,
+  lunes: ReminderWeekDay.MONDAY,
+  tue: ReminderWeekDay.TUESDAY,
+  tues: ReminderWeekDay.TUESDAY,
+  tuesday: ReminderWeekDay.TUESDAY,
+  mar: ReminderWeekDay.TUESDAY,
+  martes: ReminderWeekDay.TUESDAY,
+  wed: ReminderWeekDay.WEDNESDAY,
+  wednesday: ReminderWeekDay.WEDNESDAY,
+  mie: ReminderWeekDay.WEDNESDAY,
+  miercoles: ReminderWeekDay.WEDNESDAY,
+  miércoles: ReminderWeekDay.WEDNESDAY,
+  thu: ReminderWeekDay.THURSDAY,
+  thur: ReminderWeekDay.THURSDAY,
+  thurs: ReminderWeekDay.THURSDAY,
+  thursday: ReminderWeekDay.THURSDAY,
+  jue: ReminderWeekDay.THURSDAY,
+  jueves: ReminderWeekDay.THURSDAY,
+  fri: ReminderWeekDay.FRIDAY,
+  friday: ReminderWeekDay.FRIDAY,
+  vie: ReminderWeekDay.FRIDAY,
+  viernes: ReminderWeekDay.FRIDAY,
+  sat: ReminderWeekDay.SATURDAY,
+  saturday: ReminderWeekDay.SATURDAY,
+  sab: ReminderWeekDay.SATURDAY,
+  sabado: ReminderWeekDay.SATURDAY,
+  sábado: ReminderWeekDay.SATURDAY,
+}
+
+const reminderCreateUsage =
+  'Uso: .reminder <mensaje> -rt daily|weekly|monthly -at HH:mm [-wd mon,wed] [-md 1,15]'
+
+const parseReminderWeekDays = (rawValue: string): ReminderWeekDay[] => {
+  return rawValue
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .map((value) => {
+      const parsed = reminderWeekDayMap[value]
+      if (parsed === undefined) {
+        throw new Error(`Día de semana inválido: ${value}`)
+      }
+      return parsed
+    })
+}
+
+const parseReminderMonthDays = (rawValue: string): number[] => {
+  return rawValue
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => {
+      const parsed = Number(value)
+      if (!Number.isInteger(parsed)) {
+        throw new Error(`Día de mes inválido: ${value}`)
+      }
+      return parsed
+    })
+}
+
+type ReminderCommandAction = 'create' | 'list' | 'check' | 'pause' | 'resume' | 'delete'
+
 @injectable()
 export default class MessageProcessor {
   private defaultSnoozeMinutes = 10
@@ -54,6 +131,7 @@ export default class MessageProcessor {
     private tasksServices: TasksServices,
     private notesServices: NotesServices,
     private linksServices: LinksServices,
+    private remindersServices: RemindersServices,
     private imagesServices: ImagesServices,
     private searchRepository: SearchRepository,
     private translateServices: TranslateServices,
@@ -250,6 +328,319 @@ export default class MessageProcessor {
       role: roleTypes.assistant,
       content,
       provider: ConversationProviders.ASSISTANT,
+    }
+  }
+
+  private formatReminderValidationErrors = (
+    issues: Array<{ path: Array<string | number>; message: string }>
+  ): string => {
+    return issues
+      .map((issue) => {
+        const path = issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''
+        return `${path}${issue.message}`
+      })
+      .join(', ')
+  }
+
+  private parseReminderRecurrenceType = (rawValue: string): ReminderRecurrenceType | null => {
+    if (rawValue === ReminderRecurrenceType.DAILY) {
+      return ReminderRecurrenceType.DAILY
+    }
+
+    if (rawValue === ReminderRecurrenceType.WEEKLY) {
+      return ReminderRecurrenceType.WEEKLY
+    }
+
+    if (rawValue === ReminderRecurrenceType.MONTHLY) {
+      return ReminderRecurrenceType.MONTHLY
+    }
+
+    return null
+  }
+
+  private resolveReminderAction = (
+    assistantMessage: AssistantMessage
+  ): { action?: ReminderCommandAction; reminderId?: number; error?: string } => {
+    const actions: ReminderCommandAction[] = []
+
+    if (assistantMessage.flags[AssistantsFlags.LIST]) actions.push('list')
+    if (assistantMessage.flags[AssistantsFlags.CHECK]) actions.push('check')
+    if (assistantMessage.flags[AssistantsFlags.PAUSE]) actions.push('pause')
+    if (assistantMessage.flags[AssistantsFlags.RESUME]) actions.push('resume')
+    if (assistantMessage.flags[AssistantsFlags.DELETE]) actions.push('delete')
+
+    if (actions.length === 0) {
+      return { action: 'create' }
+    }
+
+    if (actions.length > 1) {
+      return {
+        error: 'Usa una sola acción por comando de reminder.',
+      }
+    }
+
+    const action = actions[0]
+
+    if (action === 'list') {
+      return { action }
+    }
+
+    const rawReminderId = String(assistantMessage.flags[AssistantsFlags.ID] ?? '').trim()
+    const normalizedReminderId = rawReminderId.replace(/^#/, '')
+    const reminderId = Number(normalizedReminderId)
+
+    if (!normalizedReminderId || !Number.isInteger(reminderId) || reminderId <= 0) {
+      return {
+        error: `Necesito un id válido. Ejemplo: .r -${action} -id 12`,
+      }
+    }
+
+    return {
+      action,
+      reminderId,
+    }
+  }
+
+  private formatReminderRecurrence = (reminder: {
+    recurrenceType: string
+    timeOfDay: string
+    weekDays?: number[] | null
+    monthDays?: number[] | null
+  }): string => {
+    if (reminder.recurrenceType === ReminderRecurrenceType.DAILY) {
+      return `daily at ${reminder.timeOfDay}`
+    }
+
+    if (reminder.recurrenceType === ReminderRecurrenceType.WEEKLY) {
+      const weekDays = (reminder.weekDays ?? [])
+        .map((day) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][day] ?? String(day))
+        .join(', ')
+
+      return `weekly on ${weekDays} at ${reminder.timeOfDay}`
+    }
+
+    return `monthly on ${(reminder.monthDays ?? []).join(', ')} at ${reminder.timeOfDay}`
+  }
+
+  private formatReminderSummaryLine = (reminder: {
+    id: number
+    message: string
+    recurrenceType: string
+    timeOfDay: string
+    weekDays?: number[] | null
+    monthDays?: number[] | null
+    channelId?: string | null
+    status?: string
+    nextTriggerAt?: Date
+  }): string => {
+    const nextTriggerAt = reminder.nextTriggerAt
+      ? formatDateToText(reminder.nextTriggerAt, 'es', {
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : 'sin próxima fecha'
+
+    const status = reminder.status === ReminderStatus.PAUSED ? 'paused' : 'active'
+    const scope = reminder.channelId ? 'channel' : 'personal'
+
+    return `• #${reminder.id} [${status}] ${reminder.message} · ${this.formatReminderRecurrence(
+      reminder
+    )} · ${scope} · next ${nextTriggerAt}`
+  }
+
+  private handleReminderVariable = async (
+    userId: number,
+    assistantMessage: AssistantMessage,
+    scopeChannelId: string | null
+  ): Promise<IConversation> => {
+    const actionResolution = this.resolveReminderAction(assistantMessage)
+
+    if (actionResolution.error) {
+      return this.buildAssistantResponse(actionResolution.error)
+    }
+
+    const scope = scopeChannelId ? ReminderScope.CHANNEL : ReminderScope.PERSONAL
+
+    switch (actionResolution.action) {
+      case 'list': {
+        const remindersResponse = await this.remindersServices.getRemindersByScope(userId, {
+          scope,
+          channelId: scopeChannelId,
+        })
+
+        if (remindersResponse.error) {
+          return this.buildAssistantResponse(remindersResponse.error)
+        }
+
+        const reminders = remindersResponse.data ?? []
+        const content =
+          reminders.length > 0
+            ? reminders.map((reminder) => this.formatReminderSummaryLine(reminder)).join('\n')
+            : scopeChannelId
+            ? 'No hay reminders en este canal.'
+            : 'No tienes reminders.'
+
+        return {
+          role: roleTypes.assistant,
+          content,
+          contentBlock: slackMsgUtils.msgRemindersList(reminders),
+          provider: ConversationProviders.ASSISTANT,
+        }
+      }
+
+      case 'check': {
+        const reminderId = actionResolution.reminderId
+        if (reminderId === undefined) {
+          return this.buildAssistantResponse('Necesito un id válido. Ejemplo: .r -check -id 12')
+        }
+
+        const checkResponse = await this.remindersServices.checkReminderOccurrence(reminderId, {
+          userId,
+        })
+
+        if (checkResponse.error || !checkResponse.data) {
+          return this.buildAssistantResponse(checkResponse.error ?? 'Reminder not found')
+        }
+
+        return this.buildAssistantResponse(
+          `Reminder #${reminderId} marcado como hecho para hoy (${checkResponse.data.occurrenceDate}).`
+        )
+      }
+
+      case 'pause': {
+        const reminderId = actionResolution.reminderId
+        if (reminderId === undefined) {
+          return this.buildAssistantResponse('Necesito un id válido. Ejemplo: .r -pause -id 12')
+        }
+
+        const pauseResponse = await this.remindersServices.pauseReminder(reminderId, { userId })
+
+        if (pauseResponse.error || !pauseResponse.data) {
+          return this.buildAssistantResponse(pauseResponse.error ?? 'Reminder not found')
+        }
+
+        return {
+          role: roleTypes.assistant,
+          content: `Reminder #${reminderId} pausado.`,
+          contentBlock: slackMsgUtils.msgReminderDetail(pauseResponse.data),
+          provider: ConversationProviders.ASSISTANT,
+        }
+      }
+
+      case 'resume': {
+        const reminderId = actionResolution.reminderId
+        if (reminderId === undefined) {
+          return this.buildAssistantResponse('Necesito un id válido. Ejemplo: .r -resume -id 12')
+        }
+
+        const resumeResponse = await this.remindersServices.resumeReminder(reminderId, { userId })
+
+        if (resumeResponse.error || !resumeResponse.data) {
+          return this.buildAssistantResponse(resumeResponse.error ?? 'Reminder not found')
+        }
+
+        return {
+          role: roleTypes.assistant,
+          content: `Reminder #${reminderId} reanudado.`,
+          contentBlock: slackMsgUtils.msgReminderDetail(resumeResponse.data),
+          provider: ConversationProviders.ASSISTANT,
+        }
+      }
+
+      case 'delete': {
+        const reminderId = actionResolution.reminderId
+        if (reminderId === undefined) {
+          return this.buildAssistantResponse('Necesito un id válido. Ejemplo: .r -delete -id 12')
+        }
+
+        const deleteResponse = await this.remindersServices.deleteReminder(reminderId, { userId })
+
+        if (deleteResponse.error) {
+          return this.buildAssistantResponse(deleteResponse.error)
+        }
+
+        return this.buildAssistantResponse(`Reminder #${reminderId} eliminado.`)
+      }
+
+      case 'create':
+      default: {
+        const message = String(assistantMessage.value ?? '').trim()
+        const recurrenceRaw = String(assistantMessage.flags[AssistantsFlags.RECURRENCE_TYPE] ?? '')
+          .trim()
+          .toLowerCase()
+        const timeOfDay = String(assistantMessage.flags[AssistantsFlags.TIME_OF_DAY] ?? '').trim()
+
+        if (!message || !recurrenceRaw || !timeOfDay) {
+          return this.buildAssistantResponse(reminderCreateUsage)
+        }
+
+        const recurrenceType = this.parseReminderRecurrenceType(recurrenceRaw)
+        if (!recurrenceType) {
+          return this.buildAssistantResponse('Recurrencia inválida. Usa daily, weekly o monthly.')
+        }
+
+        let weekDays: ReminderWeekDay[] | undefined
+        let monthDays: number[] | undefined
+
+        try {
+          if (assistantMessage.flags[AssistantsFlags.WEEK_DAYS] !== undefined) {
+            weekDays = parseReminderWeekDays(
+              String(assistantMessage.flags[AssistantsFlags.WEEK_DAYS] ?? '')
+            )
+          }
+
+          if (assistantMessage.flags[AssistantsFlags.MONTH_DAYS] !== undefined) {
+            monthDays = parseReminderMonthDays(
+              String(assistantMessage.flags[AssistantsFlags.MONTH_DAYS] ?? '')
+            )
+          }
+        } catch (error: any) {
+          return this.buildAssistantResponse(String(error.message ?? 'Invalid reminder config'))
+        }
+
+        const validation = createReminderSchema.safeParse({
+          message,
+          recurrenceType,
+          timeOfDay,
+          weekDays,
+          monthDays,
+          channelId: scopeChannelId,
+        })
+
+        if (!validation.success) {
+          return this.buildAssistantResponse(
+            `Parámetros inválidos: ${this.formatReminderValidationErrors(validation.error.errors)}`
+          )
+        }
+
+        const reminderResponse = await this.remindersServices.createReminder({
+          message: validation.data.message,
+          recurrenceType: validation.data.recurrenceType,
+          timeOfDay: validation.data.timeOfDay,
+          weekDays: validation.data.weekDays,
+          monthDays: validation.data.monthDays,
+          status: validation.data.status,
+          userId,
+          channelId: scopeChannelId,
+        })
+
+        if (reminderResponse.error || !reminderResponse.data) {
+          return this.buildAssistantResponse(
+            reminderResponse.error ?? 'No se pudo crear el reminder.'
+          )
+        }
+
+        return {
+          role: roleTypes.assistant,
+          content: `Reminder #${reminderResponse.data.id} creado.\n${this.formatReminderSummaryLine(
+            reminderResponse.data
+          )}`,
+          contentBlock: slackMsgUtils.msgReminderCreated(reminderResponse.data),
+          provider: ConversationProviders.ASSISTANT,
+        }
+      }
     }
   }
 
@@ -482,6 +873,15 @@ export default class MessageProcessor {
           contentBlock,
           provider: ConversationProviders.ASSISTANT,
         }
+        break
+      }
+
+      case AssistantsVariables.REMINDER: {
+        responseMessage = await this.handleReminderVariable(
+          userId,
+          assistantMessage,
+          scopeChannelId
+        )
         break
       }
 
