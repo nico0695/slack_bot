@@ -10,6 +10,9 @@ function parseTimeOfDay(timeOfDay: string): { hour: number; minute: number } {
     throw new Error('Invalid timeOfDay format')
   }
 
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    throw new Error('Invalid timeOfDay format')
+  }
   return { hour, minute }
 }
 
