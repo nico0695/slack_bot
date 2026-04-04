@@ -102,7 +102,7 @@ export default class ConversationsController extends GenericController {
    */
   @SlackAuth
   public async conversationFlow(data: any): Promise<void> {
-    const { payload, say, body }: any = data
+    const { payload, say, body, client }: any = data
     try {
       const incomingMessage = String(payload.text ?? '')
       const normalizedMessage = incomingMessage.trim().toLowerCase()
@@ -172,7 +172,15 @@ export default class ConversationsController extends GenericController {
         )
       } else {
         // Assistant mode: process as single message
-        await this.handleAssistantMessage(incomingMessage, userData.id, isPersonal, channelId, say)
+        await this.handleAssistantMessage(
+          incomingMessage,
+          userData.id,
+          isPersonal,
+          channelId,
+          say,
+          client,
+          payload.channel
+        )
       }
     } catch (error) {
       log.error({ err: error }, 'conversationFlow failed')
@@ -214,7 +222,9 @@ export default class ConversationsController extends GenericController {
     userId: number,
     isPersonal: boolean,
     channelId: string | undefined,
-    say: any
+    say: any,
+    client?: any,
+    slackChannelId?: string
   ): Promise<void> => {
     const isChannelContext = !isPersonal
     const scopedChannelId =
@@ -230,6 +240,21 @@ export default class ConversationsController extends GenericController {
     )
 
     if (result.response) {
+      if (client && slackChannelId && result.response.content?.startsWith('data:image/')) {
+        try {
+          const base64Data = result.response.content.split(',')[1]
+          if (!base64Data) throw new Error('Invalid data URL format')
+          const buffer = Buffer.from(base64Data, 'base64')
+          await client.files.uploadV2({
+            channel_id: slackChannelId,
+            file: buffer,
+            filename: 'image.png',
+          })
+          return
+        } catch (uploadError) {
+          log.error({ err: uploadError }, 'File upload failed, falling back to text')
+        }
+      }
       say(result.response.contentBlock ?? result.response.content)
     }
   }

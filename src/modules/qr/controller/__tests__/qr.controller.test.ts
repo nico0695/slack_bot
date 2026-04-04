@@ -22,69 +22,90 @@ jest.mock('../../../../config/logger', () => ({
   }),
 }))
 
-const generateQrMock = jest.fn()
+const generateQrBufferMock = jest.fn()
 
 const qrServicesMock = {
-  generateQr: generateQrMock,
+  generateQrBuffer: generateQrBufferMock,
 }
 
 describe('QrController', () => {
   let controller: QrController
   let sayMock: jest.Mock
+  let clientMock: any
 
   beforeEach(() => {
     jest.clearAllMocks()
     controller = new QrController(qrServicesMock as any)
     sayMock = jest.fn()
+    clientMock = {
+      files: {
+        uploadV2: jest.fn().mockResolvedValue({}),
+      },
+    }
   })
 
   describe('generateQr', () => {
-    it('generates QR code successfully', async () => {
+    it('uploads QR image via client.files.uploadV2', async () => {
+      const fakeBuffer = Buffer.from('fake-png-data')
       const data = {
-        payload: { text: 'qr https://example.com', user: 'U123', channel_type: 'im' },
+        payload: {
+          text: 'qr https://example.com',
+          user: 'U123',
+          channel: 'C123',
+          channel_type: 'im',
+        },
         say: sayMock,
+        client: clientMock,
       }
-      generateQrMock.mockResolvedValue({
-        data: { qrBase64: 'data:image/png;base64,abc123' },
+      generateQrBufferMock.mockResolvedValue({
+        data: { qrBuffer: fakeBuffer },
       })
 
       await controller.generateQr(data)
 
-      expect(generateQrMock).toHaveBeenCalledWith('https://example.com')
-      expect(sayMock).toHaveBeenCalledWith('data:image/png;base64,abc123')
+      expect(generateQrBufferMock).toHaveBeenCalledWith('https://example.com')
+      expect(clientMock.files.uploadV2).toHaveBeenCalledWith({
+        channel_id: 'C123',
+        file: fakeBuffer,
+        filename: 'qr.png',
+      })
+      expect(sayMock).not.toHaveBeenCalled()
     })
 
     it('says usage message when text is empty', async () => {
       const data = {
-        payload: { text: 'qr ', user: 'U123', channel_type: 'im' },
+        payload: { text: 'qr ', user: 'U123', channel: 'C123', channel_type: 'im' },
         say: sayMock,
+        client: clientMock,
       }
 
       await controller.generateQr(data)
 
       expect(sayMock).toHaveBeenCalledWith('Uso: `qr <texto o URL>`')
-      expect(generateQrMock).not.toHaveBeenCalled()
+      expect(generateQrBufferMock).not.toHaveBeenCalled()
     })
 
     it('says validation error when text exceeds max length', async () => {
       const longText = 'a'.repeat(2001)
       const data = {
-        payload: { text: `qr ${longText}`, user: 'U123', channel_type: 'im' },
+        payload: { text: `qr ${longText}`, user: 'U123', channel: 'C123', channel_type: 'im' },
         say: sayMock,
+        client: clientMock,
       }
 
       await controller.generateQr(data)
 
       expect(sayMock).toHaveBeenCalledWith(expect.stringContaining('Parámetros inválidos'))
-      expect(generateQrMock).not.toHaveBeenCalled()
+      expect(generateQrBufferMock).not.toHaveBeenCalled()
     })
 
     it('says error message when service returns error', async () => {
       const data = {
-        payload: { text: 'qr test', user: 'U123', channel_type: 'im' },
+        payload: { text: 'qr test', user: 'U123', channel: 'C123', channel_type: 'im' },
         say: sayMock,
+        client: clientMock,
       }
-      generateQrMock.mockResolvedValue({ error: 'QR generation failed' })
+      generateQrBufferMock.mockResolvedValue({ error: 'QR generation failed' })
 
       await controller.generateQr(data)
 
@@ -93,10 +114,11 @@ describe('QrController', () => {
 
     it('says error message when an exception is thrown', async () => {
       const data = {
-        payload: { text: 'qr test', user: 'U123', channel_type: 'im' },
+        payload: { text: 'qr test', user: 'U123', channel: 'C123', channel_type: 'im' },
         say: sayMock,
+        client: clientMock,
       }
-      generateQrMock.mockRejectedValue(new Error('Unexpected error'))
+      generateQrBufferMock.mockRejectedValue(new Error('Unexpected error'))
 
       await controller.generateQr(data)
 

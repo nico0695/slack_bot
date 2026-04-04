@@ -16,7 +16,7 @@ export default class QrController extends GenericController {
 
   @SlackAuth
   public async generateQr(data: any): Promise<void> {
-    const { payload, say }: any = data
+    const { payload, say, client }: any = data
 
     try {
       const text: string = payload.text.replace(/^qr\s+/i, '').trim()
@@ -34,14 +34,18 @@ export default class QrController extends GenericController {
         return
       }
 
-      const response = await this.qrServices.generateQr(validation.data.text)
+      const response = await this.qrServices.generateQrBuffer(validation.data.text)
 
       if (response.error) {
         say('No se pudo generar el código QR')
         return
       }
 
-      say(response.data.qrBase64)
+      await client.files.uploadV2({
+        channel_id: payload.channel,
+        file: response.data.qrBuffer,
+        filename: 'qr.png',
+      })
     } catch (error) {
       log.error({ err: error }, 'generateQr failed')
       say('Ups! Ocurrió un error al generar el QR.')
