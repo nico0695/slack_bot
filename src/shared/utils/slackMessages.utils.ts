@@ -234,6 +234,27 @@ const alertOverflowAccessory = (id: number): any => ({
   action_id: `alert_actions:${id}`,
 })
 
+const reminderOverflowAccessory = (id: number): any => ({
+  type: 'overflow',
+  options: [
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Ver Detalles',
+      },
+      value: `reminder:detail:${id}`,
+    },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Eliminar',
+      },
+      value: `reminder:delete:${id}`,
+    },
+  ],
+  action_id: `reminder_actions:${id}`,
+})
+
 const quickActionOverflow = (
   entity: 'alert' | 'note' | 'task' | 'link',
   extraOptions: Array<{ label: string; value: string }> = []
@@ -649,6 +670,7 @@ export const msgReminderCreated = (data: Reminders): { blocks: any[] } => {
             tokens.statusLine
           }\n> ${tokens.helper}`,
         },
+        accessory: reminderOverflowAccessory(data.id),
       },
     ],
   }
@@ -683,6 +705,7 @@ export const msgRemindersList = (reminders: Reminders[]): { blocks: any[] } => {
           tokens.statusLine
         }\n> ${tokens.helper}`,
       },
+      accessory: reminderOverflowAccessory(reminder.id),
     })
 
     blocks.push({
@@ -707,6 +730,7 @@ export const msgReminderDetail = (reminder: Reminders): { blocks: any[] } => {
             truncatedMessage || '_No message_'
           }\n> ${tokens.statusLine}\n> ${tokens.helper}`,
         },
+        accessory: reminderOverflowAccessory(reminder.id),
       },
     ],
   }

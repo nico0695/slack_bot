@@ -48,6 +48,11 @@ const linksServicesMock = {
   updateLink: jest.fn(),
 }
 
+const remindersServicesMock = {
+  getRemindersByScope: jest.fn(),
+  deleteReminder: jest.fn(),
+}
+
 const messageProcessorMock = {
   processAssistantMessage: jest.fn(),
   cleanSkipFlag: jest.fn(),
@@ -68,6 +73,8 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgTasksList: jest.fn(() => buildBlocksMock()),
   msgNotesList: jest.fn(() => buildBlocksMock()),
   msgLinksList: jest.fn(() => buildBlocksMock()),
+  msgRemindersList: jest.fn(() => buildBlocksMock()),
+  msgReminderDetail: jest.fn(() => buildBlocksMock()),
   msgAssistantQuickHelp: jest.fn(() => buildBlocksMock()),
 }))
 
@@ -80,6 +87,7 @@ const buildService = (): ConversationsServices =>
     tasksServicesMock as any,
     notesServicesMock as any,
     linksServicesMock as any,
+    remindersServicesMock as any,
     messageProcessorMock as any
   )
 
@@ -356,6 +364,44 @@ describe('ConversationsServices', () => {
       )
 
       expect(result).toBe('Acción no reconocida.')
+    })
+  })
+
+  describe('handleAction - reminder entity', () => {
+    it('shows reminder detail', async () => {
+      const slackMessagesUtils = jest.requireMock('../../../../shared/utils/slackMessages.utils')
+      remindersServicesMock.getRemindersByScope.mockResolvedValue({
+        data: [
+          {
+            id: 8,
+            message: 'Standup',
+            recurrenceType: 'daily',
+            timeOfDay: '10:00',
+            status: 'active',
+            channelId: null,
+          },
+        ],
+      })
+
+      await service.handleAction({ entity: 'reminder', operation: 'detail', targetId: 8 }, 42)
+
+      expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(42, {
+        scope: 'personal',
+        channelId: null,
+      })
+      expect(slackMessagesUtils.msgReminderDetail).toHaveBeenCalled()
+    })
+
+    it('deletes a reminder', async () => {
+      remindersServicesMock.deleteReminder.mockResolvedValue({ data: true })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'delete', targetId: 8 },
+        42
+      )
+
+      expect(remindersServicesMock.deleteReminder).toHaveBeenCalledWith(8, { userId: 42 })
+      expect(result).toBe('Reminder #8 eliminado correctamente.')
     })
   })
 
