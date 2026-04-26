@@ -9,9 +9,11 @@ import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
 import LinksServices from '../../links/services/links.services'
+import RemindersServices from '../../reminders/services/reminders.services'
 import { Tasks } from '../../../entities/tasks'
 import { Notes } from '../../../entities/notes'
 import { Links } from '../../../entities/links'
+import { ReminderScope } from '../../reminders/shared/constants/reminders.constants'
 import { LinkStatus } from '../../links/shared/constants/links.constants'
 
 import GeminiRepository from '../repositories/gemini/gemini.repository'
@@ -57,6 +59,7 @@ export default class ConversationsServices {
     private tasksServices: TasksServices,
     private notesServices: NotesServices,
     private linksServices: LinksServices,
+    private remindersServices: RemindersServices,
     private messageProcessor: MessageProcessor
   ) {}
 
@@ -579,6 +582,8 @@ export default class ConversationsServices {
           return await this.handleTaskAction(operation, targetId, userId, context)
         case 'link':
           return await this.handleLinkAction(operation, targetId, userId, context)
+        case 'reminder':
+          return await this.handleReminderAction(operation, targetId, userId, context)
         case 'assistant':
           return await this.handleAssistantAction(operation, userId)
         default:
@@ -992,6 +997,66 @@ export default class ConversationsServices {
           return 'No tienes links guardados.'
         }
         return slackMsgUtils.msgLinksList(links)
+      }
+
+      default:
+        return 'Acción no reconocida.'
+    }
+  }
+
+  private handleReminderAction = async (
+    operation: string,
+    targetId: number,
+    userId: number,
+    context: { channelId?: string; isChannelContext?: boolean }
+  ): Promise<string | { blocks: any[] }> => {
+    const scopeChannelId = this.getScopeChannelId(
+      context.channelId,
+      context.isChannelContext ?? false
+    )
+
+    switch (operation) {
+      case 'delete': {
+        const deleteRes = await this.remindersServices.deleteReminder(targetId, { userId })
+
+        if (deleteRes.error || !deleteRes.data) {
+          return `Error al eliminar el reminder, no se encontró el reminder con Id: ${targetId}`
+        }
+
+        return `Reminder #${targetId} eliminado correctamente.`
+      }
+
+      case 'detail': {
+        const remindersRes = await this.remindersServices.getRemindersByScope(userId, {
+          scope: scopeChannelId ? ReminderScope.CHANNEL : ReminderScope.PERSONAL,
+          channelId: scopeChannelId,
+        })
+        if (remindersRes.error) {
+          return 'No se pudieron obtener los reminders. 😅'
+        }
+        const reminder = remindersRes.data?.find((item) => item.id === targetId)
+
+        if (!reminder) {
+          return `No se encontró el reminder con Id: ${targetId}`
+        }
+
+        return slackMsgUtils.msgReminderDetail(reminder)
+      }
+
+      case 'list': {
+        const remindersRes = await this.remindersServices.getRemindersByScope(userId, {
+          scope: scopeChannelId ? ReminderScope.CHANNEL : ReminderScope.PERSONAL,
+          channelId: scopeChannelId,
+        })
+        if (remindersRes.error) {
+          return 'No se pudieron obtener los reminders. 😅'
+        }
+        const reminders = remindersRes.data ?? []
+        if (!reminders.length) {
+          return scopeChannelId ? 'No hay reminders en este canal.' : 'No tienes reminders.'
+        }
+
+        return slackMsgUtils.msgRemindersList(reminders)
       }
 
       default:
