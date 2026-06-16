@@ -276,11 +276,20 @@ export const assistantPromptFlagsLite2 = `
       * \`title\`: (Optional) A title for the link.
       * \`description\`: (Optional) Extra details.
       * \`tag\`: (Optional).
+  #### 4. reminder.create
+  * **Trigger**: User wants a RECURRING notification. ONLY use \`reminder.*\` when the message has an explicit recurrence/reminder cue: "reminder", "recurrente", "repetir", "todos los", "cada", "diariamente", "semanalmente", "mensualmente". A one-shot phrasing ("recordame X mañana", a specific date-time) is NOT a reminder — it stays \`alert.create\`. When ambiguous, default to \`alert.create\`.
+  * **Fields**:
+      * \`message\`: (Required) The content of the reminder.
+      * \`recurrenceType\`: (Required) One of \`daily\`, \`weekly\`, \`monthly\`.
+      * \`timeOfDay\`: (Required) 24h time in HH:mm format.
+      * \`weekDays\`: (weekly only) Array of english day names (e.g. ["monday","friday"]).
+      * \`monthDays\`: (monthly only) Array of ints 1-31 (e.g. [1,15]).
   #### 5. image.create
   * **Trigger**: Requests to generate/draw images.
   * **Fields**: \`prompt\` (Required, English translation preferred), \`size\` (default "1024x1024"), \`quality\`, \`style\`, \`numberOfImages\` (Int).
   #### 6. General Intents
-  * \`alert.list\`, \`task.list\`, \`note.list\`, \`link.list\`, \`image.list\`: Listing items. Use \`tag\` or \`userFilter\` if specified.
+  * \`alert.list\`, \`task.list\`, \`note.list\`, \`link.list\`, \`image.list\`, \`reminder.list\`: Listing items. Use \`tag\` or \`userFilter\` if specified.
+  * \`reminder.detail\`, \`reminder.check\`, \`reminder.pause\`, \`reminder.resume\`, \`reminder.delete\`: Act on an existing reminder identified by \`targetId\` (the reminder id). Use these for "mostrame/pausá/reanudá/marcá hecho/eliminá el reminder N".
   * \`question\`: General knowledge queries not requiring database actions.
   * \`search\`: Requests requiring real-time/external info.
   * \`translate\`: Requests to translate text to a specific language. Fields: \`targetLang\` (Required, target language name), \`text\` (Required, the text to translate). Example: "Traducí esto al inglés: Hola mundo" -> {"intent":"translate","targetLang":"english","text":"Hola mundo"}
@@ -350,6 +359,27 @@ export const assistantPromptFlagsLite2 = `
 
   input: "Quiero un código QR que diga Hola mundo"
   output: {"intent":"qr.generate","text":"Hola mundo","successMessage":"Generando código QR","errorMessage":""}
+
+  input: "Recordame todos los días a las 9 tomar agua"
+  output: {"intent":"reminder.create","message":"tomar agua","recurrenceType":"daily","timeOfDay":"09:00","successMessage":"Creando reminder diario","errorMessage":""}
+
+  input: "Recordatorio recurrente todos los lunes a las 9 reunión de equipo"
+  output: {"intent":"reminder.create","message":"reunión de equipo","recurrenceType":"weekly","weekDays":["monday"],"timeOfDay":"09:00","successMessage":"Creando reminder semanal","errorMessage":""}
+
+  input: "Recordame el día 1 de cada mes pagar el alquiler a las 8"
+  output: {"intent":"reminder.create","message":"pagar el alquiler","recurrenceType":"monthly","monthDays":[1],"timeOfDay":"08:00","successMessage":"Creando reminder mensual","errorMessage":""}
+
+  input: "Recordame mañana a las 9 llamar a Ana"
+  output: {"intent":"alert.create","time":"2024-05-11 09:00","title":"Llamar a Ana","successMessage":"Creo alerta","errorMessage":""}
+
+  input: "Listá mis reminders"
+  output: {"intent":"reminder.list","successMessage":"Listando tus reminders","errorMessage":""}
+
+  input: "Pausá el reminder 12"
+  output: {"intent":"reminder.pause","targetId":12,"successMessage":"Pausando reminder #12","errorMessage":""}
+
+  input: "Mostrame el reminder 12"
+  output: {"intent":"reminder.detail","targetId":12,"successMessage":"Mostrando reminder #12","errorMessage":""}
 
   #IMPORTANT
   - All user-facing content must be in Spanish

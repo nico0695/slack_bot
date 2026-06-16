@@ -40,6 +40,7 @@ const linksServicesMock = {
 const remindersServicesMock = {
   createReminder: jest.fn(),
   getRemindersByScope: jest.fn(),
+  getReminderById: jest.fn(),
   pauseReminder: jest.fn(),
   resumeReminder: jest.fn(),
   deleteReminder: jest.fn(),
@@ -582,6 +583,236 @@ describe('MessageProcessor - reminder handling', () => {
     const result = await processor.processAssistantMessage('.r -list -pause -id 12', 99)
 
     expect(result.response?.content).toBe('Usa una sola acción por comando de reminder.')
+  })
+})
+
+describe('MessageProcessor - reminder classifier intents', () => {
+  let processor: MessageProcessor
+
+  const mockClassification = (json: Record<string, unknown>): void => {
+    aiRepositoryMock.chatCompletion.mockResolvedValue({ content: JSON.stringify(json) })
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = buildProcessor()
+  })
+
+  it('creates a daily reminder from a natural-language request (reminder.create)', async () => {
+    mockClassification({
+      intent: 'reminder.create',
+      message: 'tomar agua',
+      recurrenceType: 'daily',
+      timeOfDay: '09:00',
+    })
+    remindersServicesMock.createReminder.mockResolvedValue({
+      data: {
+        id: 31,
+        message: 'tomar agua',
+        recurrenceType: ReminderRecurrenceType.DAILY,
+        timeOfDay: '09:00',
+        status: ReminderStatus.ACTIVE,
+        channelId: null,
+      },
+    })
+
+    const result = await processor.processAssistantMessage(
+      'Recordame todos los días a las 9 tomar agua',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.createReminder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'tomar agua',
+        recurrenceType: ReminderRecurrenceType.DAILY,
+        timeOfDay: '09:00',
+        userId: 99,
+        channelId: null,
+      })
+    )
+    expect(result.response?.content).toContain('#31')
+  })
+
+  it('maps weekday names to ReminderWeekDay for a weekly reminder.create', async () => {
+    mockClassification({
+      intent: 'reminder.create',
+      message: 'reunión de equipo',
+      recurrenceType: 'weekly',
+      weekDays: ['monday'],
+      timeOfDay: '09:00',
+    })
+    remindersServicesMock.createReminder.mockResolvedValue({
+      data: {
+        id: 32,
+        message: 'reunión de equipo',
+        recurrenceType: ReminderRecurrenceType.WEEKLY,
+        timeOfDay: '09:00',
+        weekDays: [ReminderWeekDay.MONDAY],
+        status: ReminderStatus.ACTIVE,
+        channelId: null,
+      },
+    })
+
+    const result = await processor.processAssistantMessage(
+      'Recordatorio recurrente todos los lunes a las 9 reunión de equipo',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.createReminder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'reunión de equipo',
+        recurrenceType: ReminderRecurrenceType.WEEKLY,
+        weekDays: [ReminderWeekDay.MONDAY],
+        timeOfDay: '09:00',
+        userId: 99,
+      })
+    )
+    expect(result.response?.content).toContain('#32')
+  })
+
+  it('returns a validation message when reminder.create has an invalid recurrence', async () => {
+    mockClassification({
+      intent: 'reminder.create',
+      message: 'algo',
+      recurrenceType: 'yearly',
+      timeOfDay: '09:00',
+    })
+
+    const result = await processor.processAssistantMessage(
+      'Recordame cada año algo a las 9',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.createReminder).not.toHaveBeenCalled()
+    expect(result.response?.content).toBe('Recurrencia inválida. Usa daily, weekly o monthly.')
+  })
+
+  it('returns a validation error for unrecognized weekday names without crashing', async () => {
+    mockClassification({
+      intent: 'reminder.create',
+      message: 'algo',
+      recurrenceType: 'weekly',
+      weekDays: ['funday'],
+      timeOfDay: '09:00',
+    })
+
+    const result = await processor.processAssistantMessage(
+      'Recordame todos los funday algo a las 9',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.createReminder).not.toHaveBeenCalled()
+    expect(result.response?.content).toContain('Día de semana inválido: funday')
+  })
+
+  it('lists reminders deriving channel scope (reminder.list)', async () => {
+    mockClassification({ intent: 'reminder.list' })
+    remindersServicesMock.getRemindersByScope.mockResolvedValue({
+      data: [
+        {
+          id: 5,
+          message: 'Standup',
+          recurrenceType: ReminderRecurrenceType.DAILY,
+          timeOfDay: '10:00',
+          status: ReminderStatus.ACTIVE,
+          channelId: 'C777',
+        },
+      ],
+    })
+
+    const result = await processor.processAssistantMessage('Listá mis reminders', 99, 'C777', true)
+
+    expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(99, {
+      scope: ReminderScope.CHANNEL,
+      channelId: 'C777',
+    })
+    expect(result.response?.content).toContain('#5')
+  })
+
+  it('pauses a reminder by targetId (reminder.pause)', async () => {
+    mockClassification({ intent: 'reminder.pause', targetId: 12 })
+    remindersServicesMock.pauseReminder.mockResolvedValue({
+      data: {
+        id: 12,
+        message: 'Drink water',
+        recurrenceType: ReminderRecurrenceType.DAILY,
+        timeOfDay: '09:00',
+        status: ReminderStatus.PAUSED,
+        channelId: null,
+      },
+    })
+
+    const result = await processor.processAssistantMessage(
+      'Pausá el reminder 12',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.pauseReminder).toHaveBeenCalledWith(12, { userId: 99 })
+    expect(result.response?.content).toContain('pausado')
+  })
+
+  it('shows reminder detail via targetId (reminder.detail)', async () => {
+    mockClassification({ intent: 'reminder.detail', targetId: 12 })
+    remindersServicesMock.getReminderById.mockResolvedValue({
+      data: {
+        id: 12,
+        message: 'Drink water',
+        recurrenceType: ReminderRecurrenceType.DAILY,
+        timeOfDay: '09:00',
+        status: ReminderStatus.ACTIVE,
+        channelId: null,
+      },
+    })
+
+    const result = await processor.processAssistantMessage(
+      'Mostrame el reminder 12',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.getReminderById).toHaveBeenCalledWith(12, { userId: 99 })
+    expect(result.response?.content).toContain('#12')
+  })
+
+  it('returns a usage message when an id-based intent is missing the id', async () => {
+    mockClassification({ intent: 'reminder.pause' })
+
+    const result = await processor.processAssistantMessage(
+      'Pausá el reminder',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.pauseReminder).not.toHaveBeenCalled()
+    expect(result.response?.content).toContain('Necesito un id válido')
+  })
+
+  it('surfaces a not-found error from the service for an id-based intent', async () => {
+    mockClassification({ intent: 'reminder.pause', targetId: 999 })
+    remindersServicesMock.pauseReminder.mockResolvedValue({ error: 'Reminder not found' })
+
+    const result = await processor.processAssistantMessage(
+      'Pausá el reminder 999',
+      99,
+      undefined,
+      false
+    )
+
+    expect(remindersServicesMock.pauseReminder).toHaveBeenCalledWith(999, { userId: 99 })
+    expect(result.response?.content).toBe('Reminder not found')
   })
 })
 
