@@ -450,6 +450,23 @@ export default class MessageProcessor {
     )} · ${scope} · next ${nextTriggerAt}`
   }
 
+  private normalizeReminderIntentId = (parsed: {
+    targetId?: unknown
+    id?: unknown
+  }): number | null => {
+    const rawId = parsed.targetId ?? parsed.id
+    const normalized = String(rawId ?? '')
+      .replace(/^#/, '')
+      .trim()
+    const reminderId = Number(normalized)
+
+    if (!normalized || !Number.isInteger(reminderId) || reminderId <= 0) {
+      return null
+    }
+
+    return reminderId
+  }
+
   private handleReminderVariable = async (
     userId: number,
     assistantMessage: AssistantMessage,
@@ -1627,6 +1644,213 @@ export default class MessageProcessor {
             contentBlock,
             provider: ConversationProviders.ASSISTANT,
           }
+        }
+        case 'reminder.create': {
+          const message = String(parsed.message ?? '').trim()
+          const recurrenceRaw = String(parsed.recurrenceType ?? '')
+            .trim()
+            .toLowerCase()
+          const timeOfDay = String(parsed.timeOfDay ?? '').trim()
+
+          if (!message || !recurrenceRaw || !timeOfDay) {
+            return this.buildAssistantResponse(reminderCreateUsage)
+          }
+
+          const recurrenceType = this.parseReminderRecurrenceType(recurrenceRaw)
+          if (!recurrenceType) {
+            return this.buildAssistantResponse('Recurrencia inválida. Usa daily, weekly o monthly.')
+          }
+
+          let weekDays: ReminderWeekDay[] | undefined
+          let monthDays: number[] | undefined
+
+          try {
+            if (parsed.weekDays !== undefined && parsed.weekDays !== null) {
+              const weekDaysRaw = Array.isArray(parsed.weekDays)
+                ? parsed.weekDays.join(',')
+                : String(parsed.weekDays)
+              weekDays = parseReminderWeekDays(weekDaysRaw)
+            }
+
+            if (parsed.monthDays !== undefined && parsed.monthDays !== null) {
+              const monthDaysRaw = Array.isArray(parsed.monthDays)
+                ? parsed.monthDays.join(',')
+                : String(parsed.monthDays)
+              monthDays = parseReminderMonthDays(monthDaysRaw)
+            }
+          } catch (error: any) {
+            return this.buildAssistantResponse(String(error.message ?? 'Invalid reminder config'))
+          }
+
+          const validation = createReminderSchema.safeParse({
+            message,
+            recurrenceType,
+            timeOfDay,
+            weekDays,
+            monthDays,
+            channelId: scopeChannelId,
+          })
+
+          if (!validation.success) {
+            return this.buildAssistantResponse(
+              `Parámetros inválidos: ${this.formatReminderValidationErrors(
+                validation.error.errors
+              )}`
+            )
+          }
+
+          const reminderResponse = await this.remindersServices.createReminder({
+            message: validation.data.message,
+            recurrenceType: validation.data.recurrenceType,
+            timeOfDay: validation.data.timeOfDay,
+            weekDays: validation.data.weekDays,
+            monthDays: validation.data.monthDays,
+            status: validation.data.status,
+            userId,
+            channelId: scopeChannelId,
+          })
+
+          if (reminderResponse.error || !reminderResponse.data) {
+            return this.buildAssistantResponse(
+              reminderResponse.error ?? 'No se pudo crear el reminder.'
+            )
+          }
+
+          return {
+            role: roleTypes.assistant,
+            content: `Reminder #${
+              reminderResponse.data.id
+            } creado.\n${this.formatReminderSummaryLine(reminderResponse.data)}`,
+            contentBlock: slackMsgUtils.msgReminderCreated(reminderResponse.data),
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'reminder.list': {
+          const scope = scopeChannelId ? ReminderScope.CHANNEL : ReminderScope.PERSONAL
+          const remindersResponse = await this.remindersServices.getRemindersByScope(userId, {
+            scope,
+            channelId: scopeChannelId,
+          })
+
+          if (remindersResponse.error) {
+            return this.buildAssistantResponse(remindersResponse.error)
+          }
+
+          const reminders = remindersResponse.data ?? []
+          const content =
+            reminders.length > 0
+              ? reminders.map((reminder) => this.formatReminderSummaryLine(reminder)).join('\n')
+              : scopeChannelId
+              ? 'No hay reminders en este canal.'
+              : 'No tienes reminders.'
+
+          return {
+            role: roleTypes.assistant,
+            content: parsed.successMessage || content,
+            contentBlock: slackMsgUtils.msgRemindersList(reminders),
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'reminder.detail': {
+          const reminderId = this.normalizeReminderIntentId(parsed)
+          if (reminderId === null) {
+            return this.buildAssistantResponse(
+              'Necesito un id válido. Ejemplo: mostrame el reminder 12'
+            )
+          }
+
+          const detailResponse = await this.remindersServices.getReminderById(reminderId, {
+            userId,
+          })
+
+          if (detailResponse.error || !detailResponse.data) {
+            return this.buildAssistantResponse(detailResponse.error ?? 'Reminder not found')
+          }
+
+          return {
+            role: roleTypes.assistant,
+            content: this.formatReminderSummaryLine(detailResponse.data),
+            contentBlock: slackMsgUtils.msgReminderDetail(detailResponse.data),
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'reminder.check': {
+          const reminderId = this.normalizeReminderIntentId(parsed)
+          if (reminderId === null) {
+            return this.buildAssistantResponse(
+              'Necesito un id válido. Ejemplo: marcá hecho el reminder 12'
+            )
+          }
+
+          const checkResponse = await this.remindersServices.checkReminderOccurrence(reminderId, {
+            userId,
+          })
+
+          if (checkResponse.error || !checkResponse.data) {
+            return this.buildAssistantResponse(checkResponse.error ?? 'Reminder not found')
+          }
+
+          return this.buildAssistantResponse(
+            `Reminder #${reminderId} marcado como hecho para hoy (${checkResponse.data.occurrenceDate}).`
+          )
+        }
+        case 'reminder.pause': {
+          const reminderId = this.normalizeReminderIntentId(parsed)
+          if (reminderId === null) {
+            return this.buildAssistantResponse(
+              'Necesito un id válido. Ejemplo: pausá el reminder 12'
+            )
+          }
+
+          const pauseResponse = await this.remindersServices.pauseReminder(reminderId, { userId })
+
+          if (pauseResponse.error || !pauseResponse.data) {
+            return this.buildAssistantResponse(pauseResponse.error ?? 'Reminder not found')
+          }
+
+          return {
+            role: roleTypes.assistant,
+            content: `Reminder #${reminderId} pausado.`,
+            contentBlock: slackMsgUtils.msgReminderDetail(pauseResponse.data),
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'reminder.resume': {
+          const reminderId = this.normalizeReminderIntentId(parsed)
+          if (reminderId === null) {
+            return this.buildAssistantResponse(
+              'Necesito un id válido. Ejemplo: reanudá el reminder 12'
+            )
+          }
+
+          const resumeResponse = await this.remindersServices.resumeReminder(reminderId, { userId })
+
+          if (resumeResponse.error || !resumeResponse.data) {
+            return this.buildAssistantResponse(resumeResponse.error ?? 'Reminder not found')
+          }
+
+          return {
+            role: roleTypes.assistant,
+            content: `Reminder #${reminderId} reanudado.`,
+            contentBlock: slackMsgUtils.msgReminderDetail(resumeResponse.data),
+            provider: ConversationProviders.ASSISTANT,
+          }
+        }
+        case 'reminder.delete': {
+          const reminderId = this.normalizeReminderIntentId(parsed)
+          if (reminderId === null) {
+            return this.buildAssistantResponse(
+              'Necesito un id válido. Ejemplo: borrá el reminder 12'
+            )
+          }
+
+          const deleteResponse = await this.remindersServices.deleteReminder(reminderId, { userId })
+
+          if (deleteResponse.error) {
+            return this.buildAssistantResponse(deleteResponse.error)
+          }
+
+          return this.buildAssistantResponse(`Reminder #${reminderId} eliminado.`)
         }
         case 'image.create': {
           if (!parsed.prompt || typeof parsed.prompt !== 'string') {

@@ -9,6 +9,7 @@ import AlertsServices from '../../alerts/services/alerts.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
 import LinksServices from '../../links/services/links.services'
+import RemindersServices from '../../reminders/services/reminders.services'
 import { Tasks } from '../../../entities/tasks'
 import { Notes } from '../../../entities/notes'
 import { Links } from '../../../entities/links'
@@ -57,7 +58,8 @@ export default class ConversationsServices {
     private tasksServices: TasksServices,
     private notesServices: NotesServices,
     private linksServices: LinksServices,
-    private messageProcessor: MessageProcessor
+    private messageProcessor: MessageProcessor,
+    private remindersServices: RemindersServices
   ) {}
 
   private generatePrompt = async (conversation: IConversation[]): Promise<IConversation[]> => {
@@ -579,6 +581,8 @@ export default class ConversationsServices {
           return await this.handleTaskAction(operation, targetId, userId, context)
         case 'link':
           return await this.handleLinkAction(operation, targetId, userId, context)
+        case 'reminder':
+          return await this.handleReminderAction(operation, targetId, userId, context)
         case 'assistant':
           return await this.handleAssistantAction(operation, userId)
         default:
@@ -992,6 +996,94 @@ export default class ConversationsServices {
           return 'No tienes links guardados.'
         }
         return slackMsgUtils.msgLinksList(links)
+      }
+
+      default:
+        return 'Acción no reconocida.'
+    }
+  }
+
+  private handleReminderAction = async (
+    operation: string,
+    targetId: number,
+    userId: number,
+    context: { channelId?: string; isChannelContext?: boolean }
+  ): Promise<string | { blocks: any[] }> => {
+    const notFoundMessage = `No se encontró el reminder #${targetId} o no tienes permisos para esta acción.`
+
+    switch (operation) {
+      case 'detail': {
+        const res = await this.remindersServices.getReminderById(targetId, { userId })
+
+        if (res.error || !res.data) {
+          return notFoundMessage
+        }
+
+        return slackMsgUtils.msgReminderDetail(res.data)
+      }
+
+      case 'check': {
+        const res = await this.remindersServices.checkReminderOccurrence(targetId, { userId })
+
+        if (res.error || !res.data) {
+          return notFoundMessage
+        }
+
+        return `Reminder #${targetId} marcado como hecho para hoy (${res.data.occurrenceDate}).`
+      }
+
+      case 'pause': {
+        const res = await this.remindersServices.pauseReminder(targetId, { userId })
+
+        if (res.error || !res.data) {
+          return notFoundMessage
+        }
+
+        const messageBlock = slackMsgUtils.msgReminderDetail(res.data)
+
+        messageBlock.blocks.push({
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: `Reminder #${targetId} pausado.`,
+            },
+          ],
+        })
+
+        return messageBlock
+      }
+
+      case 'resume': {
+        const res = await this.remindersServices.resumeReminder(targetId, { userId })
+
+        if (res.error || !res.data) {
+          return notFoundMessage
+        }
+
+        const messageBlock = slackMsgUtils.msgReminderDetail(res.data)
+
+        messageBlock.blocks.push({
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: `Reminder #${targetId} reanudado.`,
+            },
+          ],
+        })
+
+        return messageBlock
+      }
+
+      case 'delete': {
+        const res = await this.remindersServices.deleteReminder(targetId, { userId })
+
+        if (res.error || !res.data) {
+          return notFoundMessage
+        }
+
+        return `Reminder #${targetId} eliminado.`
       }
 
       default:

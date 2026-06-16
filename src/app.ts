@@ -154,7 +154,7 @@ export default class App {
     })
 
     this.slackApp.action(
-      /^(?:alert|note|task|link)_actions.*$|^(?:delete|view)_(?:alert|note|task|link)(?:_details)?$/,
+      /^(?:alert|note|task|link|reminder)_actions.*$|^(?:delete|view)_(?:alert|note|task|link)(?:_details)?$/,
       safeHandler(this.conversationController.handleActions)
     )
 
