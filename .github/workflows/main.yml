@@ -26,6 +26,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           password: ${{ secrets.SSH_PASSWORD }}
           port: 5001
+          command_timeout: 30m
           script: |
             set -e
             cd /app/slack_bot/

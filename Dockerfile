@@ -50,11 +50,14 @@ ENV SEARCH_API_KEY_CX=${SEARCH_API_KEY_CX}
 ENV STORAGE_API_URL=${STORAGE_API_URL_ARG}
 ENV STORAGE_API_KEY=${STORAGE_API_KEY_ARG}
 
-COPY ./build /app/build
+# Install dependencies first so this layer stays cached unless package*.json changes.
 COPY ./package.json /app/package.json
 COPY ./package-lock.json /app/package-lock.json
 
-RUN cd app && NODE_ENV=$NODE_ENV npm install
+RUN cd app && NODE_ENV=$NODE_ENV npm ci --omit=dev
+
+# Copy the compiled output last: it changes every deploy and must not bust the deps cache.
+COPY ./build /app/build
 
 # Expose the port your app is running on (e.g., 3000)
 EXPOSE 4000
