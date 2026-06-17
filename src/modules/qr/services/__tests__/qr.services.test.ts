@@ -11,9 +11,11 @@ jest.mock('../../../../config/logger', () => ({
 }))
 
 const toDataURLMock = jest.fn()
+const toBufferMock = jest.fn()
 
 jest.mock('qrcode', () => ({
   toDataURL: (...args: any[]) => toDataURLMock(...args),
+  toBuffer: (...args: any[]) => toBufferMock(...args),
 }))
 
 describe('QrServices', () => {
@@ -86,6 +88,47 @@ describe('QrServices', () => {
 
       expect(result.data.qrBase64).toBeDefined()
       expect(toDataURLMock).toHaveBeenCalledWith('🔗 https://example.com', expect.any(Object))
+    })
+  })
+
+  describe('generateQrBuffer', () => {
+    it('returns QR buffer on success', async () => {
+      const fakeBuffer = Buffer.from('fake-png-data')
+      toBufferMock.mockResolvedValue(fakeBuffer)
+
+      const result = await services.generateQrBuffer('https://example.com')
+
+      expect(toBufferMock).toHaveBeenCalledWith('https://example.com', {
+        width: 300,
+        errorCorrectionLevel: 'M',
+      })
+      expect(result).toEqual({
+        data: {
+          qrBuffer: fakeBuffer,
+        },
+      })
+    })
+
+    it('returns error when QRCode.toBuffer throws', async () => {
+      toBufferMock.mockRejectedValue(new Error('Buffer generation failed'))
+
+      const result = await services.generateQrBuffer('test')
+
+      expect(result).toEqual({ error: 'Error inesperado al generar el código QR' })
+    })
+
+    it('returns error when text is empty', async () => {
+      const result = await services.generateQrBuffer('')
+
+      expect(result).toEqual({ error: 'El texto debe tener entre 1 y 2000 caracteres' })
+      expect(toBufferMock).not.toHaveBeenCalled()
+    })
+
+    it('returns error when text exceeds max length', async () => {
+      const result = await services.generateQrBuffer('a'.repeat(2001))
+
+      expect(result).toEqual({ error: 'El texto debe tener entre 1 y 2000 caracteres' })
+      expect(toBufferMock).not.toHaveBeenCalled()
     })
   })
 })

@@ -5,3 +5,7 @@ export interface IQrRequest {
 export interface IQrResponse {
   qrBase64: string
 }
+
+export interface IQrBufferResponse {
+  qrBuffer: Buffer
+}
