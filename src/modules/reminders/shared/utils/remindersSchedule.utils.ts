@@ -1,5 +1,68 @@
+import {
+  ARGENTINA_TIMEZONE,
+  ARGENTINA_UTC_OFFSET_MINUTES,
+} from '../../../../shared/constants/timezone.constants'
 import { ReminderRecurrenceType, ReminderWeekDay } from '../constants/reminders.constants'
 import { IReminder, IReminderValidationResult } from '../interfaces/reminders.interfaces'
+
+interface ArgentinaDateParts {
+  year: number
+  month: number
+  day: number
+  dayOfWeek: number
+  hour: number
+  minute: number
+}
+
+const DAY_NAME_TO_INDEX: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+}
+
+function getArgentinaDateParts(date: Date): ArgentinaDateParts {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: ARGENTINA_TIMEZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  })
+
+  const parts = formatter.formatToParts(date)
+  const get = (type: string): string => parts.find((p) => p.type === type)?.value ?? '0'
+
+  const year = Number(get('year'))
+  const month = Number(get('month'))
+  const day = Number(get('day'))
+  const dayOfWeek = DAY_NAME_TO_INDEX[get('weekday')] ?? 0
+  let hour = Number(get('hour'))
+  const minute = Number(get('minute'))
+
+  if (hour === 24) {
+    hour = 0
+  }
+
+  return { year, month, day, dayOfWeek, hour, minute }
+}
+
+function buildArgentinaTimestamp(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number
+): Date {
+  const utcDate = Date.UTC(year, month - 1, day, hour, minute, 0, 0)
+  return new Date(utcDate + ARGENTINA_UTC_OFFSET_MINUTES * 60 * 1000)
+}
 
 function parseTimeOfDay(timeOfDay: string): { hour: number; minute: number } {
   const [hourRaw, minuteRaw] = timeOfDay.split(':')
@@ -18,10 +81,9 @@ function parseTimeOfDay(timeOfDay: string): { hour: number; minute: number } {
 
 function buildScheduledDate(baseDate: Date, timeOfDay: string): Date {
   const { hour, minute } = parseTimeOfDay(timeOfDay)
-  const scheduledDate = new Date(baseDate)
-  scheduledDate.setHours(hour, minute, 0, 0)
+  const arParts = getArgentinaDateParts(baseDate)
 
-  return scheduledDate
+  return buildArgentinaTimestamp(arParts.year, arParts.month, arParts.day, hour, minute)
 }
 
 export function validateRecurrenceConfig(
@@ -82,7 +144,14 @@ export function computeNextTriggerAt(
 
   if (reminder.recurrenceType === ReminderRecurrenceType.DAILY) {
     if (candidate <= fromDate) {
-      candidate.setDate(candidate.getDate() + 1)
+      const arParts = getArgentinaDateParts(candidate)
+      return buildArgentinaTimestamp(
+        arParts.year,
+        arParts.month,
+        arParts.day + 1,
+        arParts.hour,
+        arParts.minute
+      )
     }
 
     return candidate
@@ -96,10 +165,18 @@ export function computeNextTriggerAt(
     }
 
     for (let dayOffset = 0; dayOffset < 14; dayOffset += 1) {
-      const weeklyCandidate = new Date(candidate)
-      weeklyCandidate.setDate(candidate.getDate() + dayOffset)
+      const arParts = getArgentinaDateParts(candidate)
+      const weeklyCandidate = buildArgentinaTimestamp(
+        arParts.year,
+        arParts.month,
+        arParts.day + dayOffset,
+        arParts.hour,
+        arParts.minute
+      )
 
-      if (!weekDays.includes(weeklyCandidate.getDay())) {
+      const candidateParts = getArgentinaDateParts(weeklyCandidate)
+
+      if (!weekDays.includes(candidateParts.dayOfWeek)) {
         continue
       }
 
@@ -115,17 +192,25 @@ export function computeNextTriggerAt(
     throw new Error('Monthly reminders require at least one month day')
   }
 
+  const candidateParts = getArgentinaDateParts(candidate)
+
   for (let monthOffset = 0; monthOffset <= 24; monthOffset += 1) {
-    const monthCursor = new Date(fromDate)
-    monthCursor.setMonth(fromDate.getMonth() + monthOffset, 1)
-    monthCursor.setHours(candidate.getHours(), candidate.getMinutes(), 0, 0)
-    const expectedMonth = monthCursor.getMonth()
+    const targetMonth = ((candidateParts.month - 1 + monthOffset) % 12) + 1
+    const targetYear =
+      candidateParts.year + Math.floor((candidateParts.month - 1 + monthOffset) / 12)
 
     for (const monthDay of monthDays) {
-      const monthlyCandidate = new Date(monthCursor)
-      monthlyCandidate.setDate(monthDay)
+      const monthlyCandidate = buildArgentinaTimestamp(
+        targetYear,
+        targetMonth,
+        monthDay,
+        candidateParts.hour,
+        candidateParts.minute
+      )
 
-      if (monthlyCandidate.getMonth() !== expectedMonth) {
+      const monthlyParts = getArgentinaDateParts(monthlyCandidate)
+
+      if (monthlyParts.month !== targetMonth) {
         continue
       }
 
@@ -139,9 +224,10 @@ export function computeNextTriggerAt(
 }
 
 export function getOccurrenceDateKey(triggerAt: Date): string {
-  const year = triggerAt.getFullYear()
-  const month = String(triggerAt.getMonth() + 1).padStart(2, '0')
-  const day = String(triggerAt.getDate()).padStart(2, '0')
+  const arParts = getArgentinaDateParts(triggerAt)
+  const year = arParts.year
+  const month = String(arParts.month).padStart(2, '0')
+  const day = String(arParts.day).padStart(2, '0')
 
   return `${year}-${month}-${day}`
 }
@@ -154,11 +240,13 @@ export function matchesOccurrenceDate(
     return true
   }
 
+  const arParts = getArgentinaDateParts(localDate)
+
   if (reminder.recurrenceType === ReminderRecurrenceType.WEEKLY) {
-    return (reminder.weekDays ?? []).includes(localDate.getDay())
+    return (reminder.weekDays ?? []).includes(arParts.dayOfWeek)
   }
 
-  return (reminder.monthDays ?? []).includes(localDate.getDate())
+  return (reminder.monthDays ?? []).includes(arParts.day)
 }
 
 export function isBeforeScheduledTime(localNow: Date, timeOfDay: string): boolean {
