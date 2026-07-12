@@ -84,11 +84,10 @@ COMANDOS (sugerir solo si acelera): .a/.alert | .n/.note | .t/.task | .link/.lk 
 
   QR: .qr <texto o URL> (genera código QR)
 
-  Imagen: .img <descripción> -s <tamaño> -qty <calidad> -st <estilo> -num <cantidad>
-    Tamaños: 1024x1024 (default), 1024x1792, 1792x1024
-    Calidad: standard (default), hd
-    Estilo: vivid (default), natural
-    Cantidad: 1 (default), 2, 3, 4 (solo Gemini)
+  Imagen: .img <descripción> -s <tamaño> -qty <calidad> -num <cantidad>
+    Tamaños: 1024x1024 (default), 1536x1024, 1024x1536
+    Calidad: low, medium (default), high
+    Cantidad: 1 (default), 2, 3, 4
 
   Listar imágenes: .img -l | .img -lt <usuario>
 
@@ -169,8 +168,8 @@ export const assistantPromptFlags = `
     {"intent":"alert.create","time":"2h","title":"alerta","successMessage":"Creo alerta 2h","errorMessage":""}
     {"intent":"alert.create","time":"2024-05-10 23:00","title":"Revisar backups","successMessage":"Creo alerta 23:00","errorMessage":""}
     {"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
-    {"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
-    {"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
+    {"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"medium","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
+    {"intent":"image.create","prompt":"cat portrait","size":"1024x1536","quality":"high","numberOfImages":1,"successMessage":"Creando imagen en alta calidad de cat portrait","errorMessage":""}
     {"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}
     {"intent":"link.create","url":"https://example.com/article","title":"","description":"","tag":"","successMessage":"Link guardado","errorMessage":""}
     {"intent":"link.list","successMessage":"Listando tus links","errorMessage":""}
@@ -197,7 +196,7 @@ note.create: title (oblig), description (opc), tag (opc).
 link.create: url (oblig), title (opc), description (opc), tag (opc).
 link.list: tag opcional para filtrar.
 
-image.create: prompt (oblig), size (opc), quality (opc), style (opc), numberOfImages (opc: 1-4).
+image.create: prompt (oblig), size (opc: 1024x1024|1536x1024|1024x1536), quality (opc: low|medium|high), numberOfImages (opc: 1-4).
 image.list: userFilter (opc).
 
 question: sin extras.
@@ -228,8 +227,8 @@ Ejemplos:
 {"intent":"alert.create","time":"2h","title":"alerta","successMessage":"Creo alerta 2h","errorMessage":""}
 {"intent":"alert.create","time":"2024-05-10 23:00","title":"Revisar backups","successMessage":"Creo alerta 23:00","errorMessage":""}
 {"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
-{"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
-{"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
+{"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"medium","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
+{"intent":"image.create","prompt":"cat portrait","size":"1024x1536","quality":"high","numberOfImages":1,"successMessage":"Creando imagen en alta calidad de cat portrait","errorMessage":""}
 {"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}
 {"intent":"link.create","url":"https://example.com/article","title":"","description":"","tag":"","successMessage":"Link guardado","errorMessage":""}
 {"intent":"link.list","successMessage":"Listando tus links","errorMessage":""}
@@ -286,7 +285,7 @@ export const assistantPromptFlagsLite2 = `
       * \`monthDays\`: (monthly only) Array of ints 1-31 (e.g. [1,15]).
   #### 5. image.create
   * **Trigger**: Requests to generate/draw images.
-  * **Fields**: \`prompt\` (Required, English translation preferred), \`size\` (default "1024x1024"), \`quality\`, \`style\`, \`numberOfImages\` (Int).
+  * **Fields**: \`prompt\` (Required, English translation preferred), \`size\` (default "1024x1024"; also 1536x1024, 1024x1536), \`quality\` (low|medium|high), \`numberOfImages\` (Int).
   #### 6. General Intents
   * \`alert.list\`, \`task.list\`, \`note.list\`, \`link.list\`, \`image.list\`, \`reminder.list\`: Listing items. Use \`tag\` or \`userFilter\` if specified.
   * \`reminder.detail\`, \`reminder.check\`, \`reminder.pause\`, \`reminder.resume\`, \`reminder.delete\`: Act on an existing reminder identified by \`targetId\` (the reminder id). Use these for "mostrame/pausá/reanudá/marcá hecho/eliminá el reminder N".
@@ -330,11 +329,11 @@ export const assistantPromptFlagsLite2 = `
   input: "Mostrame qué tareas tengo pendientes"
   output: {"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
 
-  input: "Genera una imagen cuadrada de un atardecer sobre montañas estilo vívido"
-  output: {"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
+  input: "Genera una imagen cuadrada de un atardecer sobre montañas"
+  output: {"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"medium","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
 
-  input: "Quiero un retrato vertical de un gato en HD que se vea natural"
-  output: {"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
+  input: "Quiero un retrato vertical de un gato en alta calidad"
+  output: {"intent":"image.create","prompt":"cat portrait","size":"1024x1536","quality":"high","numberOfImages":1,"successMessage":"Creando imagen en alta calidad de cat portrait","errorMessage":""}
 
   input: "Listar mis imágenes generadas"
   output: {"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}

@@ -12,6 +12,7 @@ import { Images } from '../../../entities/images'
 import UsersServices from '../../users/services/users.services'
 import ExternalStorageServices from '../../externalStorage/services/externalStorage.services'
 import { StorageSourceModule } from '../../externalStorage/shared/constants/externalStorage.constants'
+import { IStorageUploadResult } from '../../externalStorage/shared/interfaces/externalStorage.interfaces'
 
 const log = createModuleLogger('images.service')
 
@@ -41,14 +42,15 @@ export default class ImagesServices {
 
   /**
    * Upload a generated image to external storage (api-storage / Backblaze B2)
-   * Downloads the temporary provider URL and re-uploads for persistent storage
+   * Accepts either a provider URL (downloaded and re-uploaded) or base64 data
+   * (gpt-image-1 returns b64_json instead of a hosted URL)
    */
   private uploadImageToStorage = async (
-    imageUrl: string,
+    imageSource: { url?: string; b64?: string },
     prompt: string,
     provider: string,
     userData: { slackId: string },
-    options?: { size?: string; quality?: string; style?: string }
+    options?: { size?: string; quality?: string }
   ): Promise<{ storageUrl: string; storageFileId: string }> => {
     const fileName = `img_${Date.now()}.png`
 
@@ -59,15 +61,29 @@ export default class ImagesServices {
     }
     if (options?.size) metadata.size = options.size
     if (options?.quality) metadata.quality = options.quality
-    if (options?.style) metadata.style = options.style
 
-    const result = await this.externalStorageServices.uploadFromUrl({
-      sourceUrl: imageUrl,
+    const uploadOptions = {
       fileName,
       sourceModule: StorageSourceModule.IMAGES,
       mimeType: 'image/png',
       metadata,
-    })
+    }
+
+    let result: GenericResponse<IStorageUploadResult>
+
+    if (imageSource.b64) {
+      result = await this.externalStorageServices.uploadFile({
+        ...uploadOptions,
+        fileBuffer: Buffer.from(imageSource.b64, 'base64'),
+      })
+    } else if (imageSource.url) {
+      result = await this.externalStorageServices.uploadFromUrl({
+        ...uploadOptions,
+        sourceUrl: imageSource.url,
+      })
+    } else {
+      throw new Error('Generated image has neither base64 data nor a URL')
+    }
 
     if (result.error) {
       throw new Error(result.error)
@@ -106,7 +122,7 @@ export default class ImagesServices {
 
       const response = await this.imageRepository.generateImage(prompt, {
         size: '1024x1024',
-        quality: 'standard',
+        quality: 'medium',
       })
 
       if (!response?.images?.length) {
@@ -117,11 +133,11 @@ export default class ImagesServices {
       await Promise.all(
         response.images.map(async (image) => {
           const uploaded = await this.uploadImageToStorage(
-            image.url,
+            { url: image.url, b64: image.b64 },
             prompt,
             response.provider,
             { slackId: userData.slackId },
-            { size: '1024x1024', quality: 'standard' }
+            { size: '1024x1024', quality: 'medium' }
           )
 
           storageUrls.push(uploaded.storageUrl)
@@ -161,7 +177,7 @@ export default class ImagesServices {
    *
    * @param prompt - Text description of the image to generate
    * @param userId - User ID for tracking
-   * @param options - Image generation options (size, quality, style, numberOfImages)
+   * @param options - Image generation options (size, quality, numberOfImages)
    * @returns Image generation response with images array and provider info
    */
   generateImageForAssistant = async (
@@ -180,13 +196,14 @@ export default class ImagesServices {
 
       if (!user?.data) {
         log.warn({ userId }, 'User not found for image storage')
-        return response // Return images but don't store
+        const displayableImages = response.images.filter((image) => image.url)
+        return displayableImages.length ? { ...response, images: displayableImages } : null
       }
 
       await Promise.all(
         response.images.map(async (image) => {
           const uploaded = await this.uploadImageToStorage(
-            image.url,
+            { url: image.url, b64: image.b64 },
             prompt,
             response.provider,
             { slackId: user.data.slackId },
@@ -194,6 +211,7 @@ export default class ImagesServices {
           )
 
           image.url = uploaded.storageUrl
+          delete image.b64
 
           const imageData: IImage = {
             imageUrl: uploaded.storageUrl,

@@ -11,11 +11,13 @@ import {
 const log = createModuleLogger('openai.images')
 
 /**
- * OpenAI DALL-E 3 Image Generation Repository
+ * OpenAI gpt-image-1 Image Generation Repository
  * Implements IImageRepository interface following the same pattern as conversations module
  *
  * Uses REST API via axios (similar to LeapRepository) to maintain consistency
  * and avoid breaking changes in the legacy openai v3.2.1 package used by conversations
+ *
+ * gpt-image-1 returns images as base64 (b64_json) — there is no hosted URL in the response
  */
 @singleton()
 export default class OpenaiImagesRepository implements IImageRepository {
@@ -33,31 +35,29 @@ export default class OpenaiImagesRepository implements IImageRepository {
   }
 
   /**
-   * Generate image using DALL-E 3 (IImageRepository interface implementation)
-   * DALL-E 3 is synchronous - no polling required
+   * Generate image using gpt-image-1 (IImageRepository interface implementation)
+   * gpt-image-1 is synchronous - no polling required
    *
    * @param prompt - Text description of the image to generate
-   * @param options - Generation options (size, quality, style)
-   * @returns Unified response with generated image or null on error
+   * @param options - Generation options (size, quality, numberOfImages)
+   * @returns Unified response with generated images (base64) or null on error
    */
   async generateImage(
     prompt: string,
     options?: IImageGenerationOptions
   ): Promise<IImageGenerationResponse | null> {
     try {
-      // Map options to DALL-E 3 parameters
       const size = this.mapSize(options?.size)
-      const quality = options?.quality || 'standard'
-      const style = options?.style || 'vivid'
+      const quality = this.mapQuality(options?.quality)
+      const n = this.mapNumberOfImages(options?.numberOfImages)
 
-      // DALL-E 3 only supports n=1
+      // gpt-image-1 does not accept response_format nor style — always returns b64_json
       const requestBody = {
-        model: 'dall-e-3',
+        model: 'gpt-image-1',
         prompt,
-        n: 1,
+        n,
         size,
         quality,
-        style,
       }
 
       const response = await axios.post(`${this.baseUrl}/images/generations`, requestBody, {
@@ -65,17 +65,20 @@ export default class OpenaiImagesRepository implements IImageRepository {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.apiKey}`,
         },
+        // gpt-image-1 is slower than DALL-E 3, especially at high quality
+        timeout: 120000,
       })
 
-      // DALL-E 3 returns images immediately (no polling needed)
-      if (!response.data?.data || response.data.data.length === 0) {
+      const items = (response.data?.data || []).filter((img: any) => img.b64_json)
+
+      if (items.length === 0) {
         return null
       }
 
       return {
-        images: response.data.data.map((img: any) => ({
-          url: img.url,
-          id: `openai-${Date.now()}`,
+        images: items.map((img: any, index: number) => ({
+          b64: img.b64_json,
+          id: `openai-${Date.now()}-${index}`,
           createdAt: new Date().toISOString(),
         })),
         provider: ImageProvider.OPENAI,
@@ -91,23 +94,53 @@ export default class OpenaiImagesRepository implements IImageRepository {
   }
 
   /**
-   * Map generic size options to DALL-E 3 supported sizes
-   * DALL-E 3 supports: 1024x1024, 1024x1792, 1792x1024
+   * Map generic size options to gpt-image-1 supported sizes
+   * gpt-image-1 supports: 1024x1024, 1536x1024, 1024x1536
+   * Legacy DALL-E 3 / Leap sizes are mapped to the closest equivalent
    */
   private mapSize(size?: string): string {
-    const validSizes = ['1024x1024', '1024x1792', '1792x1024']
+    const validSizes = ['1024x1024', '1536x1024', '1024x1536']
 
-    // If 512x512 is requested (Leap default), upgrade to 1024x1024
-    if (size === '512x512') {
-      return '1024x1024'
+    const legacySizeMap: Record<string, string> = {
+      '1024x1792': '1024x1536',
+      '1792x1024': '1536x1024',
+      '512x512': '1024x1024',
     }
 
-    // If size is valid, use it
+    if (size && legacySizeMap[size]) {
+      return legacySizeMap[size]
+    }
+
     if (size && validSizes.includes(size)) {
       return size
     }
 
-    // Default to square
     return '1024x1024'
+  }
+
+  private mapQuality(quality?: string): string {
+    const validQualities = ['low', 'medium', 'high', 'auto']
+
+    const legacyQualityMap: Record<string, string> = {
+      standard: 'medium',
+      hd: 'high',
+    }
+
+    if (quality && legacyQualityMap[quality]) {
+      return legacyQualityMap[quality]
+    }
+
+    if (quality && validQualities.includes(quality)) {
+      return quality
+    }
+
+    return 'medium'
+  }
+
+  private mapNumberOfImages(numberOfImages?: number): number {
+    if (!numberOfImages || numberOfImages < 1) {
+      return 1
+    }
+    return Math.min(Math.floor(numberOfImages), 4)
   }
 }

@@ -31,6 +31,7 @@ const mockImagesDataSource = {
 
 const mockExternalStorageServices = {
   uploadFromUrl: jest.fn(),
+  uploadFile: jest.fn(),
   getFileDetails: jest.fn(),
 }
 
@@ -44,7 +45,7 @@ const MOCK_STORAGE_FILE_ID = 'storage-abc-123'
 const MOCK_LOCAL_ID = 42
 
 const mockUploadSuccess = (): void => {
-  mockExternalStorageServices.uploadFromUrl.mockResolvedValue({
+  const uploadResult = {
     data: {
       localId: MOCK_LOCAL_ID,
       storageFileId: MOCK_STORAGE_FILE_ID,
@@ -53,7 +54,9 @@ const mockUploadSuccess = (): void => {
       mimeType: 'image/png',
       size: 2048,
     },
-  })
+  }
+  mockExternalStorageServices.uploadFromUrl.mockResolvedValue(uploadResult)
+  mockExternalStorageServices.uploadFile.mockResolvedValue(uploadResult)
   mockExternalStorageServices.getFileDetails.mockResolvedValue({
     data: {
       localId: MOCK_LOCAL_ID,
@@ -68,6 +71,14 @@ const mockGenerateImageResponse = (url = MOCK_PROVIDER_URL) => ({
   images: [{ url, id: 'img-1', createdAt: '2024-01-01' }],
   provider: ImageProvider.OPENAI,
   inferenceId: 'inf-123',
+})
+
+const MOCK_B64 = Buffer.from('fake-image-bytes').toString('base64')
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+const mockGenerateImageB64Response = () => ({
+  images: [{ b64: MOCK_B64, id: 'img-b64-1', createdAt: '2024-01-01' }],
+  provider: ImageProvider.OPENAI,
 })
 
 describe('ImagesServices', () => {
@@ -105,7 +116,7 @@ describe('ImagesServices', () => {
           provider: 'openai',
           slackId: 'U123',
           size: '1024x1024',
-          quality: 'standard',
+          quality: 'medium',
         },
       })
       expect(mockExternalStorageServices.getFileDetails).toHaveBeenCalledWith(MOCK_LOCAL_ID)
@@ -190,9 +201,8 @@ describe('ImagesServices', () => {
 
     it('should call uploadFromUrl with options when provided', async () => {
       const options = {
-        size: '1024x1792' as const,
-        quality: 'hd' as const,
-        style: 'vivid' as const,
+        size: '1536x1024' as const,
+        quality: 'high' as const,
       }
       mockImageRepository.generateImage.mockResolvedValue(mockGenerateImageResponse())
       mockUsersServices.getUserById.mockResolvedValue(mockUser)
@@ -204,12 +214,31 @@ describe('ImagesServices', () => {
       expect(mockExternalStorageServices.uploadFromUrl).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
-            size: '1024x1792',
-            quality: 'hd',
-            style: 'vivid',
+            size: '1536x1024',
+            quality: 'high',
           }),
         })
       )
+    })
+
+    it('should upload base64 images via uploadFile (gpt-image-1 flow)', async () => {
+      mockImageRepository.generateImage.mockResolvedValue(mockGenerateImageB64Response())
+      mockUsersServices.getUserById.mockResolvedValue(mockUser)
+      mockUploadSuccess()
+      mockImagesDataSource.createImages.mockResolvedValue(undefined)
+
+      const result = await service.generateImageForAssistant('a cat', userId)
+
+      expect(mockExternalStorageServices.uploadFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileBuffer: Buffer.from(MOCK_B64, 'base64'),
+          mimeType: 'image/png',
+          sourceModule: StorageSourceModule.IMAGES,
+        })
+      )
+      expect(mockExternalStorageServices.uploadFromUrl).not.toHaveBeenCalled()
+      expect(result?.images[0].url).toBe(MOCK_STORAGE_URL)
+      expect(result?.images[0].b64).toBeUndefined()
     })
 
     it('should store persistent URL in database', async () => {
@@ -242,15 +271,25 @@ describe('ImagesServices', () => {
       expect(mockImagesDataSource.createImages).not.toHaveBeenCalled()
     })
 
-    it('should return response without upload when user not found', async () => {
+    it('should return provider URLs without storing when user not found (URL providers)', async () => {
       mockImageRepository.generateImage.mockResolvedValue(mockGenerateImageResponse())
       mockUsersServices.getUserById.mockResolvedValue({ data: null })
 
       const result = await service.generateImageForAssistant('a cat', userId)
 
-      expect(result).not.toBeNull()
       expect(result?.images[0].url).toBe(MOCK_PROVIDER_URL)
       expect(mockExternalStorageServices.uploadFromUrl).not.toHaveBeenCalled()
+      expect(mockImagesDataSource.createImages).not.toHaveBeenCalled()
+    })
+
+    it('should return null when user not found and images are b64-only (not displayable)', async () => {
+      mockImageRepository.generateImage.mockResolvedValue(mockGenerateImageB64Response())
+      mockUsersServices.getUserById.mockResolvedValue({ data: null })
+
+      const result = await service.generateImageForAssistant('a cat', userId)
+
+      expect(result).toBeNull()
+      expect(mockExternalStorageServices.uploadFile).not.toHaveBeenCalled()
     })
 
     it('should return null when generation returns no images', async () => {
