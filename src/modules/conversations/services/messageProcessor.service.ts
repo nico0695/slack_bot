@@ -38,6 +38,10 @@ import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
 import { RedisRepository } from '../repositories/redis/conversations.redis'
 import { IGeneratedImage, ImageProvider } from '../../images/shared/interfaces/images.interfaces'
+import {
+  VALID_IMAGE_SIZES,
+  VALID_IMAGE_QUALITIES,
+} from '../../images/shared/constants/imageOptions.constants'
 
 import { buildUserDataContext, formatConversationHistory } from '../shared/utils/userContext.utils'
 
@@ -45,6 +49,8 @@ import { formatDateToText } from '../../../shared/utils/dates.utils'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 const log = createModuleLogger('conversations.messageProcessor')
+
+const IMAGE_GENERATION_ERROR = '❌ Error al generar la imagen. Intenta nuevamente.'
 
 interface IProcessMessageResult {
   response: IConversation | null
@@ -305,14 +311,13 @@ export default class MessageProcessor {
     images: IGeneratedImage[],
     provider: ImageProvider,
     prompt: string,
-    options?: { size?: string; quality?: string; style?: string }
+    options?: { size?: string; quality?: string }
   ): IConversation => {
     const imageList = images
       .map((img, index) => {
-        const metadata = []
+        const metadata: string[] = []
         if (options?.size) metadata.push(`Size: ${options.size}`)
         if (options?.quality) metadata.push(`Quality: ${options.quality}`)
-        if (options?.style) metadata.push(`Style: ${options.style}`)
 
         const metadataStr = metadata.length > 0 ? ` (${metadata.join(', ')})` : ''
 
@@ -1223,23 +1228,15 @@ export default class MessageProcessor {
 
         if (assistantMessage.flags[AssistantsFlags.SIZE]) {
           const size = assistantMessage.flags[AssistantsFlags.SIZE] as string
-          const validSizes = ['1024x1024', '1024x1792', '1792x1024', '512x512']
-          if (validSizes.includes(size)) {
+          if (VALID_IMAGE_SIZES.includes(size)) {
             imageOptions.size = size
           }
         }
 
         if (assistantMessage.flags[AssistantsFlags.QUALITY]) {
           const quality = assistantMessage.flags[AssistantsFlags.QUALITY] as string
-          if (quality === 'standard' || quality === 'hd') {
+          if (VALID_IMAGE_QUALITIES.includes(quality)) {
             imageOptions.quality = quality
-          }
-        }
-
-        if (assistantMessage.flags[AssistantsFlags.STYLE]) {
-          const style = assistantMessage.flags[AssistantsFlags.STYLE] as string
-          if (style === 'vivid' || style === 'natural') {
-            imageOptions.style = style
           }
         }
 
@@ -1270,7 +1267,6 @@ export default class MessageProcessor {
             {
               size: imageOptions.size,
               quality: imageOptions.quality,
-              style: imageOptions.style,
             }
           )
         } catch (error: any) {
@@ -1866,21 +1862,14 @@ export default class MessageProcessor {
           const imageOptions: any = {}
 
           if (parsed.size && typeof parsed.size === 'string') {
-            const validSizes = ['1024x1024', '1024x1792', '1792x1024', '512x512']
-            if (validSizes.includes(parsed.size)) {
+            if (VALID_IMAGE_SIZES.includes(parsed.size)) {
               imageOptions.size = parsed.size
             }
           }
 
           if (parsed.quality && typeof parsed.quality === 'string') {
-            if (parsed.quality === 'standard' || parsed.quality === 'hd') {
+            if (VALID_IMAGE_QUALITIES.includes(parsed.quality)) {
               imageOptions.quality = parsed.quality
-            }
-          }
-
-          if (parsed.style && typeof parsed.style === 'string') {
-            if (parsed.style === 'vivid' || parsed.style === 'natural') {
-              imageOptions.style = parsed.style
             }
           }
 
@@ -1900,17 +1889,16 @@ export default class MessageProcessor {
             )
 
             if (!response?.images?.length) {
-              return null
+              return this.buildAssistantResponse(IMAGE_GENERATION_ERROR)
             }
 
             return this.buildImageResponse(response.images, response.provider, imagePrompt, {
               size: imageOptions.size,
               quality: imageOptions.quality,
-              style: imageOptions.style,
             })
           } catch (error) {
             log.error({ err: error }, 'Intent fallback router - image.create failed')
-            return null
+            return this.buildAssistantResponse(IMAGE_GENERATION_ERROR)
           }
         }
         case 'image.list': {

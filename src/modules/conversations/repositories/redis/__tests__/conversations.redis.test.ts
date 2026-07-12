@@ -5,6 +5,24 @@ const getMock = jest.fn()
 const delMock = jest.fn()
 const keysMock = jest.fn()
 
+const mockLogFns = {
+  info: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
+  fatal: jest.fn(),
+}
+
+jest.mock('../../../../../config/logger', () => ({
+  createModuleLogger: jest.fn().mockReturnValue({
+    info: (...args: any[]) => mockLogFns.info(...args),
+    error: (...args: any[]) => mockLogFns.error(...args),
+    warn: (...args: any[]) => mockLogFns.warn(...args),
+    debug: (...args: any[]) => mockLogFns.debug(...args),
+    fatal: (...args: any[]) => mockLogFns.fatal(...args),
+  }),
+}))
+
 jest.mock('../../../../../config/redisConfig', () => ({
   RedisConfig: {
     getClient: () => ({
@@ -80,6 +98,24 @@ describe('RedisRepository', () => {
     const result = await repository.getConversationMessages('key')
 
     expect(result).toBeNull()
+  })
+
+  it('returns null without logging an error when conversation key does not exist', async () => {
+    getMock.mockResolvedValue(null)
+
+    const result = await repository.getConversationMessages('key')
+
+    expect(result).toBeNull()
+    expect(mockLogFns.error).not.toHaveBeenCalled()
+  })
+
+  it('returns null without logging an error when conversation flow does not exist', async () => {
+    getMock.mockResolvedValue(null)
+
+    const result = await repository.getConversationFlow('channel-1')
+
+    expect(result).toBeNull()
+    expect(mockLogFns.error).not.toHaveBeenCalled()
   })
 
   it('saves alert snooze config with expiration', async () => {

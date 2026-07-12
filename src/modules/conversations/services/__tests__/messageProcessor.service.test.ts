@@ -214,18 +214,17 @@ describe('MessageProcessor - image handling', () => {
       provider: 'openai',
     })
 
-    // Note: -s is shorthand for -size, -qty for -quality, -st for -style, -num for -number
+    // Note: -s is shorthand for -size, -qty for -quality, -num for -number
     const result = await processor.processAssistantMessage(
-      '.img a cat -size 1024x1792 -quality hd -style vivid -num 2',
+      '.img a cat -size 1536x1024 -quality high -num 2',
       99,
       undefined,
       false
     )
 
     expect(imagesServicesMock.generateImageForAssistant).toHaveBeenCalledWith('a cat', 99, {
-      size: '1024x1792',
-      quality: 'hd',
-      style: 'vivid',
+      size: '1536x1024',
+      quality: 'high',
       numberOfImages: 2,
     })
     expect(result.response).toBeTruthy()
@@ -586,12 +585,12 @@ describe('MessageProcessor - reminder handling', () => {
   })
 })
 
+const mockClassification = (json: Record<string, unknown>): void => {
+  aiRepositoryMock.chatCompletion.mockResolvedValue({ content: JSON.stringify(json) })
+}
+
 describe('MessageProcessor - reminder classifier intents', () => {
   let processor: MessageProcessor
-
-  const mockClassification = (json: Record<string, unknown>): void => {
-    aiRepositoryMock.chatCompletion.mockResolvedValue({ content: JSON.stringify(json) })
-  }
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -813,6 +812,62 @@ describe('MessageProcessor - reminder classifier intents', () => {
 
     expect(remindersServicesMock.pauseReminder).toHaveBeenCalledWith(999, { userId: 99 })
     expect(result.response?.content).toBe('Reminder not found')
+  })
+})
+
+describe('MessageProcessor - image classifier intent (image.create)', () => {
+  let processor: MessageProcessor
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    processor = buildProcessor()
+  })
+
+  it('generates an image from a natural-language request', async () => {
+    mockClassification({ intent: 'image.create', prompt: 'a dog' })
+    imagesServicesMock.generateImageForAssistant.mockResolvedValue({
+      images: [{ url: 'https://example.com/dog.png', id: '1', createdAt: new Date() }],
+      provider: 'openai',
+    })
+
+    const result = await processor.processAssistantMessage(
+      'crea una imagen de un perro',
+      99,
+      undefined,
+      false
+    )
+
+    expect(imagesServicesMock.generateImageForAssistant).toHaveBeenCalledWith('a dog', 99, {})
+    expect(result.response?.content).toContain('Generated')
+  })
+
+  it('responds with an error message when generation fails (no silent null)', async () => {
+    mockClassification({ intent: 'image.create', prompt: 'a dog' })
+    imagesServicesMock.generateImageForAssistant.mockResolvedValue(null)
+
+    const result = await processor.processAssistantMessage(
+      'crea una imagen de un perro',
+      99,
+      undefined,
+      false
+    )
+
+    expect(result.response?.content).toContain('❌ Error al generar la imagen')
+  })
+
+  it('responds with an error message when generation throws', async () => {
+    mockClassification({ intent: 'image.create', prompt: 'a dog' })
+    imagesServicesMock.generateImageForAssistant.mockRejectedValue(new Error('boom'))
+
+    const result = await processor.processAssistantMessage(
+      'crea una imagen de un perro',
+      99,
+      undefined,
+      false
+    )
+
+    expect(result.response?.content).toContain('❌ Error al generar la imagen')
   })
 })
 

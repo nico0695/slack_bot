@@ -18,29 +18,21 @@ export enum ImageProvider {
 export interface IImageGenerationOptions {
   /**
    * Image dimensions
-   * - DALL-E 3: supports 1024x1024, 1024x1792, 1792x1024
+   * - gpt-image-1: supports 1024x1024, 1536x1024, 1024x1536
    * - Imagen 3: supports various sizes
-   * - Leap: supports 512x512, 1024x1024
+   * - Legacy sizes (1024x1792, 1792x1024, 512x512) are accepted and mapped by each repository
    */
-  size?: '1024x1024' | '1024x1792' | '1792x1024' | '512x512'
+  size?: '1024x1024' | '1536x1024' | '1024x1536' | '1024x1792' | '1792x1024' | '512x512'
 
   /**
-   * Image quality (mainly for DALL-E 3)
-   * - standard: faster, lower cost
-   * - hd: higher quality, more time, higher cost
+   * Image quality (mainly for gpt-image-1)
+   * - low / medium / high / auto: native gpt-image-1 values
+   * - standard / hd: legacy DALL-E 3 values, mapped by the repository (standard→medium, hd→high)
    */
-  quality?: 'standard' | 'hd'
-
-  /**
-   * Style of the generated image (mainly for DALL-E 3)
-   * - vivid: hyper-real and dramatic
-   * - natural: more natural, less hyper-real
-   */
-  style?: 'vivid' | 'natural'
+  quality?: 'low' | 'medium' | 'high' | 'auto' | 'standard' | 'hd'
 
   /**
    * Number of images to generate
-   * Note: DALL-E 3 only supports 1
    */
   numberOfImages?: number
 
@@ -55,9 +47,14 @@ export interface IImageGenerationOptions {
  */
 export interface IGeneratedImage {
   /**
-   * URL of the generated image
+   * URL of the generated image (providers that return a hosted URL)
    */
-  url: string
+  url?: string
+
+  /**
+   * Base64-encoded image data (providers like gpt-image-1 that return b64_json instead of a URL)
+   */
+  b64?: string
 
   /**
    * Unique identifier for this image (provider-specific)
@@ -99,7 +96,7 @@ export interface IImageRepository {
    * Generates one or more images based on a text prompt
    *
    * @param prompt - Text description of the image to generate
-   * @param options - Optional generation parameters (size, quality, style, etc.)
+   * @param options - Optional generation parameters (size, quality, etc.)
    * @returns Promise with generation response or null on error
    *
    * Error Handling:

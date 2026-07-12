@@ -34,9 +34,13 @@ export class RedisRepository {
     }
   }
 
-  getConversationMessages = async (key: string): Promise<IConversation[]> => {
+  getConversationMessages = async (key: string): Promise<IConversation[] | null> => {
     try {
       const response = await this.redisClient.get(key)
+
+      if (!response) {
+        return null
+      }
 
       const responseFormated: IConversation[] = JSON.parse(response).filter(
         (item: any) => item !== null
@@ -61,9 +65,13 @@ export class RedisRepository {
     }
   }
 
-  getConversationFlow = async (chanelId: string): Promise<IConversationFlow> => {
+  getConversationFlow = async (chanelId: string): Promise<IConversationFlow | null> => {
     try {
       const response = await this.redisClient.get(rConversationFlow(chanelId))
+
+      if (!response) {
+        return null
+      }
 
       const responseFormated: IConversationFlow = JSON.parse(response)
 
@@ -87,7 +95,7 @@ export class RedisRepository {
     }
   }
 
-  getChannelsConversationFlow = async (): Promise<string[]> => {
+  getChannelsConversationFlow = async (): Promise<string[] | null> => {
     try {
       const response = await this.redisClient.keys(rConversationFlow('*'))
 
