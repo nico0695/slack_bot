@@ -104,6 +104,36 @@ describe('ConversationsController', () => {
       })
     })
 
+    it('parses reminder triple value pattern', () => {
+      const action = {
+        action_id: 'reminder_actions:12',
+        selected_option: { value: 'reminder:detail:12' },
+      }
+
+      const parsed = (controller as any).parseSlackAction(action)
+
+      expect(parsed).toEqual({
+        entity: 'reminder',
+        operation: 'detail',
+        targetId: 12,
+      })
+    })
+
+    it('parses reminder extended action id when value lacks info', () => {
+      const action = {
+        action_id: 'reminder_actions:pause:8',
+        value: '',
+      }
+
+      const parsed = (controller as any).parseSlackAction(action)
+
+      expect(parsed).toEqual({
+        entity: 'reminder',
+        operation: 'pause',
+        targetId: 8,
+      })
+    })
+
     it('returns null when action cannot be interpreted', () => {
       const action = {
         action_id: '',
@@ -113,6 +143,37 @@ describe('ConversationsController', () => {
       const parsed = (controller as any).parseSlackAction(action)
 
       expect(parsed).toBeNull()
+    })
+  })
+
+  describe('action regex (AC-3)', () => {
+    // keep in sync with src/app.ts slackApp.action(...) regex literal — the inline
+    // regex there is not exported, so this duplicated literal guards routing for
+    // reminder_actions while preserving all previously matched patterns.
+    const actionRegex =
+      /^(?:alert|note|task|link|reminder)_actions.*$|^(?:delete|view)_(?:alert|note|task|link)(?:_details)?$/
+
+    it('matches reminder_actions ids', () => {
+      expect(actionRegex.test('reminder_actions:12')).toBe(true)
+      expect(actionRegex.test('reminder_actions')).toBe(true)
+    })
+
+    it('still matches all previous _actions entities', () => {
+      expect(actionRegex.test('alert_actions:1')).toBe(true)
+      expect(actionRegex.test('note_actions:2')).toBe(true)
+      expect(actionRegex.test('task_actions:3')).toBe(true)
+      expect(actionRegex.test('link_actions:4')).toBe(true)
+    })
+
+    it('still matches the legacy delete/view branch (unchanged)', () => {
+      expect(actionRegex.test('delete_alert')).toBe(true)
+      expect(actionRegex.test('view_task_details')).toBe(true)
+      expect(actionRegex.test('delete_note')).toBe(true)
+    })
+
+    it('does not match unrelated action ids', () => {
+      expect(actionRegex.test('reminder_other')).toBe(false)
+      expect(actionRegex.test('delete_reminder')).toBe(false)
     })
   })
 

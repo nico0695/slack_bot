@@ -84,11 +84,10 @@ COMANDOS (sugerir solo si acelera): .a/.alert | .n/.note | .t/.task | .link/.lk 
 
   QR: .qr <texto o URL> (genera código QR)
 
-  Imagen: .img <descripción> -s <tamaño> -qty <calidad> -st <estilo> -num <cantidad>
-    Tamaños: 1024x1024 (default), 1024x1792, 1792x1024
-    Calidad: standard (default), hd
-    Estilo: vivid (default), natural
-    Cantidad: 1 (default), 2, 3, 4 (solo Gemini)
+  Imagen: .img <descripción> -s <tamaño> -qty <calidad> -num <cantidad>
+    Tamaños: 1024x1024 (default), 1536x1024, 1024x1536
+    Calidad: low, medium (default), high
+    Cantidad: 1 (default), 2, 3, 4
 
   Listar imágenes: .img -l | .img -lt <usuario>
 
@@ -169,8 +168,8 @@ export const assistantPromptFlags = `
     {"intent":"alert.create","time":"2h","title":"alerta","successMessage":"Creo alerta 2h","errorMessage":""}
     {"intent":"alert.create","time":"2024-05-10 23:00","title":"Revisar backups","successMessage":"Creo alerta 23:00","errorMessage":""}
     {"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
-    {"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
-    {"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
+    {"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"medium","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
+    {"intent":"image.create","prompt":"cat portrait","size":"1024x1536","quality":"high","numberOfImages":1,"successMessage":"Creando imagen en alta calidad de cat portrait","errorMessage":""}
     {"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}
     {"intent":"link.create","url":"https://example.com/article","title":"","description":"","tag":"","successMessage":"Link guardado","errorMessage":""}
     {"intent":"link.list","successMessage":"Listando tus links","errorMessage":""}
@@ -197,7 +196,7 @@ note.create: title (oblig), description (opc), tag (opc).
 link.create: url (oblig), title (opc), description (opc), tag (opc).
 link.list: tag opcional para filtrar.
 
-image.create: prompt (oblig), size (opc), quality (opc), style (opc), numberOfImages (opc: 1-4).
+image.create: prompt (oblig), size (opc: 1024x1024|1536x1024|1024x1536), quality (opc: low|medium|high), numberOfImages (opc: 1-4).
 image.list: userFilter (opc).
 
 question: sin extras.
@@ -228,8 +227,8 @@ Ejemplos:
 {"intent":"alert.create","time":"2h","title":"alerta","successMessage":"Creo alerta 2h","errorMessage":""}
 {"intent":"alert.create","time":"2024-05-10 23:00","title":"Revisar backups","successMessage":"Creo alerta 23:00","errorMessage":""}
 {"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
-{"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
-{"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
+{"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"medium","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
+{"intent":"image.create","prompt":"cat portrait","size":"1024x1536","quality":"high","numberOfImages":1,"successMessage":"Creando imagen en alta calidad de cat portrait","errorMessage":""}
 {"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}
 {"intent":"link.create","url":"https://example.com/article","title":"","description":"","tag":"","successMessage":"Link guardado","errorMessage":""}
 {"intent":"link.list","successMessage":"Listando tus links","errorMessage":""}
@@ -276,11 +275,20 @@ export const assistantPromptFlagsLite2 = `
       * \`title\`: (Optional) A title for the link.
       * \`description\`: (Optional) Extra details.
       * \`tag\`: (Optional).
+  #### 4. reminder.create
+  * **Trigger**: User wants a RECURRING notification. ONLY use \`reminder.*\` when the message has an explicit recurrence/reminder cue: "reminder", "recurrente", "repetir", "todos los", "cada", "diariamente", "semanalmente", "mensualmente". A one-shot phrasing ("recordame X mañana", a specific date-time) is NOT a reminder — it stays \`alert.create\`. When ambiguous, default to \`alert.create\`.
+  * **Fields**:
+      * \`message\`: (Required) The content of the reminder.
+      * \`recurrenceType\`: (Required) One of \`daily\`, \`weekly\`, \`monthly\`.
+      * \`timeOfDay\`: (Required) 24h time in HH:mm format.
+      * \`weekDays\`: (weekly only) Array of english day names (e.g. ["monday","friday"]).
+      * \`monthDays\`: (monthly only) Array of ints 1-31 (e.g. [1,15]).
   #### 5. image.create
   * **Trigger**: Requests to generate/draw images.
-  * **Fields**: \`prompt\` (Required, English translation preferred), \`size\` (default "1024x1024"), \`quality\`, \`style\`, \`numberOfImages\` (Int).
+  * **Fields**: \`prompt\` (Required, English translation preferred), \`size\` (default "1024x1024"; also 1536x1024, 1024x1536), \`quality\` (low|medium|high), \`numberOfImages\` (Int).
   #### 6. General Intents
-  * \`alert.list\`, \`task.list\`, \`note.list\`, \`link.list\`, \`image.list\`: Listing items. Use \`tag\` or \`userFilter\` if specified.
+  * \`alert.list\`, \`task.list\`, \`note.list\`, \`link.list\`, \`image.list\`, \`reminder.list\`: Listing items. Use \`tag\` or \`userFilter\` if specified.
+  * \`reminder.detail\`, \`reminder.check\`, \`reminder.pause\`, \`reminder.resume\`, \`reminder.delete\`: Act on an existing reminder identified by \`targetId\` (the reminder id). Use these for "mostrame/pausá/reanudá/marcá hecho/eliminá el reminder N".
   * \`question\`: General knowledge queries not requiring database actions.
   * \`search\`: Requests requiring real-time/external info.
   * \`translate\`: Requests to translate text to a specific language. Fields: \`targetLang\` (Required, target language name), \`text\` (Required, the text to translate). Example: "Traducí esto al inglés: Hola mundo" -> {"intent":"translate","targetLang":"english","text":"Hola mundo"}
@@ -321,11 +329,11 @@ export const assistantPromptFlagsLite2 = `
   input: "Mostrame qué tareas tengo pendientes"
   output: {"intent":"task.list","successMessage":"Listando tareas","errorMessage":""}
 
-  input: "Genera una imagen cuadrada de un atardecer sobre montañas estilo vívido"
-  output: {"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"standard","style":"vivid","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
+  input: "Genera una imagen cuadrada de un atardecer sobre montañas"
+  output: {"intent":"image.create","prompt":"sunset over mountains","size":"1024x1024","quality":"medium","numberOfImages":1,"successMessage":"Generando imagen de sunset over mountains","errorMessage":""}
 
-  input: "Quiero un retrato vertical de un gato en HD que se vea natural"
-  output: {"intent":"image.create","prompt":"cat portrait","size":"1024x1792","quality":"hd","style":"natural","numberOfImages":1,"successMessage":"Creando imagen HD de cat portrait","errorMessage":""}
+  input: "Quiero un retrato vertical de un gato en alta calidad"
+  output: {"intent":"image.create","prompt":"cat portrait","size":"1024x1536","quality":"high","numberOfImages":1,"successMessage":"Creando imagen en alta calidad de cat portrait","errorMessage":""}
 
   input: "Listar mis imágenes generadas"
   output: {"intent":"image.list","successMessage":"Listando tus imágenes generadas","errorMessage":""}
@@ -350,6 +358,27 @@ export const assistantPromptFlagsLite2 = `
 
   input: "Quiero un código QR que diga Hola mundo"
   output: {"intent":"qr.generate","text":"Hola mundo","successMessage":"Generando código QR","errorMessage":""}
+
+  input: "Recordame todos los días a las 9 tomar agua"
+  output: {"intent":"reminder.create","message":"tomar agua","recurrenceType":"daily","timeOfDay":"09:00","successMessage":"Creando reminder diario","errorMessage":""}
+
+  input: "Recordatorio recurrente todos los lunes a las 9 reunión de equipo"
+  output: {"intent":"reminder.create","message":"reunión de equipo","recurrenceType":"weekly","weekDays":["monday"],"timeOfDay":"09:00","successMessage":"Creando reminder semanal","errorMessage":""}
+
+  input: "Recordame el día 1 de cada mes pagar el alquiler a las 8"
+  output: {"intent":"reminder.create","message":"pagar el alquiler","recurrenceType":"monthly","monthDays":[1],"timeOfDay":"08:00","successMessage":"Creando reminder mensual","errorMessage":""}
+
+  input: "Recordame mañana a las 9 llamar a Ana"
+  output: {"intent":"alert.create","time":"2024-05-11 09:00","title":"Llamar a Ana","successMessage":"Creo alerta","errorMessage":""}
+
+  input: "Listá mis reminders"
+  output: {"intent":"reminder.list","successMessage":"Listando tus reminders","errorMessage":""}
+
+  input: "Pausá el reminder 12"
+  output: {"intent":"reminder.pause","targetId":12,"successMessage":"Pausando reminder #12","errorMessage":""}
+
+  input: "Mostrame el reminder 12"
+  output: {"intent":"reminder.detail","targetId":12,"successMessage":"Mostrando reminder #12","errorMessage":""}
 
   #IMPORTANT
   - All user-facing content must be in Spanish

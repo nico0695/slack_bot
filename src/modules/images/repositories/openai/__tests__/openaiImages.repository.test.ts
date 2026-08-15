@@ -52,36 +52,35 @@ describe('OpenaiImagesRepository', () => {
   })
 
   describe('generateImage', () => {
-    it('should generate image successfully with default options', async () => {
-      const mockResponse = {
-        data: {
-          data: [
-            {
-              url: 'https://example.com/generated-image.png',
-            },
-          ],
-        },
-      }
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+    const mockB64Response = (count = 1) => ({
+      data: {
+        data: Array.from({ length: count }, (_, i) => ({
+          b64_json: `base64-image-data-${i}`,
+        })),
+      },
+    })
 
-      mockedAxios.post.mockResolvedValue(mockResponse)
+    it('should generate image successfully with default options', async () => {
+      mockedAxios.post.mockResolvedValue(mockB64Response())
 
       const result = await repository.generateImage('a beautiful sunset')
 
       expect(result).not.toBeNull()
       expect(result?.provider).toBe(ImageProvider.OPENAI)
       expect(result?.images).toHaveLength(1)
-      expect(result?.images[0].url).toBe('https://example.com/generated-image.png')
-      expect(result?.images[0].id).toMatch(/^openai-\d+$/)
+      expect(result?.images[0].b64).toBe('base64-image-data-0')
+      expect(result?.images[0].url).toBeUndefined()
+      expect(result?.images[0].id).toMatch(/^openai-\d+-0$/)
 
       expect(mockedAxios.post).toHaveBeenCalledWith(
         'https://api.openai.com/v1/images/generations',
         {
-          model: 'dall-e-3',
+          model: 'gpt-image-1',
           prompt: 'a beautiful sunset',
           n: 1,
           size: '1024x1024',
-          quality: 'standard',
-          style: 'vivid',
+          quality: 'medium',
         },
         expect.objectContaining({
           headers: expect.objectContaining({
@@ -92,23 +91,12 @@ describe('OpenaiImagesRepository', () => {
       )
     })
 
-    it('should generate image with custom options', async () => {
-      const mockResponse = {
-        data: {
-          data: [
-            {
-              url: 'https://example.com/hd-image.png',
-            },
-          ],
-        },
-      }
-
-      mockedAxios.post.mockResolvedValue(mockResponse)
+    it('should generate image with native gpt-image-1 options', async () => {
+      mockedAxios.post.mockResolvedValue(mockB64Response())
 
       const result = await repository.generateImage('a beautiful landscape', {
-        size: '1024x1792',
-        quality: 'hd',
-        style: 'natural',
+        size: '1536x1024',
+        quality: 'high',
       })
 
       expect(result).not.toBeNull()
@@ -117,26 +105,43 @@ describe('OpenaiImagesRepository', () => {
       expect(mockedAxios.post).toHaveBeenCalledWith(
         'https://api.openai.com/v1/images/generations',
         expect.objectContaining({
-          size: '1024x1792',
-          quality: 'hd',
-          style: 'natural',
+          size: '1536x1024',
+          quality: 'high',
         }),
         expect.any(Object)
       )
     })
 
-    it('should upgrade 512x512 to 1024x1024 (DALL-E 3 does not support 512)', async () => {
-      const mockResponse = {
-        data: {
-          data: [
-            {
-              url: 'https://example.com/image.png',
-            },
-          ],
-        },
-      }
+    it('should map legacy DALL-E 3 options (hd/1024x1792) to gpt-image-1 equivalents', async () => {
+      mockedAxios.post.mockResolvedValue(mockB64Response())
 
-      mockedAxios.post.mockResolvedValue(mockResponse)
+      await repository.generateImage('a beautiful landscape', {
+        size: '1024x1792',
+        quality: 'hd',
+      })
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          size: '1024x1536',
+          quality: 'high',
+        }),
+        expect.any(Object)
+      )
+    })
+
+    it('should not send the style parameter (removed by OpenAI)', async () => {
+      mockedAxios.post.mockResolvedValue(mockB64Response())
+
+      await repository.generateImage('test prompt')
+
+      const requestBody = mockedAxios.post.mock.calls[0][1]
+      expect(requestBody).not.toHaveProperty('style')
+      expect(requestBody).not.toHaveProperty('response_format')
+    })
+
+    it('should upgrade 512x512 to 1024x1024 (gpt-image-1 does not support 512)', async () => {
+      mockedAxios.post.mockResolvedValue(mockB64Response())
 
       await repository.generateImage('test prompt', { size: '512x512' })
 
@@ -147,6 +152,50 @@ describe('OpenaiImagesRepository', () => {
         }),
         expect.any(Object)
       )
+    })
+
+    it('should request multiple images when numberOfImages is set', async () => {
+      mockedAxios.post.mockResolvedValue(mockB64Response(3))
+
+      const result = await repository.generateImage('test prompt', { numberOfImages: 3 })
+
+      expect(result?.images).toHaveLength(3)
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ n: 3 }),
+        expect.any(Object)
+      )
+    })
+
+    it('should floor fractional numberOfImages before sending n', async () => {
+      mockedAxios.post.mockResolvedValue(mockB64Response(2))
+
+      await repository.generateImage('test prompt', { numberOfImages: 2.5 })
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ n: 2 }),
+        expect.any(Object)
+      )
+    })
+
+    it('should skip response items without b64_json and return null if none remain', async () => {
+      mockedAxios.post.mockResolvedValue({
+        data: {
+          data: [{ revised_prompt: 'no image here' }, { b64_json: 'valid-b64' }],
+        },
+      })
+
+      const partial = await repository.generateImage('test prompt')
+      expect(partial?.images).toHaveLength(1)
+      expect(partial?.images[0].b64).toBe('valid-b64')
+
+      mockedAxios.post.mockResolvedValue({
+        data: { data: [{ revised_prompt: 'no image here' }] },
+      })
+
+      const empty = await repository.generateImage('test prompt')
+      expect(empty).toBeNull()
     })
 
     it('should return null when API returns no images', async () => {

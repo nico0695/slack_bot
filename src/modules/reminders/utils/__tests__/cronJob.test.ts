@@ -90,7 +90,7 @@ describe('reminderCronJob', () => {
   })
 
   it('sends slack notification and advances next trigger when reminder is unchecked', async () => {
-    const now = new Date(2026, 2, 29, 10, 0, 0, 0)
+    const now = new Date(Date.UTC(2026, 2, 29, 13, 0, 0, 0))
     jest.useFakeTimers().setSystemTime(now)
 
     const reminder = {
@@ -117,7 +117,7 @@ describe('reminderCronJob', () => {
   })
 
   it('skips notification when reminder occurrence is already checked', async () => {
-    const now = new Date(2026, 2, 29, 10, 0, 0, 0)
+    const now = new Date(Date.UTC(2026, 2, 29, 13, 0, 0, 0))
     jest.useFakeTimers().setSystemTime(now)
 
     const reminder = {

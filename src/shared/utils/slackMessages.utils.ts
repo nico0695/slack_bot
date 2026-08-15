@@ -234,7 +234,7 @@ const alertOverflowAccessory = (id: number): any => ({
   action_id: `alert_actions:${id}`,
 })
 
-const reminderOverflowAccessory = (id: number): any => ({
+const reminderOverflowAccessory = (reminder: Reminders): any => ({
   type: 'overflow',
   options: [
     {
@@ -242,17 +242,39 @@ const reminderOverflowAccessory = (id: number): any => ({
         type: 'plain_text',
         text: 'Ver Detalles',
       },
-      value: `reminder:detail:${id}`,
+      value: `reminder:detail:${reminder.id}`,
     },
+    {
+      text: {
+        type: 'plain_text',
+        text: 'Marcar hecho hoy',
+      },
+      value: `reminder:check:${reminder.id}`,
+    },
+    reminder.status === ReminderStatus.PAUSED
+      ? {
+          text: {
+            type: 'plain_text',
+            text: 'Reanudar',
+          },
+          value: `reminder:resume:${reminder.id}`,
+        }
+      : {
+          text: {
+            type: 'plain_text',
+            text: 'Pausar',
+          },
+          value: `reminder:pause:${reminder.id}`,
+        },
     {
       text: {
         type: 'plain_text',
         text: 'Eliminar',
       },
-      value: `reminder:delete:${id}`,
+      value: `reminder:delete:${reminder.id}`,
     },
   ],
-  action_id: `reminder_actions:${id}`,
+  action_id: `reminder_actions:${reminder.id}`,
 })
 
 const quickActionOverflow = (
@@ -670,7 +692,7 @@ export const msgReminderCreated = (data: Reminders): { blocks: any[] } => {
             tokens.statusLine
           }\n> ${tokens.helper}`,
         },
-        accessory: reminderOverflowAccessory(data.id),
+        accessory: reminderOverflowAccessory(data),
       },
     ],
   }
@@ -705,7 +727,7 @@ export const msgRemindersList = (reminders: Reminders[]): { blocks: any[] } => {
           tokens.statusLine
         }\n> ${tokens.helper}`,
       },
-      accessory: reminderOverflowAccessory(reminder.id),
+      accessory: reminderOverflowAccessory(reminder),
     })
 
     blocks.push({
@@ -730,7 +752,7 @@ export const msgReminderDetail = (reminder: Reminders): { blocks: any[] } => {
             truncatedMessage || '_No message_'
           }\n> ${tokens.statusLine}\n> ${tokens.helper}`,
         },
-        accessory: reminderOverflowAccessory(reminder.id),
+        accessory: reminderOverflowAccessory(reminder),
       },
     ],
   }

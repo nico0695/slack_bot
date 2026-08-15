@@ -1,3 +1,5 @@
+import { ARGENTINA_TIMEZONE, ARGENTINA_UTC_OFFSET_MINUTES } from '../constants/timezone.constants'
+
 /**
  * Format text to date
  * @param dateText string - YYYY-MM-DD HH:mm[:ss] interpreted as Argentina local time OR relative 9w9d9h9m (optionals)
@@ -10,10 +12,8 @@ export function formatTextToDate(dateText: string): Date {
   const date = new Date(raw)
 
   if (date.toString() !== 'Invalid Date' && absolutePattern.test(raw)) {
-    // Interpret naive date/time values in the Argentina timezone.
-    const ARG_OFFSET_MINUTES = 180 // Argentina (UTC-3) timezoneOffset
-    const serverOffsetMinutes = new Date().getTimezoneOffset() // minutes between UTC and server local
-    const diffMinutes = ARG_OFFSET_MINUTES - serverOffsetMinutes
+    const serverOffsetMinutes = new Date().getTimezoneOffset()
+    const diffMinutes = ARGENTINA_UTC_OFFSET_MINUTES - serverOffsetMinutes
     return new Date(date.getTime() + diffMinutes * 60000)
   }
 
@@ -69,7 +69,7 @@ export const formatDateToText = (
   }
 
   if (!baseOptions.timeZone) {
-    baseOptions.timeZone = 'America/Argentina/Buenos_Aires'
+    baseOptions.timeZone = ARGENTINA_TIMEZONE
   }
 
   return new Intl.DateTimeFormat(local, baseOptions).format(date)
@@ -104,7 +104,7 @@ export const getRelativeTimeCompact = (date: Date, now: Date = new Date()): stri
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone: 'America/Argentina/Buenos_Aires',
+    timeZone: ARGENTINA_TIMEZONE,
   })
 
   if (date >= tomorrow && date < dayAfter) {
@@ -114,7 +114,7 @@ export const getRelativeTimeCompact = (date: Date, now: Date = new Date()): stri
   const dateStr = date.toLocaleDateString('es-AR', {
     day: '2-digit',
     month: '2-digit',
-    timeZone: 'America/Argentina/Buenos_Aires',
+    timeZone: ARGENTINA_TIMEZONE,
   })
   return `${dateStr}${timeStr}`
 }

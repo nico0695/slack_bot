@@ -63,7 +63,6 @@ export enum AssistantsFlags {
   DELETE = 'delete',
   SIZE = 'size',
   QUALITY = 'quality',
-  STYLE = 'style',
   NUMBER = 'number',
 }
 
@@ -108,9 +107,6 @@ export const assistantFlagsKey: {
 
   quality: AssistantsFlags.QUALITY,
   qty: AssistantsFlags.QUALITY,
-
-  style: AssistantsFlags.STYLE,
-  st: AssistantsFlags.STYLE,
 
   number: AssistantsFlags.NUMBER,
   num: AssistantsFlags.NUMBER,
@@ -248,9 +244,6 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
         defaultValue: null,
       },
       [AssistantsFlags.QUALITY]: {
-        defaultValue: null,
-      },
-      [AssistantsFlags.STYLE]: {
         defaultValue: null,
       },
       [AssistantsFlags.NUMBER]: {

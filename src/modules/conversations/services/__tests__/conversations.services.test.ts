@@ -48,14 +48,18 @@ const linksServicesMock = {
   updateLink: jest.fn(),
 }
 
-const remindersServicesMock = {
-  getRemindersByScope: jest.fn(),
-  deleteReminder: jest.fn(),
-}
-
 const messageProcessorMock = {
   processAssistantMessage: jest.fn(),
   cleanSkipFlag: jest.fn(),
+}
+
+const remindersServicesMock = {
+  getRemindersByScope: jest.fn(),
+  getReminderById: jest.fn(),
+  checkReminderOccurrence: jest.fn(),
+  pauseReminder: jest.fn(),
+  resumeReminder: jest.fn(),
+  deleteReminder: jest.fn(),
 }
 
 jest.mock('../../../../config/socketConfig', () => ({
@@ -87,8 +91,8 @@ const buildService = (): ConversationsServices =>
     tasksServicesMock as any,
     notesServicesMock as any,
     linksServicesMock as any,
-    remindersServicesMock as any,
-    messageProcessorMock as any
+    messageProcessorMock as any,
+    remindersServicesMock as any
   )
 
 describe('ConversationsServices', () => {
@@ -368,40 +372,218 @@ describe('ConversationsServices', () => {
   })
 
   describe('handleAction - reminder entity', () => {
-    it('shows reminder detail', async () => {
-      const slackMessagesUtils = jest.requireMock('../../../../shared/utils/slackMessages.utils')
-      remindersServicesMock.getRemindersByScope.mockResolvedValue({
-        data: [
-          {
-            id: 8,
-            message: 'Standup',
-            recurrenceType: 'daily',
-            timeOfDay: '10:00',
-            status: 'active',
-            channelId: null,
-          },
-        ],
-      })
+    const slackMessagesUtils = jest.requireMock('../../../../shared/utils/slackMessages.utils')
+    const notFoundCopy = (id: number): string =>
+      `No se encontró el reminder #${id} o no tienes permisos para esta acción.`
 
-      await service.handleAction({ entity: 'reminder', operation: 'detail', targetId: 8 }, 42)
+    beforeEach(() => {
+      // jest.resetAllMocks() clears factory implementations; restore fresh blocks per call
+      slackMessagesUtils.msgReminderDetail.mockImplementation(() => ({ blocks: [] as any[] }))
+      slackMessagesUtils.msgRemindersList.mockImplementation(() => ({ blocks: [] as any[] }))
+    })
+
+    it('shows reminder detail as blocks with actor { userId } only', async () => {
+      const reminder = { id: 5, title: 'Daily standup', status: 'active' }
+      remindersServicesMock.getReminderById.mockResolvedValue({ data: reminder })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'detail', targetId: 5 },
+        42
+      )
+
+      expect(remindersServicesMock.getReminderById).toHaveBeenCalledWith(5, { userId: 42 })
+      expect(slackMessagesUtils.msgReminderDetail).toHaveBeenCalledWith(reminder)
+      expect(result).toHaveProperty('blocks')
+    })
+
+    it('returns not-found copy when detail fails (not-found or not-authorized)', async () => {
+      remindersServicesMock.getReminderById.mockResolvedValue({ error: 'Reminder not found' })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'detail', targetId: 99 },
+        42
+      )
+
+      expect(result).toBe(notFoundCopy(99))
+      expect(slackMessagesUtils.msgReminderDetail).not.toHaveBeenCalled()
+    })
+
+    it('shows channel-scoped reminder detail by filtering the channel list', async () => {
+      const reminder = {
+        id: 8,
+        message: 'Standup',
+        recurrenceType: 'daily',
+        timeOfDay: '10:00',
+        status: 'active',
+        channelId: 'C123',
+      }
+      remindersServicesMock.getRemindersByScope.mockResolvedValue({ data: [reminder] })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'detail', targetId: 8 },
+        42,
+        { channelId: 'C123', isChannelContext: true }
+      )
+
+      expect(remindersServicesMock.getReminderById).not.toHaveBeenCalled()
+      expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(42, {
+        scope: 'channel',
+        channelId: 'C123',
+      })
+      expect(slackMessagesUtils.msgReminderDetail).toHaveBeenCalledWith(reminder)
+      expect(result).toHaveProperty('blocks')
+    })
+
+    it('lists reminders for the current scope', async () => {
+      const reminder = { id: 4, message: 'Prepare report', status: 'active' }
+      remindersServicesMock.getRemindersByScope.mockResolvedValue({ data: [reminder] })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'list', targetId: 0 },
+        42
+      )
 
       expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(42, {
         scope: 'personal',
         channelId: null,
       })
-      expect(slackMessagesUtils.msgReminderDetail).toHaveBeenCalled()
+      expect(slackMessagesUtils.msgRemindersList).toHaveBeenCalledWith([reminder])
+      expect(result).toHaveProperty('blocks')
     })
 
-    it('deletes a reminder', async () => {
-      remindersServicesMock.deleteReminder.mockResolvedValue({ data: true })
+    it('returns an empty channel message when no reminders exist there', async () => {
+      remindersServicesMock.getRemindersByScope.mockResolvedValue({ data: [] })
 
       const result = await service.handleAction(
-        { entity: 'reminder', operation: 'delete', targetId: 8 },
+        { entity: 'reminder', operation: 'list', targetId: 0 },
+        42,
+        { channelId: 'C123', isChannelContext: true }
+      )
+
+      expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(42, {
+        scope: 'channel',
+        channelId: 'C123',
+      })
+      expect(result).toBe('No hay reminders en este canal.')
+    })
+
+    it('checks reminder occurrence and returns confirmation text', async () => {
+      remindersServicesMock.checkReminderOccurrence.mockResolvedValue({
+        data: { id: 1, reminderId: 5, occurrenceDate: '2026-06-10' },
+      })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'check', targetId: 5 },
         42
       )
 
-      expect(remindersServicesMock.deleteReminder).toHaveBeenCalledWith(8, { userId: 42 })
-      expect(result).toBe('Reminder #8 eliminado correctamente.')
+      expect(remindersServicesMock.checkReminderOccurrence).toHaveBeenCalledWith(5, { userId: 42 })
+      expect(result).toBe('Reminder #5 marcado como hecho para hoy (2026-06-10).')
+    })
+
+    it('returns not-found copy when check fails', async () => {
+      remindersServicesMock.checkReminderOccurrence.mockResolvedValue({
+        error: 'Reminder not found',
+      })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'check', targetId: 7 },
+        42
+      )
+
+      expect(result).toBe(notFoundCopy(7))
+    })
+
+    it('pauses reminder and returns refreshed detail blocks with confirmation context', async () => {
+      const reminder = { id: 5, title: 'Daily standup', status: 'paused' }
+      remindersServicesMock.pauseReminder.mockResolvedValue({ data: reminder })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'pause', targetId: 5 },
+        42
+      )
+
+      expect(remindersServicesMock.pauseReminder).toHaveBeenCalledWith(5, { userId: 42 })
+      expect(slackMessagesUtils.msgReminderDetail).toHaveBeenCalledWith(reminder)
+      expect((result as { blocks: any[] }).blocks).toContainEqual({
+        type: 'context',
+        elements: [{ type: 'mrkdwn', text: 'Reminder #5 pausado.' }],
+      })
+    })
+
+    it('returns not-found copy when pause fails', async () => {
+      remindersServicesMock.pauseReminder.mockResolvedValue({ error: 'Reminder not found' })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'pause', targetId: 8 },
+        42
+      )
+
+      expect(result).toBe(notFoundCopy(8))
+      expect(slackMessagesUtils.msgReminderDetail).not.toHaveBeenCalled()
+    })
+
+    it('resumes reminder and returns refreshed detail blocks with confirmation context', async () => {
+      const reminder = { id: 5, title: 'Daily standup', status: 'active' }
+      remindersServicesMock.resumeReminder.mockResolvedValue({ data: reminder })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'resume', targetId: 5 },
+        42
+      )
+
+      expect(remindersServicesMock.resumeReminder).toHaveBeenCalledWith(5, { userId: 42 })
+      expect(slackMessagesUtils.msgReminderDetail).toHaveBeenCalledWith(reminder)
+      expect((result as { blocks: any[] }).blocks).toContainEqual({
+        type: 'context',
+        elements: [{ type: 'mrkdwn', text: 'Reminder #5 reanudado.' }],
+      })
+    })
+
+    it('returns not-found copy when resume fails', async () => {
+      remindersServicesMock.resumeReminder.mockResolvedValue({ error: 'Reminder not found' })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'resume', targetId: 8 },
+        42
+      )
+
+      expect(result).toBe(notFoundCopy(8))
+    })
+
+    it('deletes reminder and returns confirmation text', async () => {
+      remindersServicesMock.deleteReminder.mockResolvedValue({ data: true })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'delete', targetId: 5 },
+        42
+      )
+
+      expect(remindersServicesMock.deleteReminder).toHaveBeenCalledWith(5, { userId: 42 })
+      expect(result).toBe('Reminder #5 eliminado.')
+    })
+
+    it('returns not-found copy when delete fails (ownership denial, no existence leak)', async () => {
+      remindersServicesMock.deleteReminder.mockResolvedValue({ error: 'Reminder not found' })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'delete', targetId: 9 },
+        42
+      )
+
+      expect(result).toBe(notFoundCopy(9))
+      expect(result).not.toContain('Reminder not found')
+    })
+
+    it('returns unrecognized action for unknown reminder operation', async () => {
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'unknown', targetId: 1 },
+        42
+      )
+
+      expect(result).toBe('Acción no reconocida.')
+      expect(remindersServicesMock.getReminderById).not.toHaveBeenCalled()
+      expect(remindersServicesMock.deleteReminder).not.toHaveBeenCalled()
     })
   })
 
