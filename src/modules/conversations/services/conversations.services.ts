@@ -13,6 +13,7 @@ import RemindersServices from '../../reminders/services/reminders.services'
 import { Tasks } from '../../../entities/tasks'
 import { Notes } from '../../../entities/notes'
 import { Links } from '../../../entities/links'
+import { ReminderScope } from '../../reminders/shared/constants/reminders.constants'
 import { LinkStatus } from '../../links/shared/constants/links.constants'
 
 import GeminiRepository from '../repositories/gemini/gemini.repository'
@@ -1009,17 +1010,56 @@ export default class ConversationsServices {
     userId: number,
     context: { channelId?: string; isChannelContext?: boolean }
   ): Promise<string | { blocks: any[] }> => {
+    const scopeChannelId = this.getScopeChannelId(
+      context.channelId,
+      context.isChannelContext ?? false
+    )
     const notFoundMessage = `No se encontró el reminder #${targetId} o no tienes permisos para esta acción.`
 
     switch (operation) {
       case 'detail': {
-        const res = await this.remindersServices.getReminderById(targetId, { userId })
+        if (!scopeChannelId) {
+          const res = await this.remindersServices.getReminderById(targetId, { userId })
 
-        if (res.error || !res.data) {
+          if (res.error || !res.data) {
+            return notFoundMessage
+          }
+
+          return slackMsgUtils.msgReminderDetail(res.data)
+        }
+
+        const remindersRes = await this.remindersServices.getRemindersByScope(userId, {
+          scope: ReminderScope.CHANNEL,
+          channelId: scopeChannelId,
+        })
+
+        if (remindersRes.error) {
+          return 'No se pudieron obtener los reminders. 😅'
+        }
+
+        const reminder = remindersRes.data?.find((item) => item.id === targetId)
+
+        if (!reminder) {
           return notFoundMessage
         }
 
-        return slackMsgUtils.msgReminderDetail(res.data)
+        return slackMsgUtils.msgReminderDetail(reminder)
+      }
+
+      case 'list': {
+        const remindersRes = await this.remindersServices.getRemindersByScope(userId, {
+          scope: scopeChannelId ? ReminderScope.CHANNEL : ReminderScope.PERSONAL,
+          channelId: scopeChannelId,
+        })
+        if (remindersRes.error) {
+          return 'No se pudieron obtener los reminders. 😅'
+        }
+        const reminders = remindersRes.data ?? []
+        if (!reminders.length) {
+          return scopeChannelId ? 'No hay reminders en este canal.' : 'No tienes reminders.'
+        }
+
+        return slackMsgUtils.msgRemindersList(reminders)
       }
 
       case 'check': {
@@ -1082,7 +1122,6 @@ export default class ConversationsServices {
         if (res.error || !res.data) {
           return notFoundMessage
         }
-
         return `Reminder #${targetId} eliminado.`
       }
 
