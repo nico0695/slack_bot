@@ -54,6 +54,7 @@ const messageProcessorMock = {
 }
 
 const remindersServicesMock = {
+  getRemindersByScope: jest.fn(),
   getReminderById: jest.fn(),
   checkReminderOccurrence: jest.fn(),
   pauseReminder: jest.fn(),
@@ -76,8 +77,9 @@ jest.mock('../../../../shared/utils/slackMessages.utils', () => ({
   msgTasksList: jest.fn(() => buildBlocksMock()),
   msgNotesList: jest.fn(() => buildBlocksMock()),
   msgLinksList: jest.fn(() => buildBlocksMock()),
-  msgAssistantQuickHelp: jest.fn(() => buildBlocksMock()),
+  msgRemindersList: jest.fn(() => buildBlocksMock()),
   msgReminderDetail: jest.fn(() => buildBlocksMock()),
+  msgAssistantQuickHelp: jest.fn(() => buildBlocksMock()),
 }))
 
 const buildService = (): ConversationsServices =>
@@ -377,6 +379,7 @@ describe('ConversationsServices', () => {
     beforeEach(() => {
       // jest.resetAllMocks() clears factory implementations; restore fresh blocks per call
       slackMessagesUtils.msgReminderDetail.mockImplementation(() => ({ blocks: [] as any[] }))
+      slackMessagesUtils.msgRemindersList.mockImplementation(() => ({ blocks: [] as any[] }))
     })
 
     it('shows reminder detail as blocks with actor { userId } only', async () => {
@@ -403,6 +406,65 @@ describe('ConversationsServices', () => {
 
       expect(result).toBe(notFoundCopy(99))
       expect(slackMessagesUtils.msgReminderDetail).not.toHaveBeenCalled()
+    })
+
+    it('shows channel-scoped reminder detail by filtering the channel list', async () => {
+      const reminder = {
+        id: 8,
+        message: 'Standup',
+        recurrenceType: 'daily',
+        timeOfDay: '10:00',
+        status: 'active',
+        channelId: 'C123',
+      }
+      remindersServicesMock.getRemindersByScope.mockResolvedValue({ data: [reminder] })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'detail', targetId: 8 },
+        42,
+        { channelId: 'C123', isChannelContext: true }
+      )
+
+      expect(remindersServicesMock.getReminderById).not.toHaveBeenCalled()
+      expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(42, {
+        scope: 'channel',
+        channelId: 'C123',
+      })
+      expect(slackMessagesUtils.msgReminderDetail).toHaveBeenCalledWith(reminder)
+      expect(result).toHaveProperty('blocks')
+    })
+
+    it('lists reminders for the current scope', async () => {
+      const reminder = { id: 4, message: 'Prepare report', status: 'active' }
+      remindersServicesMock.getRemindersByScope.mockResolvedValue({ data: [reminder] })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'list', targetId: 0 },
+        42
+      )
+
+      expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(42, {
+        scope: 'personal',
+        channelId: null,
+      })
+      expect(slackMessagesUtils.msgRemindersList).toHaveBeenCalledWith([reminder])
+      expect(result).toHaveProperty('blocks')
+    })
+
+    it('returns an empty channel message when no reminders exist there', async () => {
+      remindersServicesMock.getRemindersByScope.mockResolvedValue({ data: [] })
+
+      const result = await service.handleAction(
+        { entity: 'reminder', operation: 'list', targetId: 0 },
+        42,
+        { channelId: 'C123', isChannelContext: true }
+      )
+
+      expect(remindersServicesMock.getRemindersByScope).toHaveBeenCalledWith(42, {
+        scope: 'channel',
+        channelId: 'C123',
+      })
+      expect(result).toBe('No hay reminders en este canal.')
     })
 
     it('checks reminder occurrence and returns confirmation text', async () => {
