@@ -8,6 +8,11 @@ import {
   ReminderStatus,
   ReminderWeekDay,
 } from '../../modules/reminders/shared/constants/reminders.constants'
+import {
+  ISnoozePreset,
+  preferencePresets,
+  snoozePresets,
+} from '../../modules/alerts/shared/constants/snoozeCatalog'
 
 interface AlertStatusTokens {
   icon: string
@@ -192,7 +197,27 @@ const overflowAccessory = (entity: 'note' | 'task', id: number): any => ({
   action_id: `${entity}_actions:${id}`,
 })
 
-const alertOverflowAccessory = (id: number): any => ({
+/**
+ * Slack's `overflow` element caps at 5 options. An alert overflow already spends
+ * 3 on `Ver Detalles`, `Marcar resuelta` and `Eliminar` — each the only path in
+ * Slack to its operation — leaving 2 slots for snooze presets. The catalog may
+ * grow past that, so listing rows take the first entries and stop.
+ *
+ * Single-alert surfaces render the full catalog in an `actions` row instead
+ * (cap 25), which is the unbounded extensibility point. Listings cannot: ten
+ * alerts would render thirty buttons.
+ */
+export const LISTING_SNOOZE_SLOTS = 2
+
+const snoozeOverflowOption = (preset: ISnoozePreset, id: number): any => ({
+  text: {
+    type: 'plain_text',
+    text: preset.label,
+  },
+  value: preset.actionValue(id),
+})
+
+const buildAlertOverflow = (id: number, presets: ISnoozePreset[]): any => ({
   type: 'overflow',
   options: [
     {
@@ -202,20 +227,7 @@ const alertOverflowAccessory = (id: number): any => ({
       },
       value: `alert:detail:${id}`,
     },
-    {
-      text: {
-        type: 'plain_text',
-        text: 'Snooze 5 min',
-      },
-      value: `alert:snooze_5m:${id}`,
-    },
-    {
-      text: {
-        type: 'plain_text',
-        text: 'Snooze 1 hora',
-      },
-      value: `alert:snooze_1h:${id}`,
-    },
+    ...presets.map((preset) => snoozeOverflowOption(preset, id)),
     {
       text: {
         type: 'plain_text',
@@ -232,6 +244,31 @@ const alertOverflowAccessory = (id: number): any => ({
     },
   ],
   action_id: `alert_actions:${id}`,
+})
+
+/** Single-alert surfaces: no snooze options, those render as an `actions` row. */
+const alertOverflowAccessory = (id: number): any => buildAlertOverflow(id, [])
+
+/** Multi-alert surfaces (listing rows, digest highlights): bounded to stay under Slack's cap. */
+const alertListingOverflowAccessory = (id: number): any =>
+  buildAlertOverflow(id, snoozePresets.slice(0, LISTING_SNOOZE_SLOTS))
+
+/**
+ * Snooze button row for SINGLE-ALERT surfaces: one button per catalog entry,
+ * with every label and action value taken from the catalog. Adding a preset
+ * adds a button here and requires no change to this file.
+ */
+const alertSnoozeActions = (id: number): any => ({
+  type: 'actions',
+  elements: snoozePresets.map((preset) => ({
+    type: 'button',
+    action_id: `alert_actions:${preset.key}:${id}`,
+    text: {
+      type: 'plain_text',
+      text: preset.label,
+    },
+    value: preset.actionValue(id),
+  })),
 })
 
 const reminderOverflowAccessory = (reminder: Reminders): any => ({
@@ -368,26 +405,12 @@ export const msgAssistantQuickHelp = (data: IQuickHelpPayload): { blocks: any[] 
       },
       {
         type: 'actions',
-        elements: [
-          {
-            type: 'button',
-            action_id: 'assistant_actions:set_snooze_5m:0',
-            text: { type: 'plain_text', text: 'Snooze 5m' },
-            value: 'assistant:set_snooze_5m:0',
-          },
-          {
-            type: 'button',
-            action_id: 'assistant_actions:set_snooze_10m:0',
-            text: { type: 'plain_text', text: 'Snooze 10m' },
-            value: 'assistant:set_snooze_10m:0',
-          },
-          {
-            type: 'button',
-            action_id: 'assistant_actions:set_snooze_30m:0',
-            text: { type: 'plain_text', text: 'Snooze 30m' },
-            value: 'assistant:set_snooze_30m:0',
-          },
-        ],
+        elements: preferencePresets.map((preset) => ({
+          type: 'button',
+          action_id: `assistant_actions:${preset.key}:0`,
+          text: { type: 'plain_text', text: `Snooze ${preset.minutes}m` },
+          value: `assistant:${preset.key}:0`,
+        })),
       },
     ],
   }
@@ -409,6 +432,7 @@ export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
         },
         accessory: alertOverflowAccessory(data.id),
       },
+      alertSnoozeActions(data.id),
     ],
   }
 }
@@ -442,7 +466,7 @@ export const msgAlertsList = (alerts: Alerts[]): { blocks: any[] } => {
           tokens.statusLine
         }\n> ${tokens.helper}`,
       },
-      accessory: alertOverflowAccessory(alert.id),
+      accessory: alertListingOverflowAccessory(alert.id),
     })
 
     blocks.push({
@@ -468,6 +492,7 @@ export const msgAlertDetail = (alert: Alerts): { blocks: any[] } => {
         },
         accessory: alertOverflowAccessory(alert.id),
       },
+      alertSnoozeActions(alert.id),
     ],
   }
 }
@@ -834,7 +859,7 @@ export const msgAssistantDigest = (payload: {
             tokens.statusLine
           }\n> ${tokens.helper}`,
         },
-        accessory: alertOverflowAccessory(alert.id),
+        accessory: alertListingOverflowAccessory(alert.id),
       })
     })
 

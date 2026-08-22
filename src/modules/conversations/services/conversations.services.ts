@@ -6,6 +6,10 @@ import { IoServer } from '../../../config/socketConfig'
 
 import UsersServices from '../../users/services/users.services'
 import AlertsServices from '../../alerts/services/alerts.services'
+import AlertInteractionsService, {
+  SNOOZE_DEFAULT_PRESET_KEY,
+} from '../../alerts/services/alertInteractions.services'
+import { snoozePresets } from '../../alerts/shared/constants/snoozeCatalog'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
 import LinksServices from '../../links/services/links.services'
@@ -48,7 +52,6 @@ export enum AIRepositoryType {
 
 @injectable()
 export default class ConversationsServices {
-  private defaultSnoozeMinutes = 10
   private maxContextMessages = 20
 
   constructor(
@@ -56,6 +59,7 @@ export default class ConversationsServices {
     private redisRepository: RedisRepository,
     private usersServices: UsersServices,
     private alertsServices: AlertsServices,
+    private alertInteractionsService: AlertInteractionsService,
     private tasksServices: TasksServices,
     private notesServices: NotesServices,
     private linksServices: LinksServices,
@@ -111,13 +115,12 @@ export default class ConversationsServices {
     return membersNames
   }
 
-  private getSnoozeMinutes = async (userId: number): Promise<number> => {
-    const config = await this.redisRepository.getAlertSnoozeConfig(userId)
-    return config?.defaultSnoozeMinutes ?? this.defaultSnoozeMinutes
-  }
-
-  private setSnoozeMinutes = async (userId: number, minutes: number): Promise<void> => {
-    await this.redisRepository.saveAlertSnoozeConfig(userId, { defaultSnoozeMinutes: minutes })
+  /** Any operation `AlertInteractionsService.snoozeAlert` can resolve. */
+  private isSnoozeOperation = (operation: string): boolean => {
+    return (
+      operation === SNOOZE_DEFAULT_PRESET_KEY ||
+      snoozePresets.some((preset) => preset.key === operation)
+    )
   }
 
   private getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
@@ -595,112 +598,6 @@ export default class ConversationsServices {
     }
   }
 
-  private handleAlertSnooze = async (
-    alertId: number,
-    userId: number,
-    minutes: number,
-    options: { updatePreference?: boolean } = {}
-  ): Promise<string | { blocks: any[] }> => {
-    if (!Number.isFinite(minutes) || minutes <= 0) {
-      return 'El snooze debe ser mayor a 1 minuto.'
-    }
-
-    const res = await this.alertsServices.rescheduleAlert(alertId, userId, minutes)
-
-    if (res.error || !res.data) {
-      return res.error ?? 'No se pudo reprogramar la alerta. 😅'
-    }
-
-    if (options.updatePreference) {
-      await this.setSnoozeMinutes(userId, minutes)
-    }
-
-    return slackMsgUtils.msgAlertDetail(res.data)
-  }
-
-  private handleAlertRepeat = async (
-    alertId: number,
-    userId: number,
-    minutesToAdd: number,
-    policy: 'daily' | 'weekly'
-  ): Promise<string | { blocks: any[] }> => {
-    const followUp = await this.alertsServices.createFollowUpAlert(alertId, userId, minutesToAdd)
-
-    if (followUp.error || !followUp.data) {
-      return followUp.error ?? 'No se pudo crear la recurrencia. 😅'
-    }
-
-    const messageBlock = slackMsgUtils.msgAlertCreated(followUp.data)
-
-    messageBlock.blocks.push({
-      type: 'context',
-      elements: [
-        {
-          type: 'mrkdwn',
-          text: `La alerta #${alertId} se repetirá de forma ${
-            policy === 'daily' ? 'diaria' : 'semanal'
-          }.`,
-        },
-      ],
-    })
-
-    return messageBlock
-  }
-
-  private listAlertsByScope = async (
-    userId: number,
-    scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved',
-    channelId: string | null
-  ): Promise<string | { blocks: any[] }> => {
-    const alertsRes = await this.alertsServices.getAlertsByUserId(userId, {
-      channelId,
-    })
-    if (alertsRes.error) {
-      return 'No se pudieron obtener las alertas. 😅'
-    }
-
-    const alerts = alertsRes.data ?? []
-    if (!alerts.length) {
-      return 'No tienes alertas guardadas.'
-    }
-
-    const now = new Date()
-
-    let filtered = alerts
-    let emptyMessage = 'No hay alertas para mostrar.'
-
-    switch (scope) {
-      case 'pending':
-        filtered = alerts.filter((alert) => !alert.sent)
-        emptyMessage = 'No tienes alertas pendientes.'
-        break
-      case 'snoozed':
-        // Snoozed scope removed - show pending alerts instead
-        filtered = alerts.filter((alert) => !alert.sent)
-        emptyMessage = 'No tienes alertas pendientes.'
-        break
-      case 'overdue':
-        filtered = alerts.filter((alert) => !alert.sent && new Date(alert.date) < now)
-        emptyMessage = 'No tienes alertas atrasadas.'
-        break
-      case 'resolved':
-        filtered = alerts.filter((alert) => alert.sent)
-        emptyMessage = 'No tienes alertas resueltas.'
-        break
-      case 'all':
-      default:
-        filtered = alerts
-        emptyMessage = 'No tienes alertas guardadas.'
-        break
-    }
-
-    if (!filtered.length) {
-      return emptyMessage
-    }
-
-    return slackMsgUtils.msgAlertsList(filtered)
-  }
-
   private handleAlertResolve = async (
     alertId: number,
     userId: number
@@ -720,15 +617,15 @@ export default class ConversationsServices {
   ): Promise<string | { blocks: any[] }> => {
     switch (operation) {
       case 'set_snooze_5m': {
-        await this.setSnoozeMinutes(userId, 5)
+        await this.alertInteractionsService.setDefaultSnoozeMinutes(userId, 5)
         return 'Snooze preferido configurado en 5 minutos.'
       }
       case 'set_snooze_10m': {
-        await this.setSnoozeMinutes(userId, 10)
+        await this.alertInteractionsService.setDefaultSnoozeMinutes(userId, 10)
         return 'Snooze preferido configurado en 10 minutos.'
       }
       case 'set_snooze_30m': {
-        await this.setSnoozeMinutes(userId, 30)
+        await this.alertInteractionsService.setDefaultSnoozeMinutes(userId, 30)
         return 'Snooze preferido configurado en 30 minutos.'
       }
       default:
@@ -746,6 +643,15 @@ export default class ConversationsServices {
       context.channelId,
       context.isChannelContext ?? false
     )
+
+    // Forwarded as-is: no per-preset branch here, so a new catalog entry
+    // needs no edit to this file.
+    if (this.isSnoozeOperation(operation)) {
+      return await this.alertInteractionsService.snoozeAlert(targetId, userId, {
+        presetKey: operation,
+        updatePreference: false,
+      })
+    }
 
     switch (operation) {
       case 'delete': {
@@ -774,43 +680,52 @@ export default class ConversationsServices {
         return slackMsgUtils.msgAlertDetail(alert)
       }
 
-      case 'snooze_5m':
-        return await this.handleAlertSnooze(targetId, userId, 5)
-
-      case 'snooze_1h':
-        return await this.handleAlertSnooze(targetId, userId, 60)
-
-      case 'snooze_default': {
-        const minutes = await this.getSnoozeMinutes(userId)
-        return await this.handleAlertSnooze(targetId, userId, minutes, { updatePreference: true })
-      }
-
       case 'repeat_daily':
-        return await this.handleAlertRepeat(targetId, userId, 24 * 60, 'daily')
+        return await this.alertInteractionsService.repeatAlert(targetId, userId, 'daily')
 
       case 'repeat_weekly':
-        return await this.handleAlertRepeat(targetId, userId, 7 * 24 * 60, 'weekly')
+        return await this.alertInteractionsService.repeatAlert(targetId, userId, 'weekly')
 
       case 'resolve':
         return await this.handleAlertResolve(targetId, userId)
 
       case 'list_overdue':
-        return await this.listAlertsByScope(userId, 'overdue', scopeChannelId)
+        return await this.alertInteractionsService.listAlertsByScope(
+          userId,
+          'overdue',
+          scopeChannelId
+        )
 
       case 'list_snoozed':
-        return await this.listAlertsByScope(userId, 'snoozed', scopeChannelId)
+        return await this.alertInteractionsService.listAlertsByScope(
+          userId,
+          'snoozed',
+          scopeChannelId
+        )
 
       case 'list_all':
-        return await this.listAlertsByScope(userId, 'all', scopeChannelId)
+        return await this.alertInteractionsService.listAlertsByScope(userId, 'all', scopeChannelId)
 
       case 'list_pending':
-        return await this.listAlertsByScope(userId, 'pending', scopeChannelId)
+        return await this.alertInteractionsService.listAlertsByScope(
+          userId,
+          'pending',
+          scopeChannelId
+        )
 
       case 'list_resolved':
-        return await this.listAlertsByScope(userId, 'resolved', scopeChannelId)
+        return await this.alertInteractionsService.listAlertsByScope(
+          userId,
+          'resolved',
+          scopeChannelId
+        )
 
       case 'list':
-        return await this.listAlertsByScope(userId, 'pending', scopeChannelId)
+        return await this.alertInteractionsService.listAlertsByScope(
+          userId,
+          'pending',
+          scopeChannelId
+        )
 
       default:
         return 'Acción no reconocida.'
@@ -1188,7 +1103,9 @@ export default class ConversationsServices {
         return status !== 'completed' && status !== 'canceled'
       }).length
 
-      const defaultSnoozeMinutes = await this.getSnoozeMinutes(userId)
+      const defaultSnoozeMinutes = await this.alertInteractionsService.getDefaultSnoozeMinutes(
+        userId
+      )
 
       const linksUnread = links.filter((link) => link.status === LinkStatus.UNREAD).length
 

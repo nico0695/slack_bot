@@ -1,4 +1,6 @@
 import ConversationsController from '../conversations.controller'
+import ConversationsServices from '../../services/conversations.services'
+import AlertInteractionsService from '../../../alerts/services/alertInteractions.services'
 
 jest.mock('../../../../config/slackConfig', () => ({
   connectionSlackApp: {
@@ -149,9 +151,17 @@ describe('ConversationsController', () => {
   describe('action regex (AC-3)', () => {
     // keep in sync with src/app.ts slackApp.action(...) regex literal — the inline
     // regex there is not exported, so this duplicated literal guards routing for
-    // reminder_actions while preserving all previously matched patterns.
+    // reminder_actions and assistant_actions while preserving all previously
+    // matched patterns.
     const actionRegex =
-      /^(?:alert|note|task|link|reminder)_actions.*$|^(?:delete|view)_(?:alert|note|task|link)(?:_details)?$/
+      /^(?:alert|note|task|link|reminder|assistant)_actions.*$|^(?:delete|view)_(?:alert|note|task|link)(?:_details)?$/
+
+    it('matches assistant_actions ids', () => {
+      expect(actionRegex.test('assistant_actions:set_snooze_5m:0')).toBe(true)
+      expect(actionRegex.test('assistant_actions:set_snooze_10m:0')).toBe(true)
+      expect(actionRegex.test('assistant_actions:set_snooze_30m:0')).toBe(true)
+      expect(actionRegex.test('assistant_actions')).toBe(true)
+    })
 
     it('matches reminder_actions ids', () => {
       expect(actionRegex.test('reminder_actions:12')).toBe(true)
@@ -269,6 +279,108 @@ describe('ConversationsController', () => {
       expect(handleActionMock).not.toHaveBeenCalled()
       expect(say).toHaveBeenCalledWith('Ups! Acción no reconocida 🤷‍♂️')
       expect(ack).toHaveBeenCalled()
+    })
+  })
+
+  // AC-1, integration half. The describes above stub ConversationsServices, so they
+  // prove routing but not that the button actually answers. These cases wire a real
+  // ConversationsServices into the controller and exercise the full chain the
+  // src/app.ts regex fix re-enabled — parseSlackAction -> handleAction ->
+  // handleAssistantAction -> setSnoozeMinutes — mocking only the Redis boundary.
+  // A regression anywhere in that chain fails here even though the regex
+  // assertions in 'action regex (AC-3)' would still pass.
+  describe('handleActions with real services — assistant quick-help buttons (AC-1)', () => {
+    const saveAlertSnoozeConfig = jest.fn()
+
+    const buildControllerWithRealServices = (): ConversationsController => {
+      // The preference write now runs through a REAL AlertInteractionsService, so
+      // the chain under test still ends at the same Redis boundary and the same
+      // saveAlertSnoozeConfig call — only the hop in between is new.
+      const realAlertInteractions = new AlertInteractionsService(
+        {} as any, // alertsServices — unreachable from the assistant action path
+        { saveAlertSnoozeConfig } as any // redisRepository — the one real boundary
+      )
+
+      // Only the Redis boundary is stubbed; the other constructor collaborators are
+      // never touched for these operations.
+      const realServices = new ConversationsServices(
+        {} as any, // aiRepository
+        { saveAlertSnoozeConfig } as any, // redisRepository
+        {} as any, // usersServices
+        {} as any, // alertsServices
+        realAlertInteractions, // alertInteractionsService — real, not stubbed
+        {} as any, // tasksServices
+        {} as any, // notesServices
+        {} as any, // linksServices
+        {} as any, // messageProcessor
+        {} as any // remindersServices
+      )
+
+      const realController = new ConversationsController(
+        realServices,
+        messageProcessorMock as any,
+        flowManagerMock as any
+      )
+      realController.userData = { id: 123 } as any
+
+      return realController
+    }
+
+    const snoozeButtonCases: Array<[string, number, string]> = [
+      ['set_snooze_5m', 5, 'Snooze preferido configurado en 5 minutos.'],
+      ['set_snooze_10m', 10, 'Snooze preferido configurado en 10 minutos.'],
+      ['set_snooze_30m', 30, 'Snooze preferido configurado en 30 minutos.'],
+    ]
+
+    it.each(snoozeButtonCases)(
+      'replies with the confirmation and persists the preference for %s',
+      async (operation, minutes, expectedReply) => {
+        saveAlertSnoozeConfig.mockResolvedValue(true)
+        const say = jest.fn()
+        const ack = jest.fn()
+
+        await buildControllerWithRealServices().handleActions({
+          ack,
+          say,
+          body: {
+            channel: { id: 'D123', type: 'im' },
+            actions: [
+              {
+                action_id: `assistant_actions:${operation}:0`,
+                value: `assistant:${operation}:0`,
+              },
+            ],
+          },
+        })
+
+        expect(ack).toHaveBeenCalled()
+        expect(saveAlertSnoozeConfig).toHaveBeenCalledWith(123, {
+          defaultSnoozeMinutes: minutes,
+        })
+        expect(say).toHaveBeenCalledWith(expectedReply)
+      }
+    )
+
+    it('does not write a preference for an unknown assistant operation', async () => {
+      const say = jest.fn()
+      const ack = jest.fn()
+
+      await buildControllerWithRealServices().handleActions({
+        ack,
+        say,
+        body: {
+          channel: { id: 'D123', type: 'im' },
+          actions: [
+            {
+              action_id: 'assistant_actions:set_snooze_99m:0',
+              value: 'assistant:set_snooze_99m:0',
+            },
+          ],
+        },
+      })
+
+      expect(saveAlertSnoozeConfig).not.toHaveBeenCalled()
+      expect(say).toHaveBeenCalledWith('Acción no reconocida.')
     })
   })
 })

@@ -27,11 +27,22 @@ const usersServicesMock = {
 
 const alertsServicesMock = {
   deleteAlert: jest.fn(),
+  getAlertById: jest.fn(),
   getAlertsByUserId: jest.fn(),
   rescheduleAlert: jest.fn(),
   createFollowUpAlert: jest.fn(),
   resolveAlert: jest.fn(),
   createAssistantAlert: jest.fn(),
+}
+
+// The five alert-interaction operations now live in AlertInteractionsService;
+// ConversationsServices only parses input and delegates to it.
+const alertInteractionsServiceMock = {
+  snoozeAlert: jest.fn(),
+  repeatAlert: jest.fn(),
+  listAlertsByScope: jest.fn(),
+  getDefaultSnoozeMinutes: jest.fn(),
+  setDefaultSnoozeMinutes: jest.fn(),
 }
 
 const tasksServicesMock = {
@@ -88,6 +99,7 @@ const buildService = (): ConversationsServices =>
     redisRepositoryMock as any,
     usersServicesMock as any,
     alertsServicesMock as any,
+    alertInteractionsServiceMock as any,
     tasksServicesMock as any,
     notesServicesMock as any,
     linksServicesMock as any,
@@ -587,11 +599,118 @@ describe('ConversationsServices', () => {
     })
   })
 
+  // S4 wiring tripwire. ConversationsServices no longer owns the snooze/repeat/list
+  // bodies, so what has to be verified here is the delegation itself: that each Slack
+  // action forwards the right arguments to AlertInteractionsService and returns its
+  // result untouched. Without these, a swapped preset key or policy would compile,
+  // lint and pass the rest of the suite.
+  describe('handleAction - alert entity delegates to AlertInteractionsService', () => {
+    const snoozeCases: Array<[string, string]> = [
+      ['snooze_5m', 'snooze_5m'],
+      ['snooze_1h', 'snooze_1h'],
+      // Resolved inside the service, never pre-resolved here.
+      ['snooze_default', 'snooze_default'],
+      // Not a case label anywhere in the caller: it dispatches purely from the catalog.
+      ['snooze_tomorrow', 'snooze_tomorrow'],
+    ]
+
+    it.each(snoozeCases)(
+      'forwards %s as a presetKey without writing the preference',
+      async (operation, expectedPresetKey) => {
+        alertInteractionsServiceMock.snoozeAlert.mockResolvedValue({ blocks: [] })
+
+        const result = await service.handleAction({ entity: 'alert', operation, targetId: 7 }, 42, {
+          channelId: 'C123',
+          isChannelContext: true,
+        })
+
+        expect(alertInteractionsServiceMock.snoozeAlert).toHaveBeenCalledWith(7, 42, {
+          presetKey: expectedPresetKey,
+          updatePreference: false,
+        })
+        expect(result).toEqual({ blocks: [] })
+      }
+    )
+
+    it('returns the service message verbatim when the snooze fails', async () => {
+      alertInteractionsServiceMock.snoozeAlert.mockResolvedValue('Acción no reconocida.')
+
+      const result = await service.handleAction(
+        { entity: 'alert', operation: 'snooze_5m', targetId: 7 },
+        42
+      )
+
+      expect(result).toBe('Acción no reconocida.')
+    })
+
+    const repeatCases: Array<[string, string]> = [
+      ['repeat_daily', 'daily'],
+      ['repeat_weekly', 'weekly'],
+    ]
+
+    it.each(repeatCases)('forwards %s as the %s policy', async (operation, policy) => {
+      alertInteractionsServiceMock.repeatAlert.mockResolvedValue({ blocks: [] })
+
+      await service.handleAction({ entity: 'alert', operation, targetId: 3 }, 42)
+
+      expect(alertInteractionsServiceMock.repeatAlert).toHaveBeenCalledWith(3, 42, policy)
+    })
+
+    const listCases: Array<[string, string]> = [
+      ['list_overdue', 'overdue'],
+      ['list_snoozed', 'snoozed'],
+      ['list_all', 'all'],
+      ['list_pending', 'pending'],
+      ['list_resolved', 'resolved'],
+      ['list', 'pending'],
+    ]
+
+    it.each(listCases)('forwards %s as the %s scope', async (operation, scope) => {
+      alertInteractionsServiceMock.listAlertsByScope.mockResolvedValue({ blocks: [] })
+
+      await service.handleAction({ entity: 'alert', operation, targetId: 0 }, 42, {
+        channelId: 'C123',
+        isChannelContext: true,
+      })
+
+      expect(alertInteractionsServiceMock.listAlertsByScope).toHaveBeenCalledWith(42, scope, 'C123')
+    })
+
+    it('passes a null channel scope outside a channel context', async () => {
+      alertInteractionsServiceMock.listAlertsByScope.mockResolvedValue({ blocks: [] })
+
+      await service.handleAction({ entity: 'alert', operation: 'list', targetId: 0 }, 42, {
+        channelId: 'D555',
+        isChannelContext: false,
+      })
+
+      expect(alertInteractionsServiceMock.listAlertsByScope).toHaveBeenCalledWith(
+        42,
+        'pending',
+        null
+      )
+    })
+
+    it('does not delegate an unknown alert operation', async () => {
+      const result = await service.handleAction(
+        { entity: 'alert', operation: 'snooze', targetId: 7 },
+        42
+      )
+
+      expect(result).toBe('Acción no reconocida.')
+      expect(alertInteractionsServiceMock.snoozeAlert).not.toHaveBeenCalled()
+      expect(alertInteractionsServiceMock.repeatAlert).not.toHaveBeenCalled()
+      expect(alertInteractionsServiceMock.listAlertsByScope).not.toHaveBeenCalled()
+    })
+  })
+
   describe('getAssistantQuickHelp', () => {
     const slackMessagesUtils = jest.requireMock('../../../../shared/utils/slackMessages.utils')
 
     beforeEach(() => {
-      redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+      // The snooze preference is now read through AlertInteractionsService, not
+      // straight off the Redis repository.
+      alertInteractionsServiceMock.getDefaultSnoozeMinutes.mockResolvedValue(10)
       slackMessagesUtils.msgAssistantQuickHelp.mockReturnValue({ blocks: [] })
     })
 
