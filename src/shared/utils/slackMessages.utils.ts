@@ -198,14 +198,33 @@ const overflowAccessory = (entity: 'note' | 'task', id: number): any => ({
 })
 
 /**
- * Slack's `overflow` element caps at 5 options. An alert overflow already spends
- * 3 on `Ver Detalles`, `Marcar resuelta` and `Eliminar` — each the only path in
- * Slack to its operation — leaving 2 slots for snooze presets. The catalog may
- * grow past that, so listing rows take the first entries and stop.
+ * Slack's `overflow` element caps at 5 options, and going over makes Slack
+ * reject the whole message rather than truncate the block.
  *
- * Single-alert surfaces render the full catalog in an `actions` row instead
- * (cap 25), which is the unbounded extensibility point. Listings cannot: ten
- * alerts would render thirty buttons.
+ * Single-alert surfaces spend 2 on `Marcar resuelta` and `Eliminar` — each the
+ * only path in Slack to its operation — leaving 3 for snooze presets, which the
+ * catalog fills exactly. `Ver Detalles` is not among them: on those surfaces the
+ * message already IS the detail view, so the option only re-rendered the same
+ * block.
+ *
+ * Listing rows do keep `Ver Detalles`: carrying fewer presets in their own
+ * overflow, it stays their path to the rest of the catalog.
+ */
+export const OVERFLOW_MAX_OPTIONS = 5
+
+/** `Marcar resuelta` + `Eliminar`: the fixed tail of every alert overflow. */
+const FIXED_ALERT_OPTIONS = 2
+
+/**
+ * Snooze presets that fit a single-alert overflow. Growing `snoozePresets` past
+ * this drops the surplus here rather than emitting a message Slack refuses; the
+ * AC-7 guard fails the build so the drop is never silent.
+ */
+export const SNOOZE_SLOTS = OVERFLOW_MAX_OPTIONS - FIXED_ALERT_OPTIONS
+
+/**
+ * Listing rows spend one more option on `Ver Detalles`, so they fit one preset
+ * fewer. Stays a literal: the rendered listing must remain byte-identical.
  */
 export const LISTING_SNOOZE_SLOTS = 2
 
@@ -217,16 +236,22 @@ const snoozeOverflowOption = (preset: ISnoozePreset, id: number): any => ({
   value: preset.actionValue(id),
 })
 
-const buildAlertOverflow = (id: number, presets: ISnoozePreset[]): any => ({
+const alertDetailOption = (id: number): any => ({
+  text: {
+    type: 'plain_text',
+    text: 'Ver Detalles',
+  },
+  value: `alert:detail:${id}`,
+})
+
+const buildAlertOverflow = (
+  id: number,
+  presets: ISnoozePreset[],
+  leadingOptions: any[] = []
+): any => ({
   type: 'overflow',
   options: [
-    {
-      text: {
-        type: 'plain_text',
-        text: 'Ver Detalles',
-      },
-      value: `alert:detail:${id}`,
-    },
+    ...leadingOptions,
     ...presets.map((preset) => snoozeOverflowOption(preset, id)),
     {
       text: {
@@ -246,30 +271,13 @@ const buildAlertOverflow = (id: number, presets: ISnoozePreset[]): any => ({
   action_id: `alert_actions:${id}`,
 })
 
-/** Single-alert surfaces: no snooze options, those render as an `actions` row. */
-const alertOverflowAccessory = (id: number): any => buildAlertOverflow(id, [])
+/** Single-alert surfaces: the catalog lives in the overflow itself. */
+const alertOverflowAccessory = (id: number): any =>
+  buildAlertOverflow(id, snoozePresets.slice(0, SNOOZE_SLOTS))
 
 /** Multi-alert surfaces (listing rows, digest highlights): bounded to stay under Slack's cap. */
 const alertListingOverflowAccessory = (id: number): any =>
-  buildAlertOverflow(id, snoozePresets.slice(0, LISTING_SNOOZE_SLOTS))
-
-/**
- * Snooze button row for SINGLE-ALERT surfaces: one button per catalog entry,
- * with every label and action value taken from the catalog. Adding a preset
- * adds a button here and requires no change to this file.
- */
-const alertSnoozeActions = (id: number): any => ({
-  type: 'actions',
-  elements: snoozePresets.map((preset) => ({
-    type: 'button',
-    action_id: `alert_actions:${preset.key}:${id}`,
-    text: {
-      type: 'plain_text',
-      text: preset.label,
-    },
-    value: preset.actionValue(id),
-  })),
-})
+  buildAlertOverflow(id, snoozePresets.slice(0, LISTING_SNOOZE_SLOTS), [alertDetailOption(id)])
 
 const reminderOverflowAccessory = (reminder: Reminders): any => ({
   type: 'overflow',
@@ -432,7 +440,6 @@ export const msgAlertCreated = (data: Alerts): { blocks: any[] } => {
         },
         accessory: alertOverflowAccessory(data.id),
       },
-      alertSnoozeActions(data.id),
     ],
   }
 }
@@ -492,7 +499,6 @@ export const msgAlertDetail = (alert: Alerts): { blocks: any[] } => {
         },
         accessory: alertOverflowAccessory(alert.id),
       },
-      alertSnoozeActions(alert.id),
     ],
   }
 }

@@ -8,6 +8,8 @@ import {
   msgAlertsList,
   msgAssistantDigest,
   LISTING_SNOOZE_SLOTS,
+  SNOOZE_SLOTS,
+  OVERFLOW_MAX_OPTIONS,
 } from '../slackMessages.utils'
 import { Reminders } from '../../../entities/reminders'
 import {
@@ -254,6 +256,10 @@ const getAccessory = (blocks: any[]): any =>
 const getActionsBlock = (blocks: any[]): any =>
   blocks.find((block: any) => block.type === 'actions')
 
+/** Snooze options only, so a surface's fixed options do not shift the indexes. */
+const getSnoozeOptions = (accessory: any): any[] =>
+  accessory.options.filter((option: any) => option.value.startsWith('alert:snooze_'))
+
 /** Every `overflow` element anywhere in a block list, however it is nested. */
 const collectOverflows = (blocks: any[]): any[] => {
   const found: any[] = []
@@ -277,7 +283,7 @@ const collectOverflows = (blocks: any[]): any[] => {
 }
 
 describe('alert snooze render paths (S6)', () => {
-  describe('AC-6a: single-alert surfaces render a catalog-driven actions row', () => {
+  describe('AC-6a: single-alert surfaces carry the catalog inside the overflow', () => {
     // msgAlertDetail is also the cron notification (cronJob.ts:36).
     const singleAlertSurfaces: Array<[string, (alert: Alerts) => { blocks: any[] }]> = [
       ['msgAlertCreated', msgAlertCreated],
@@ -286,20 +292,19 @@ describe('alert snooze render paths (S6)', () => {
 
     singleAlertSurfaces.forEach(([name, build]) => {
       describe(name, () => {
-        it('renders exactly one button per snooze preset', () => {
-          const actions = getActionsBlock(build(buildAlert()).blocks)
+        it('renders exactly one option per snooze preset', () => {
+          const accessory = getAccessory(build(buildAlert()).blocks)
 
-          expect(actions).toBeDefined()
-          expect(actions.elements).toHaveLength(snoozePresets.length)
+          expect(accessory.type).toBe('overflow')
+          expect(getSnoozeOptions(accessory)).toHaveLength(snoozePresets.length)
         })
 
-        it('derives every button label and value from the catalog entry', () => {
-          const actions = getActionsBlock(build(buildAlert({ id: 7 })).blocks)
+        it('derives every option label and value from the catalog entry', () => {
+          const accessory = getAccessory(build(buildAlert({ id: 7 })).blocks)
+          const snoozeOptions = getSnoozeOptions(accessory)
 
           snoozePresets.forEach((preset, index) => {
-            expect(actions.elements[index]).toEqual({
-              type: 'button',
-              action_id: `alert_actions:${preset.key}:7`,
+            expect(snoozeOptions[index]).toEqual({
               text: { type: 'plain_text', text: preset.label },
               value: preset.actionValue(7),
             })
@@ -307,26 +312,32 @@ describe('alert snooze render paths (S6)', () => {
         })
 
         it('keeps the action_id prefix the app.ts action regex matches', () => {
-          const actions = getActionsBlock(build(buildAlert()).blocks)
+          const accessory = getAccessory(build(buildAlert({ id: 7 })).blocks)
 
-          actions.elements.forEach((element: any) => {
-            expect(element.action_id).toMatch(/^alert_actions:/)
-          })
+          expect(accessory.action_id).toBe('alert_actions:7')
         })
 
-        it('leaves the overflow with the three non-snooze options only', () => {
+        it('drops the redundant "Ver Detalles" option: the message already IS the detail', () => {
           const accessory = getAccessory(build(buildAlert()).blocks)
 
           expect(getOptionLabels(accessory)).toEqual([
-            'Ver Detalles',
+            'Snooze 5 min',
+            'Snooze 1 hora',
+            'Mañana 9:00',
             'Marcar resuelta',
             'Eliminar',
           ])
           expect(getOptionValues(accessory)).toEqual([
-            'alert:detail:42',
+            'alert:snooze_5m:42',
+            'alert:snooze_1h:42',
+            'alert:snooze_tomorrow:42',
             'alert:resolve:42',
             'alert:delete:42',
           ])
+        })
+
+        it('no longer attaches a snooze actions row', () => {
+          expect(getActionsBlock(build(buildAlert()).blocks)).toBeUndefined()
         })
       })
     })
@@ -393,14 +404,32 @@ describe('alert snooze render paths (S6)', () => {
   describe('AC-12: legacy action values survive the container change', () => {
     it('emits alert:snooze_5m and alert:snooze_1h byte-identically on both paths', () => {
       const listing = getAccessory(msgAlertsList([buildAlert({ id: 99 })]).blocks)
-      const single = getActionsBlock(msgAlertDetail(buildAlert({ id: 99 })).blocks)
+      const single = getAccessory(msgAlertDetail(buildAlert({ id: 99 })).blocks)
 
       expect(getOptionValues(listing)).toContain('alert:snooze_5m:99')
       expect(getOptionValues(listing)).toContain('alert:snooze_1h:99')
 
-      const buttonValues = single.elements.map((element: any) => element.value)
-      expect(buttonValues).toContain('alert:snooze_5m:99')
-      expect(buttonValues).toContain('alert:snooze_1h:99')
+      expect(getOptionValues(single)).toContain('alert:snooze_5m:99')
+      expect(getOptionValues(single)).toContain('alert:snooze_1h:99')
+    })
+  })
+
+  describe('AC-7 guard: the catalog must stay within what a surface can render', () => {
+    /**
+     * Slack rejects the ENTIRE message when an overflow exceeds its cap, so the
+     * builder slices. That slice is silent by construction: without this test a
+     * fourth preset would ship, resolve fine by text command, and simply never
+     * appear in Slack. Fail the build instead.
+     */
+    it('keeps snoozePresets within SNOOZE_SLOTS', () => {
+      expect(snoozePresets.length).toBeLessThanOrEqual(SNOOZE_SLOTS)
+    })
+
+    it('derives SNOOZE_SLOTS from Slack’s cap minus the fixed options', () => {
+      expect(OVERFLOW_MAX_OPTIONS).toBe(5)
+      // `Marcar resuelta` + `Eliminar` are the two fixed options.
+      expect(SNOOZE_SLOTS).toBe(OVERFLOW_MAX_OPTIONS - 2)
+      expect(LISTING_SNOOZE_SLOTS).toBe(SNOOZE_SLOTS - 1)
     })
   })
 
