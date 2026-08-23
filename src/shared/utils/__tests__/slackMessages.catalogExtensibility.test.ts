@@ -4,9 +4,21 @@
  * `jest.mock` substitutes the catalog module itself, so production code runs
  * unmodified and unaware. A local fixture would pass green while the builder
  * still held hardcoded labels — the exact defect this guards against.
+ *
+ * Extensibility is now BOUNDED, not unlimited: since the snooze presets moved
+ * into the overflow, Slack's 5-option cap leaves `SNOOZE_SLOTS` of room. The
+ * mocked catalog deliberately carries one entry MORE than fits, so these tests
+ * pin what happens to the surplus — it is dropped, and the emitted overflow
+ * stays valid. The build-time guard against ever shipping that state lives in
+ * `slackMessages.utils.test.ts`, where the catalog is the real one.
  */
 
-import { msgAlertDetail, msgAlertsList, LISTING_SNOOZE_SLOTS } from '../slackMessages.utils'
+import {
+  msgAlertDetail,
+  msgAlertsList,
+  LISTING_SNOOZE_SLOTS,
+  SNOOZE_SLOTS,
+} from '../slackMessages.utils'
 import { snoozePresets } from '../../../modules/alerts/shared/constants/snoozeCatalog'
 import AlertInteractionsService from '../../../modules/alerts/services/alertInteractions.services'
 import { Alerts } from '../../../entities/alerts'
@@ -70,31 +82,39 @@ const getActionsBlock = (blocks: any[]): any =>
 const getAccessory = (blocks: any[]): any =>
   blocks.find((block: any) => block.type === 'section' && block.accessory)?.accessory
 
+const getSnoozeOptions = (accessory: any): any[] =>
+  accessory.options.filter((option: any) => option.value.startsWith('alert:snooze_'))
+
 describe('AC-7: adding a catalog preset requires no other source change', () => {
   it('confirms the mocked catalog really carries the extra entry', () => {
     expect(snoozePresets).toHaveLength(4)
     expect(snoozePresets[3].key).toBe('snooze_3h')
+    // One more than the single-alert overflow can hold: that is the point.
+    expect(snoozePresets.length).toBeGreaterThan(SNOOZE_SLOTS)
   })
 
-  describe('(a) single-alert actions row is unbounded', () => {
-    it('renders a button for the new preset', () => {
-      const actions = getActionsBlock(msgAlertDetail(buildAlert({ id: 8 })).blocks)
+  describe('(a) single-alert overflow is bounded by SNOOZE_SLOTS', () => {
+    it('renders an option for every preset that fits, taken from the catalog', () => {
+      const accessory = getAccessory(msgAlertDetail(buildAlert({ id: 8 })).blocks)
+      const snoozeOptions = getSnoozeOptions(accessory)
 
-      expect(actions.elements).toHaveLength(4)
-      expect(actions.elements[3]).toEqual({
-        type: 'button',
-        action_id: 'alert_actions:snooze_3h:8',
-        text: { type: 'plain_text', text: 'Snooze 3 horas' },
-        value: 'alert:snooze_3h:8',
-      })
+      expect(snoozeOptions).toHaveLength(SNOOZE_SLOTS)
+      expect(snoozeOptions.map((option: any) => option.value)).toEqual(
+        snoozePresets.slice(0, SNOOZE_SLOTS).map((preset) => preset.actionValue(8))
+      )
     })
 
-    it('renders one button per catalog entry, whatever the catalog length', () => {
-      const actions = getActionsBlock(msgAlertDetail(buildAlert({ id: 8 })).blocks)
+    it('drops the surplus preset rather than emitting an overflow Slack rejects', () => {
+      const accessory = getAccessory(msgAlertDetail(buildAlert({ id: 8 })).blocks)
 
-      expect(actions.elements.map((element: any) => element.value)).toEqual(
-        snoozePresets.map((preset) => preset.actionValue(8))
+      expect(accessory.options).toHaveLength(5)
+      expect(getSnoozeOptions(accessory).map((option: any) => option.value)).not.toContain(
+        'alert:snooze_3h:8'
       )
+    })
+
+    it('no longer renders a snooze actions row', () => {
+      expect(getActionsBlock(msgAlertDetail(buildAlert({ id: 8 })).blocks)).toBeUndefined()
     })
   })
 
