@@ -289,6 +289,7 @@ export const assistantPromptFlagsLite2 = `
   #### 6. General Intents
   * \`alert.list\`, \`task.list\`, \`note.list\`, \`link.list\`, \`image.list\`, \`reminder.list\`: Listing items. Use \`tag\` or \`userFilter\` if specified.
   * \`reminder.detail\`, \`reminder.check\`, \`reminder.pause\`, \`reminder.resume\`, \`reminder.delete\`: Act on an existing reminder identified by \`targetId\` (the reminder id). Use these for "mostrame/pausá/reanudá/marcá hecho/eliminá el reminder N".
+  * \`alert.snooze\`: User wants to postpone/snooze an existing alert identified by \`targetId\` (the alert id). Fields: \`targetId\` (Required, the alert id), \`duration\` (Optional, same grammar as alert.create's \`time\`: relative amount \`30m\`/\`2h\`/\`2d\`, or \`mañana\`/\`mañana HH[:mm]\`; omit if the user doesn't specify a new duration). Use for "posponé la alerta 12 30m", "snoozeá la alerta 5 hasta mañana a las 14:30".
   * \`question\`: General knowledge queries not requiring database actions.
   * \`search\`: Requests requiring real-time/external info.
   * \`translate\`: Requests to translate text to a specific language. Fields: \`targetLang\` (Required, target language name), \`text\` (Required, the text to translate). Example: "Traducí esto al inglés: Hola mundo" -> {"intent":"translate","targetLang":"english","text":"Hola mundo"}
@@ -379,6 +380,9 @@ export const assistantPromptFlagsLite2 = `
 
   input: "Mostrame el reminder 12"
   output: {"intent":"reminder.detail","targetId":12,"successMessage":"Mostrando reminder #12","errorMessage":""}
+
+  input: "Posponé la alerta 12 por 30 minutos"
+  output: {"intent":"alert.snooze","targetId":12,"duration":"30m","successMessage":"Posponiendo alerta #12","errorMessage":""}
 
   #IMPORTANT
   - All user-facing content must be in Spanish

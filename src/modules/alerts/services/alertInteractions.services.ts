@@ -23,6 +23,8 @@ export interface ISnoozeAlertOptions {
   presetKey?: string
   /** Never defaulted here: the button and text-command paths diverge on purpose. */
   updatePreference: boolean
+  /** Caller-computed target (e.g. `mañana HH:mm`) that has no fixed catalog preset. */
+  resolveTargetDate?: (base: Date) => Date
 }
 
 type TMinutesResolution = { minutes: number } | { error: string }
@@ -183,6 +185,22 @@ export default class AlertInteractionsService {
   ): Promise<TMinutesResolution> => {
     if (options.minutes !== undefined) {
       return { minutes: options.minutes }
+    }
+
+    // Additive branch (`resolveTargetDate`): only reached when both `minutes`
+    // and `presetKey` are absent, so no existing caller (which always supplies
+    // exactly one of them) can hit this path.
+    if (options.presetKey === undefined && options.resolveTargetDate) {
+      const baseResolution = await this.resolveSnoozeBase(alertId, userId)
+
+      if ('error' in baseResolution) {
+        return { error: baseResolution.error }
+      }
+
+      const { base } = baseResolution
+      const target = options.resolveTargetDate(base)
+
+      return { minutes: (target.getTime() - base.getTime()) / MINUTE_IN_MS }
     }
 
     if (options.presetKey === SNOOZE_DEFAULT_PRESET_KEY) {

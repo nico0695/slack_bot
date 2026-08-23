@@ -61,6 +61,7 @@ export enum AssistantsFlags {
   PAUSE = 'pause',
   RESUME = 'resume',
   DELETE = 'delete',
+  SNOOZE = 'snooze',
   SIZE = 'size',
   QUALITY = 'quality',
   NUMBER = 'number',
@@ -101,6 +102,7 @@ export const assistantFlagsKey: {
   pause: AssistantsFlags.PAUSE,
   resume: AssistantsFlags.RESUME,
   delete: AssistantsFlags.DELETE,
+  snooze: AssistantsFlags.SNOOZE,
 
   size: AssistantsFlags.SIZE,
   s: AssistantsFlags.SIZE,
@@ -134,6 +136,15 @@ export const assistantMessageConfig: IAssistantMessageConfig = {
     flags: {
       [AssistantsFlags.LIST]: {
         defaultValue: true,
+      },
+      [AssistantsFlags.SNOOZE]: {
+        defaultValue: true,
+      },
+      [AssistantsFlags.ID]: {
+        defaultValue: null,
+      },
+      [AssistantsFlags.TAG]: {
+        defaultValue: null,
       },
     },
   },

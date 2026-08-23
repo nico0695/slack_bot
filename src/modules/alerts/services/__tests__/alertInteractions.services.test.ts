@@ -1,6 +1,7 @@
 import AlertInteractionsService, { SNOOZE_DEFAULT_PRESET_KEY } from '../alertInteractions.services'
 import { snoozePresets, preferencePresets } from '../../shared/constants/snoozeCatalog'
 import * as slackMsgUtilsMock from '../../../../shared/utils/slackMessages.utils'
+import { resolveNextCalendarDayAt } from '../../../../shared/utils/dates.utils'
 
 const buildBlocksMock = (): { blocks: any[] } => ({ blocks: [] as any[] })
 
@@ -364,6 +365,89 @@ describe('AlertInteractionsService', () => {
       })
 
       expect(result).toBe('No se encontró la alerta solicitada')
+      expect(rescheduleAlertMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('snoozeAlert - resolveTargetDate extension (AC-B3)', () => {
+    it('resolves through the caller-supplied closure, base = max(now, alert_date) - alert in the past', async () => {
+      const now = argentinaDate(2026, 8, 1, 12, 0)
+      jest.useFakeTimers().setSystemTime(now)
+
+      getAlertByIdMock.mockResolvedValue({
+        data: { id: 3, date: argentinaDate(2026, 7, 30, 8, 0) },
+      })
+      rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
+
+      await service.snoozeAlert(3, 11, {
+        resolveTargetDate: (base) => resolveNextCalendarDayAt(base, 14, 30),
+        updatePreference: false,
+      })
+
+      expect(getAlertByIdMock).toHaveBeenCalledWith(3, 11)
+
+      const expectedTarget = resolveNextCalendarDayAt(now, 14, 30)
+      const expectedMinutes = (expectedTarget.getTime() - now.getTime()) / (60 * 1000)
+
+      expect(rescheduleAlertMock).toHaveBeenCalledWith(3, 11, expectedMinutes)
+      expect(saveAlertSnoozeConfigMock).not.toHaveBeenCalled()
+    })
+
+    it('resolves from the alert date when the alert is in the future (base = alert_date)', async () => {
+      const now = argentinaDate(2026, 8, 1, 12, 0)
+      const alertDate = argentinaDate(2026, 8, 3, 18, 30)
+      jest.useFakeTimers().setSystemTime(now)
+
+      getAlertByIdMock.mockResolvedValue({ data: { id: 3, date: alertDate } })
+      rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
+
+      await service.snoozeAlert(3, 11, {
+        resolveTargetDate: (base) => resolveNextCalendarDayAt(base, 9, 15),
+        updatePreference: false,
+      })
+
+      const expectedTarget = resolveNextCalendarDayAt(alertDate, 9, 15)
+      const expectedMinutes = (expectedTarget.getTime() - alertDate.getTime()) / (60 * 1000)
+
+      expect(rescheduleAlertMock).toHaveBeenCalledWith(3, 11, expectedMinutes)
+    })
+
+    it('bare-hour form (minute 0) resolves the same way', async () => {
+      const now = argentinaDate(2026, 8, 1, 12, 0)
+      jest.useFakeTimers().setSystemTime(now)
+
+      getAlertByIdMock.mockResolvedValue({
+        data: { id: 3, date: argentinaDate(2026, 7, 30, 8, 0) },
+      })
+      rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
+
+      await service.snoozeAlert(3, 11, {
+        resolveTargetDate: (base) => resolveNextCalendarDayAt(base, 14, 0),
+        updatePreference: false,
+      })
+
+      const expectedTarget = resolveNextCalendarDayAt(now, 14, 0)
+      const expectedMinutes = (expectedTarget.getTime() - now.getTime()) / (60 * 1000)
+
+      expect(rescheduleAlertMock).toHaveBeenCalledWith(3, 11, expectedMinutes)
+    })
+
+    it('surfaces the alert lookup error instead of rescheduling', async () => {
+      getAlertByIdMock.mockResolvedValue({ error: 'No se encontró la alerta solicitada' })
+
+      const result = await service.snoozeAlert(3, 11, {
+        resolveTargetDate: (base) => resolveNextCalendarDayAt(base, 14, 30),
+        updatePreference: false,
+      })
+
+      expect(result).toBe('No se encontró la alerta solicitada')
+      expect(rescheduleAlertMock).not.toHaveBeenCalled()
+    })
+
+    it('does not call getAlertById-based resolution when neither minutes/presetKey/resolveTargetDate is supplied (pre-existing, untouched fallback)', async () => {
+      const result = await service.snoozeAlert(3, 11, { updatePreference: false })
+
+      expect(result).toBe('Acción no reconocida.')
       expect(rescheduleAlertMock).not.toHaveBeenCalled()
     })
   })

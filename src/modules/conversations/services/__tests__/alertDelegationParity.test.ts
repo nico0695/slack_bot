@@ -125,7 +125,6 @@ describe('Alert delegation parity between the two entry points (AC-5)', () => {
 
     messageProcessor = new MessageProcessor(
       {} as any, // aiRepository
-      redisRepositoryMock as any,
       alertsServicesMock as any,
       alertInteractionsService,
       {} as any, // tasksServices
