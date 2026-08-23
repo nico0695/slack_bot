@@ -17,6 +17,7 @@ import {
 } from '../shared/constants/prompt.constants'
 
 import AlertsServices from '../../alerts/services/alerts.services'
+import AlertInteractionsService from '../../alerts/services/alertInteractions.services'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
 import LinksServices from '../../links/services/links.services'
@@ -36,7 +37,6 @@ import { qrSchema } from '../../qr/shared/schemas/qr.schemas'
 import SearchRepository from '../repositories/search/search.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
-import { RedisRepository } from '../repositories/redis/conversations.redis'
 import { IGeneratedImage, ImageProvider } from '../../images/shared/interfaces/images.interfaces'
 import {
   VALID_IMAGE_SIZES,
@@ -44,13 +44,20 @@ import {
 } from '../../images/shared/constants/imageOptions.constants'
 
 import { buildUserDataContext, formatConversationHistory } from '../shared/utils/userContext.utils'
+import { parseSnoozeDuration } from '../shared/utils/snoozeDuration.utils'
 
-import { formatDateToText } from '../../../shared/utils/dates.utils'
+import { formatDateToText, resolveNextCalendarDayAt } from '../../../shared/utils/dates.utils'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 const log = createModuleLogger('conversations.messageProcessor')
 
 const IMAGE_GENERATION_ERROR = '❌ Error al generar la imagen. Intenta nuevamente.'
+
+// Shared across every snooze entry point so wording never drifts between them.
+const SNOOZE_DURATION_USAGE_MESSAGE =
+  'Usa minutos, horas, días o "mañana" para snooze. Ejemplo: snooze #12 30m / 2h / 2d / mañana 14:30'
+
+const SNOOZE_MAX_DURATION_MESSAGE = 'El snooze máximo es de 60 días.'
 
 interface IProcessMessageResult {
   response: IConversation | null
@@ -128,12 +135,10 @@ type ReminderCommandAction = 'create' | 'list' | 'check' | 'pause' | 'resume' | 
 
 @injectable()
 export default class MessageProcessor {
-  private defaultSnoozeMinutes = 10
-
   constructor(
     @inject('AIRepository') private aiRepository: OpenaiRepository | GeminiRepository,
-    private redisRepository: RedisRepository,
     private alertsServices: AlertsServices,
+    private alertInteractionsService: AlertInteractionsService,
     private tasksServices: TasksServices,
     private notesServices: NotesServices,
     private linksServices: LinksServices,
@@ -283,15 +288,6 @@ export default class MessageProcessor {
     }
 
     return parts.length > 0 ? '\n' + parts.join('\n') : ''
-  }
-
-  private getSnoozeMinutes = async (userId: number): Promise<number> => {
-    const config = await this.redisRepository.getAlertSnoozeConfig(userId)
-    return config?.defaultSnoozeMinutes ?? this.defaultSnoozeMinutes
-  }
-
-  private setSnoozeMinutes = async (userId: number, minutes: number): Promise<void> => {
-    await this.redisRepository.saveAlertSnoozeConfig(userId, { defaultSnoozeMinutes: minutes })
   }
 
   private buildAssistantResponse = (content: string, block?: { blocks: any[] }): IConversation => {
@@ -666,6 +662,97 @@ export default class MessageProcessor {
     }
   }
 
+  /** Shared by the keyword, `.a -snooze`, and `alert.snooze` entry points so none drift on wording. */
+  private resolveSnoozeDispatch = async (
+    alertId: number,
+    userId: number,
+    rawDuration?: string
+  ): Promise<IConversation> => {
+    const parsedDuration = parseSnoozeDuration(rawDuration)
+
+    if (parsedDuration.kind === 'invalid' && parsedDuration.reason === 'exceedsMax') {
+      return this.buildAssistantResponse(SNOOZE_MAX_DURATION_MESSAGE)
+    }
+
+    if (parsedDuration.kind === 'invalid') {
+      return this.buildAssistantResponse(SNOOZE_DURATION_USAGE_MESSAGE)
+    }
+
+    if (parsedDuration.kind === 'presetTomorrow') {
+      const result = await this.alertInteractionsService.snoozeAlert(alertId, userId, {
+        presetKey: 'snooze_tomorrow',
+        updatePreference: false,
+      })
+
+      if (typeof result === 'string') {
+        return this.buildAssistantResponse(result)
+      }
+
+      return this.buildAssistantResponse(
+        `Alerta #${alertId} reprogramada para mañana a las 09:00.`,
+        result
+      )
+    }
+
+    if (parsedDuration.kind === 'calendarTime') {
+      const { hour, minute } = parsedDuration
+      const result = await this.alertInteractionsService.snoozeAlert(alertId, userId, {
+        resolveTargetDate: (base) => resolveNextCalendarDayAt(base, hour, minute),
+        updatePreference: false,
+      })
+
+      if (typeof result === 'string') {
+        return this.buildAssistantResponse(result)
+      }
+
+      const timeLabel = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      return this.buildAssistantResponse(
+        `Alerta #${alertId} reprogramada para mañana a las ${timeLabel}.`,
+        result
+      )
+    }
+
+    const minutes: number =
+      parsedDuration.kind === 'minutes'
+        ? parsedDuration.minutes
+        : await this.alertInteractionsService.getDefaultSnoozeMinutes(userId)
+
+    const result = await this.alertInteractionsService.snoozeAlert(alertId, userId, {
+      minutes,
+      updatePreference: false,
+    })
+
+    if (typeof result === 'string') {
+      return this.buildAssistantResponse(result)
+    }
+
+    const summary =
+      parsedDuration.kind === 'minutes' && parsedDuration.unit === 'd'
+        ? `Alerta #${alertId} reprogramada a ${parsedDuration.amount} día${
+            parsedDuration.amount > 1 ? 's' : ''
+          }.`
+        : `Alerta #${alertId} reprogramada a ${minutes} minuto${minutes > 1 ? 's' : ''}.`
+    return this.buildAssistantResponse(summary, result)
+  }
+
+  /** `.a`/`.alert -snooze -id N [-t <duration>]`. Id validation mirrors `resolveReminderAction`. */
+  private handleAlertSnoozeVariable = async (
+    userId: number,
+    assistantMessage: AssistantMessage
+  ): Promise<IConversation> => {
+    const rawAlertId = String(assistantMessage.flags[AssistantsFlags.ID] ?? '').trim()
+    const normalizedAlertId = rawAlertId.replace(/^#/, '')
+    const alertId = Number(normalizedAlertId)
+
+    if (!normalizedAlertId || !Number.isInteger(alertId) || alertId <= 0) {
+      return this.buildAssistantResponse('Necesito un id válido. Ejemplo: .a -snooze -id 12')
+    }
+
+    const rawDuration = assistantMessage.flags[AssistantsFlags.TAG] as string | undefined
+
+    return await this.resolveSnoozeDispatch(alertId, userId, rawDuration)
+  }
+
   private handleAssistantCommand = async (
     userId: number,
     message: string,
@@ -680,50 +767,22 @@ export default class MessageProcessor {
     const lower = trimmed.toLowerCase()
     const scopeChannelId = this.getScopeChannelId(channelId, isChannelContext)
 
-    const snoozeMatch = lower.match(/^snooze\s+#?(\d+)(?:\s+(\d+)([mh]))?/)
+    const snoozeMatch = lower.match(/^snooze\s+#?(\d+)(?:\s+(.+))?$/)
     if (snoozeMatch) {
       const alertId = Number(snoozeMatch[1])
       if (!Number.isFinite(alertId)) {
         return this.buildAssistantResponse('Necesito un número de alerta válido para snooze.')
       }
 
-      let minutes: number | null = null
-      const amountRaw = snoozeMatch[2]
-      const unit = snoozeMatch[3]
-
-      if (amountRaw && unit) {
-        const amount = Number(amountRaw)
-        if (!Number.isFinite(amount) || amount <= 0) {
-          return this.buildAssistantResponse('Usa minutos u horas válidas para snooze.')
-        }
-        minutes = unit === 'h' ? amount * 60 : amount
-      }
-
-      if (!minutes) {
-        minutes = await this.getSnoozeMinutes(userId)
-      }
-
-      const result = await this.handleAlertSnooze(alertId, userId, minutes, {
-        updatePreference: Boolean(amountRaw),
-      })
-
-      if (typeof result === 'string') {
-        return this.buildAssistantResponse(result)
-      }
-
-      const summary = `Alerta #${alertId} reprogramada a ${minutes} minuto${
-        minutes > 1 ? 's' : ''
-      }.`
-      return this.buildAssistantResponse(summary, result)
+      return await this.resolveSnoozeDispatch(alertId, userId, snoozeMatch[2])
     }
 
     const repeatMatch = lower.match(/^(?:alert\s+)?repeat\s+#?(\d+)\s+(daily|weekly)/)
     if (repeatMatch) {
       const alertId = Number(repeatMatch[1])
       const policy = repeatMatch[2] as 'daily' | 'weekly'
-      const minutesToAdd = policy === 'daily' ? 24 * 60 : 7 * 24 * 60
 
-      const result = await this.handleAlertRepeat(alertId, userId, minutesToAdd, policy)
+      const result = await this.alertInteractionsService.repeatAlert(alertId, userId, policy)
 
       if (typeof result === 'string') {
         return this.buildAssistantResponse(result)
@@ -754,7 +813,11 @@ export default class MessageProcessor {
         scope = 'pending'
       }
 
-      const result = await this.listAlertsByScope(userId, scope, scopeChannelId)
+      const result = await this.alertInteractionsService.listAlertsByScope(
+        userId,
+        scope,
+        scopeChannelId
+      )
 
       if (typeof result === 'string') {
         return this.buildAssistantResponse(result)
@@ -785,7 +848,7 @@ export default class MessageProcessor {
       }
 
       const minutes = unit === 'h' ? amount * 60 : amount
-      await this.setSnoozeMinutes(userId, minutes)
+      await this.alertInteractionsService.setDefaultSnoozeMinutes(userId, minutes)
       return this.buildAssistantResponse(
         `Snooze preferido actualizado a ${minutes} minuto${minutes > 1 ? 's' : ''}.`
       )
@@ -867,6 +930,11 @@ export default class MessageProcessor {
             contentBlock: messageBlockToResponse,
             provider: ConversationProviders.ASSISTANT,
           }
+          break
+        }
+
+        if (assistantMessage.flags[AssistantsFlags.SNOOZE]) {
+          responseMessage = await this.handleAlertSnoozeVariable(userId, assistantMessage)
           break
         }
 
@@ -1848,6 +1916,16 @@ export default class MessageProcessor {
 
           return this.buildAssistantResponse(`Reminder #${reminderId} eliminado.`)
         }
+        case 'alert.snooze': {
+          const alertId = this.normalizeReminderIntentId(parsed)
+          if (alertId === null) {
+            return this.buildAssistantResponse('Necesito un id válido para posponer la alerta.')
+          }
+
+          const rawDuration = typeof parsed.duration === 'string' ? parsed.duration : undefined
+
+          return await this.resolveSnoozeDispatch(alertId, userId, rawDuration)
+        }
         case 'image.create': {
           if (!parsed.prompt || typeof parsed.prompt !== 'string') {
             return null
@@ -2027,110 +2105,5 @@ export default class MessageProcessor {
       content: aiSummary?.content || 'No se pudo generar un resumen.',
       provider: ConversationProviders.ASSISTANT,
     }
-  }
-
-  private handleAlertSnooze = async (
-    alertId: number,
-    userId: number,
-    minutes: number,
-    options: { updatePreference?: boolean } = {}
-  ): Promise<string | { blocks: any[] }> => {
-    if (!Number.isFinite(minutes) || minutes <= 0) {
-      return 'El snooze debe ser mayor a 1 minuto.'
-    }
-
-    const res = await this.alertsServices.rescheduleAlert(alertId, userId, minutes)
-
-    if (res.error || !res.data) {
-      return res.error ?? 'No se pudo reprogramar la alerta. 😅'
-    }
-
-    if (options.updatePreference) {
-      await this.setSnoozeMinutes(userId, minutes)
-    }
-
-    return slackMsgUtils.msgAlertDetail(res.data)
-  }
-
-  private handleAlertRepeat = async (
-    alertId: number,
-    userId: number,
-    minutesToAdd: number,
-    policy: 'daily' | 'weekly'
-  ): Promise<string | { blocks: any[] }> => {
-    const followUp = await this.alertsServices.createFollowUpAlert(alertId, userId, minutesToAdd)
-
-    if (followUp.error || !followUp.data) {
-      return followUp.error ?? 'No se pudo crear la recurrencia. 😅'
-    }
-
-    const messageBlock = slackMsgUtils.msgAlertCreated(followUp.data)
-
-    messageBlock.blocks.push({
-      type: 'context',
-      elements: [
-        {
-          type: 'mrkdwn',
-          text: `La alerta #${alertId} se repetirá de forma ${
-            policy === 'daily' ? 'diaria' : 'semanal'
-          }.`,
-        },
-      ],
-    })
-
-    return messageBlock
-  }
-
-  private listAlertsByScope = async (
-    userId: number,
-    scope: 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved',
-    channelId: string | null
-  ): Promise<string | { blocks: any[] }> => {
-    const alertsRes = await this.alertsServices.getAlertsByUserId(userId, {
-      channelId,
-    })
-    if (alertsRes.error) {
-      return 'No se pudieron obtener las alertas. 😅'
-    }
-
-    const alerts = alertsRes.data ?? []
-    if (!alerts.length) {
-      return 'No tienes alertas guardadas.'
-    }
-
-    const now = new Date()
-
-    let filtered = alerts
-    let emptyMessage = 'No hay alertas para mostrar.'
-
-    switch (scope) {
-      case 'pending':
-        filtered = alerts.filter((alert) => !alert.sent)
-        emptyMessage = 'No tienes alertas pendientes.'
-        break
-      case 'snoozed':
-        filtered = alerts.filter((alert) => !alert.sent)
-        emptyMessage = 'No tienes alertas pendientes.'
-        break
-      case 'overdue':
-        filtered = alerts.filter((alert) => !alert.sent && new Date(alert.date) < now)
-        emptyMessage = 'No tienes alertas atrasadas.'
-        break
-      case 'resolved':
-        filtered = alerts.filter((alert) => alert.sent)
-        emptyMessage = 'No tienes alertas resueltas.'
-        break
-      case 'all':
-      default:
-        filtered = alerts
-        emptyMessage = 'No tienes alertas guardadas.'
-        break
-    }
-
-    if (!filtered.length) {
-      return emptyMessage
-    }
-
-    return slackMsgUtils.msgAlertsList(filtered)
   }
 }

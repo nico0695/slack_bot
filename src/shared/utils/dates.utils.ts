@@ -1,5 +1,83 @@
 import { ARGENTINA_TIMEZONE, ARGENTINA_UTC_OFFSET_MINUTES } from '../constants/timezone.constants'
 
+export interface IArgentinaDateParts {
+  year: number
+  month: number
+  day: number
+  dayOfWeek: number
+  hour: number
+  minute: number
+}
+
+const DAY_NAME_TO_INDEX: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+}
+
+/**
+ * Decompose a Date into its Argentina (America/Argentina/Buenos_Aires) calendar parts.
+ */
+export function getArgentinaDateParts(date: Date): IArgentinaDateParts {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: ARGENTINA_TIMEZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  })
+
+  const parts = formatter.formatToParts(date)
+  const get = (type: string): string => parts.find((p) => p.type === type)?.value ?? '0'
+
+  const year = Number(get('year'))
+  const month = Number(get('month'))
+  const day = Number(get('day'))
+  const dayOfWeek = DAY_NAME_TO_INDEX[get('weekday')] ?? 0
+  let hour = Number(get('hour'))
+  const minute = Number(get('minute'))
+
+  if (hour === 24) {
+    hour = 0
+  }
+
+  return { year, month, day, dayOfWeek, hour, minute }
+}
+
+/**
+ * Build a Date from Argentina calendar parts. Out-of-range day values normalize
+ * (day 32 of August becomes September 1st), which calendar-day callers rely on.
+ */
+export function buildArgentinaTimestamp(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number
+): Date {
+  const utcDate = Date.UTC(year, month - 1, day, hour, minute, 0, 0)
+  return new Date(utcDate + ARGENTINA_UTC_OFFSET_MINUTES * 60 * 1000)
+}
+
+/**
+ * Resolve the Argentina calendar day AFTER `base`, at `hour:minute` Argentina time.
+ * Unconditional: there is no same-day case, regardless of `base`'s time of day.
+ * @param hour number - Argentina local hour
+ * @param minute number - Argentina local minute (defaults to 0)
+ */
+export function resolveNextCalendarDayAt(base: Date, hour: number, minute = 0): Date {
+  const parts = getArgentinaDateParts(base)
+
+  return buildArgentinaTimestamp(parts.year, parts.month, parts.day + 1, hour, minute)
+}
+
 /**
  * Format text to date
  * @param dateText string - YYYY-MM-DD HH:mm[:ss] interpreted as Argentina local time OR relative 9w9d9h9m (optionals)
