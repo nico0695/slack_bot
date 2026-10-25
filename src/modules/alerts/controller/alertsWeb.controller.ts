@@ -4,6 +4,7 @@ import { injectable } from 'tsyringe'
 
 import GenericController from '../../../shared/modules/genericController'
 import BadRequestError from '../../../shared/utils/errors/BadRequestError'
+import ConflictError from '../../../shared/utils/errors/ConflictError'
 import { validateBody, validateParams, idParamSchema } from '../../../shared/utils/validation'
 
 import { HttpAuth, Permission } from '../../../shared/middleware/auth'
@@ -45,7 +46,20 @@ export default class AlertsWebController extends GenericController {
       userId: user.id,
     }
 
+    if (parsed.requestId) {
+      dataAlert.requestId = parsed.requestId
+      dataAlert.source = parsed.source ?? null
+      dataAlert.deviceId = parsed.deviceId ?? null
+    }
+
     const response = await this.alertsServices.createAlert(dataAlert)
+
+    if (response.conflictAlertId) {
+      throw new ConflictError({
+        message: response.error,
+        context: { code: 'ALERT_REQUEST_CONFLICT', alertId: response.conflictAlertId },
+      })
+    }
 
     if (response.error) {
       throw new BadRequestError({ message: response.error })

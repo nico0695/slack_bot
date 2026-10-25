@@ -4,17 +4,30 @@ import { container } from 'tsyringe'
 import { createModuleLogger } from '../../../config/logger'
 import { connectionSlackApp as slackApp } from '../../../config/slackConfig'
 import AlertsServices from '../services/alerts.services'
+import BridgeServices from '../../bridge/services/bridge.services'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
 
 const log = createModuleLogger('alerts.cron')
 
+// Prevents overlapping runs when a tick takes longer than the schedule interval
+let isRunning = false
+
 /**
- * Get alerts to notify and send message to slack
+ * Get alerts to notify, enqueue their bridge events and send message to slack
  */
 export const alertCronJob = async (): Promise<void> => {
+  if (isRunning) {
+    log.warn('Previous alertCronJob still running, skipping tick')
+    return
+  }
+
+  isRunning = true
+
   try {
     const startTime = Date.now()
+    const now = new Date()
     const alertsServices = container.resolve(AlertsServices)
+    const bridgeServices = container.resolve(BridgeServices)
 
     const alerts = await alertsServices.getAlertsToNotify()
 
@@ -27,8 +40,17 @@ export const alertCronJob = async (): Promise<void> => {
       return
     }
 
-    await Promise.all(
+    const processedIds = await Promise.all(
       alerts?.data.map(async (alert) => {
+        // Enqueue first: if it fails the alert stays unsent and the whole alert is retried
+        // next tick, so the bridge event is never lost and Slack/Web Push are not repeated
+        const bridgeResponse = await bridgeServices.enqueueAlertEvent(alert, now)
+
+        if (bridgeResponse.error) {
+          log.error({ alertId: alert.id }, 'Skipping alert, bridge event could not be enqueued')
+          return null
+        }
+
         const targetChannel = alert.channelId ?? alert.user.slackChannelId
 
         if (targetChannel) {
@@ -62,14 +84,25 @@ export const alertCronJob = async (): Promise<void> => {
             }
           }
         }
+
+        return alert.id
       })
     )
 
-    await alertsServices.updateAlertAsNotified(alerts?.data.map((alert) => alert.id))
+    const notifiedIds = processedIds.filter((id) => id !== null)
+
+    if (notifiedIds.length > 0) {
+      await alertsServices.updateAlertAsNotified(notifiedIds)
+    }
 
     const durationMs = Date.now() - startTime
-    log.info({ count: alerts?.data.length, durationMs }, 'Alerts notified successfully')
+    log.info(
+      { count: notifiedIds.length, skipped: alerts.data.length - notifiedIds.length, durationMs },
+      'Alerts notified successfully'
+    )
   } catch (error) {
     log.error({ err: error }, 'alertCronJob failed')
+  } finally {
+    isRunning = false
   }
 }

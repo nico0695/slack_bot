@@ -134,6 +134,15 @@ describe('UsersDataSources', () => {
 
       expect(result).toBe(error)
     })
+
+    it('reloads the user by the updated id even when data has no id', async () => {
+      updateMock.mockResolvedValue(undefined)
+      findOneMock.mockResolvedValue({ id: 5 })
+
+      await dataSource.updateUserById(5, { supabaseId: 'sb-1' })
+
+      expect(findOneMock).toHaveBeenCalledWith({ where: { id: 5 } })
+    })
   })
 
   describe('getUserBySlackId', () => {

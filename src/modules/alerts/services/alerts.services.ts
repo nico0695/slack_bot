@@ -2,7 +2,11 @@ import { singleton } from 'tsyringe'
 
 import { Alerts } from '../../../entities/alerts'
 import { GenericResponse } from '../../../shared/interfaces/services'
-import { IAlertToNotify, IAlert } from '../shared/interfaces/alerts.interfaces'
+import {
+  IAlertToNotify,
+  IAlert,
+  ICreateAlertResponse,
+} from '../shared/interfaces/alerts.interfaces'
 
 import AlertsDataSource from '../repositories/database/alerts.dataSource'
 import { UsersRedis } from '../../users/repositories/redis/users.redis'
@@ -53,12 +57,79 @@ export default class AlertsServices {
   }
 
   /**
-   * Save alert in database
+   * Whether an existing alert matches the data of a repeated request
+   */
+  private isSameAlertRequest(alert: Alerts, data: IAlert): boolean {
+    return (
+      alert.message.trim() === data.message.trim() &&
+      new Date(alert.date).getTime() === new Date(data.date).getTime() &&
+      (alert.source ?? null) === (data.source ?? null) &&
+      (alert.deviceId ?? null) === (data.deviceId ?? null)
+    )
+  }
+
+  private resolveExistingAlert(alert: Alerts, data: IAlert): ICreateAlertResponse {
+    if (this.isSameAlertRequest(alert, data)) {
+      log.info(
+        { userId: data.userId, alertId: alert.id, requestId: data.requestId },
+        'Alert request replayed'
+      )
+      return { data: alert }
+    }
+
+    log.warn(
+      { userId: data.userId, alertId: alert.id, requestId: data.requestId },
+      'Alert requestId reused with different data'
+    )
+    return {
+      error: 'El requestId ya fue usado con datos distintos',
+      conflictAlertId: alert.id,
+    }
+  }
+
+  /**
+   * Create an alert once per (user, requestId). Retries return the stored alert,
+   * also when a concurrent request inserted it first.
+   */
+  private async createIdempotentAlert(data: IAlert): Promise<ICreateAlertResponse> {
+    const existing = await this.alertsDataSource.getAlertByRequestId(data.userId, data.requestId)
+
+    if (existing) {
+      return this.resolveExistingAlert(existing, data)
+    }
+
+    await this.alertsDataSource.insertAlertIfAbsent(data)
+
+    // Read back the stored row: ours, or the one of a concurrent request
+    const stored = await this.alertsDataSource.getAlertByRequestId(data.userId, data.requestId)
+
+    if (!stored) {
+      throw new Error('Alert not found after insert')
+    }
+
+    if (!this.isSameAlertRequest(stored, data)) {
+      return this.resolveExistingAlert(stored, data)
+    }
+
+    log.info(
+      { userId: data.userId, alertId: stored.id, requestId: data.requestId },
+      'Alert created'
+    )
+
+    return { data: stored }
+  }
+
+  /**
+   * Save alert in database. With a requestId, creation is idempotent
    * @param data IAlert - Data alert
    * @returns
    */
-  public async createAlert(data: IAlert): Promise<GenericResponse<Alerts>> {
+  public async createAlert(data: IAlert): Promise<ICreateAlertResponse> {
     try {
+      if (data.requestId) {
+        return await this.createIdempotentAlert(data)
+      }
+
       const response = await this.alertsDataSource.createAlert(data)
 
       log.info({ userId: data.userId, alertId: response.id }, 'Alert created')

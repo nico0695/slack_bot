@@ -7,10 +7,13 @@ import {
   JoinColumn,
   CreateDateColumn,
   DeleteDateColumn,
+  Index,
 } from 'typeorm'
 import { Users } from './users'
 
 @Entity()
+// NULL requestIds are distinct in SQLite, so alerts without one are unaffected
+@Index(['user', 'requestId'], { unique: true })
 export class Alerts extends BaseEntity {
   @PrimaryGeneratedColumn()
   id: number
@@ -26,6 +29,16 @@ export class Alerts extends BaseEntity {
 
   @Column({ nullable: true })
   channelId: string
+
+  // Client generated id used to make creation retries idempotent
+  @Column({ nullable: true, default: null })
+  requestId: string | null
+
+  @Column({ nullable: true, default: null })
+  source: string | null
+
+  @Column({ nullable: true, default: null })
+  deviceId: string | null
 
   @ManyToOne((type) => Users)
   @JoinColumn({ name: 'userId' })
