@@ -28,18 +28,31 @@ describe('AlertsDataSource', () => {
       expect(result.user.id).toBe(5)
     })
 
-    it('returns the error when save fails', async () => {
+    it('throws when save fails', async () => {
       const error = new Error('db error')
       jest.spyOn(Alerts.prototype as any, 'save').mockRejectedValue(error)
 
-      const result = await dataSource.createAlert({
-        userId: 9,
-        date: new Date(),
-        message: 'Ping',
-      })
-
-      expect(result).toBe(error)
+      await expect(
+        dataSource.createAlert({
+          userId: 9,
+          date: new Date(),
+          message: 'Ping',
+        })
+      ).rejects.toBe(error)
     })
+  })
+
+  it('gets alert by request id including soft deleted rows', async () => {
+    const alert = { id: 4 } as any
+    const findOneSpy = jest.spyOn(Alerts, 'findOne').mockResolvedValue(alert)
+
+    const result = await dataSource.getAlertByRequestId(3, 'req-1')
+
+    expect(findOneSpy).toHaveBeenCalledWith({
+      where: { user: { id: 3 }, requestId: 'req-1' },
+      withDeleted: true,
+    })
+    expect(result).toBe(alert)
   })
 
   it('retrieves alerts for user with extra filters', async () => {
@@ -113,8 +126,11 @@ describe('AlertsDataSource', () => {
       id: true,
       message: true,
       date: true,
-      user: expect.any(Object),
+      requestId: true,
+      deviceId: true,
+      user: expect.objectContaining({ bridgeBaseUrl: true, bridgeWebhookEnabled: true }),
     })
+    expect(callArgs.select.user).not.toHaveProperty('bridgeWebhookSecret')
     expect(callArgs.relations).toEqual(['user'])
     expect(callArgs.where.sent).toBe(false)
     expect(result).toBe(alerts)

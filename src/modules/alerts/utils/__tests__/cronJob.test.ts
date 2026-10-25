@@ -3,6 +3,7 @@ import { alertCronJob } from '../cronJob'
 const mockAlertsFns = {
   getAlertsToNotify: jest.fn(),
   updateAlertAsNotified: jest.fn(),
+  enqueueAlertEvent: jest.fn(),
 }
 
 jest.mock('../../services/alerts.services', () => ({
@@ -10,11 +11,17 @@ jest.mock('../../services/alerts.services', () => ({
   default: class MockAlertsServices {},
 }))
 
+jest.mock('../../../bridge/services/bridge.services', () => ({
+  __esModule: true,
+  default: class MockBridgeServices {},
+}))
+
 jest.mock('tsyringe', () => ({
   container: {
     resolve: jest.fn().mockReturnValue({
       getAlertsToNotify: (...args: any[]) => mockAlertsFns.getAlertsToNotify(...args),
       updateAlertAsNotified: (...args: any[]) => mockAlertsFns.updateAlertAsNotified(...args),
+      enqueueAlertEvent: (...args: any[]) => mockAlertsFns.enqueueAlertEvent(...args),
     }),
   },
   singleton: () => (cls: any) => cls,
@@ -22,6 +29,7 @@ jest.mock('tsyringe', () => ({
 
 const getAlertsToNotifyMock = mockAlertsFns.getAlertsToNotify
 const updateAlertAsNotifiedMock = mockAlertsFns.updateAlertAsNotified
+const enqueueAlertEventMock = mockAlertsFns.enqueueAlertEvent
 const postMessageMock = jest.fn()
 const sendNotificationMock = jest.fn()
 const msgAlertDetailMock = jest.fn()
@@ -57,6 +65,7 @@ jest.mock('../../../../config/logger', () => ({
 describe('alertCronJob', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    enqueueAlertEventMock.mockResolvedValue({ data: false })
   })
 
   it('returns early when alert service responds with error', async () => {
@@ -145,5 +154,82 @@ describe('alertCronJob', () => {
     expect(postMessageMock).toHaveBeenCalled()
     expect(sendNotificationMock).not.toHaveBeenCalled()
     expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([3])
+  })
+
+  describe('bridge events', () => {
+    const slackAlert: any = {
+      id: 4,
+      message: 'Bridge',
+      user: { id: 5, slackChannelId: 'channel', bridgeWebhookEnabled: true },
+    }
+    const noChannelAlert: any = {
+      id: 5,
+      message: 'Bridge without Slack',
+      user: { id: 5, slackChannelId: '', bridgeWebhookEnabled: true },
+    }
+
+    beforeEach(() => {
+      msgAlertDetailMock.mockReturnValue({ blocks: [] })
+      postMessageMock.mockResolvedValue(undefined)
+      updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+    })
+
+    it('enqueues every alert with the same trigger time, also without Slack channel', async () => {
+      getAlertsToNotifyMock.mockResolvedValue({ data: [slackAlert, noChannelAlert] })
+      enqueueAlertEventMock.mockResolvedValue({ data: true })
+
+      await alertCronJob()
+
+      expect(enqueueAlertEventMock).toHaveBeenCalledTimes(2)
+      expect(enqueueAlertEventMock).toHaveBeenCalledWith(slackAlert, expect.any(Date))
+      expect(enqueueAlertEventMock).toHaveBeenCalledWith(noChannelAlert, expect.any(Date))
+      const [[, firstDate], [, secondDate]] = enqueueAlertEventMock.mock.calls
+      expect(firstDate).toBe(secondDate)
+      expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([4, 5])
+    })
+
+    it('skips Slack and keeps the alert unsent when enqueuing fails', async () => {
+      getAlertsToNotifyMock.mockResolvedValue({ data: [slackAlert, noChannelAlert] })
+      enqueueAlertEventMock.mockImplementation(async (alert: any) =>
+        alert.id === 4 ? { error: 'fail' } : { data: true }
+      )
+
+      await alertCronJob()
+
+      expect(postMessageMock).not.toHaveBeenCalled()
+      expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([5])
+    })
+
+    it('does not mark anything when every enqueue fails', async () => {
+      getAlertsToNotifyMock.mockResolvedValue({ data: [slackAlert] })
+      enqueueAlertEventMock.mockResolvedValue({ error: 'fail' })
+
+      await alertCronJob()
+
+      expect(postMessageMock).not.toHaveBeenCalled()
+      expect(updateAlertAsNotifiedMock).not.toHaveBeenCalled()
+    })
+
+    it('skips a tick while the previous run is still in progress', async () => {
+      let releaseFirstRun: (value: any) => void
+      getAlertsToNotifyMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          releaseFirstRun = resolve
+        })
+      )
+
+      const firstRun = alertCronJob()
+      await alertCronJob()
+
+      expect(getAlertsToNotifyMock).toHaveBeenCalledTimes(1)
+
+      releaseFirstRun({ data: [] })
+      await firstRun
+
+      getAlertsToNotifyMock.mockResolvedValue({ data: [] })
+      await alertCronJob()
+
+      expect(getAlertsToNotifyMock).toHaveBeenCalledTimes(2)
+    })
   })
 })

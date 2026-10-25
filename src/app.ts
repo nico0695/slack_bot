@@ -33,6 +33,7 @@ import { IJoinRoomData } from './modules/conversations/shared/interfaces/convers
 import { ProgressCallback } from './modules/conversations/shared/interfaces/converstions'
 import SummaryWebController from './modules/summary/controller/summary.controller'
 import { alertCronJob } from './modules/alerts/utils/cronJob'
+import { bridgeDeliveryCronJob } from './modules/bridge/utils/cronJob'
 import { reminderCronJob } from './modules/reminders/utils/cronJob'
 import { supabaseKeepAlive } from './modules/system/utils/supabaseKeepAlive'
 import AlertsWebController from './modules/alerts/controller/alertsWeb.controller'
@@ -45,6 +46,7 @@ import ConstantsController from './modules/constants/controller/constants.contro
 import TranslateWebController from './modules/translate/controller/translateWeb.controller'
 import QrController from './modules/qr/controller/qr.controller'
 import QrWebController from './modules/qr/controller/qrWeb.controller'
+import BridgeWebController from './modules/bridge/controller/bridgeWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
 dotenv.config()
@@ -78,6 +80,7 @@ export default class App {
   private translateWebController: TranslateWebController
   private qrController: QrController
   private qrWebController: QrWebController
+  private bridgeWebController: BridgeWebController
 
   constructor() {
     this.usersController = container.resolve(UsersController)
@@ -101,6 +104,7 @@ export default class App {
     this.translateWebController = container.resolve(TranslateWebController)
     this.qrController = container.resolve(QrController)
     this.qrWebController = container.resolve(QrWebController)
+    this.bridgeWebController = container.resolve(BridgeWebController)
 
     this.app = express()
     this.config()
@@ -139,6 +143,7 @@ export default class App {
     this.app.use('/summary', [this.summaryWebController.router])
     this.app.use('/translate', [this.translateWebController.router])
     this.app.use('/qr', [this.qrWebController.router])
+    this.app.use('/bridge', [this.bridgeWebController.router])
   }
 
   private slackListeners(): void {
@@ -295,7 +300,11 @@ export default class App {
 
   private cronJobs(): void {
     try {
-      const alertJob = cron.schedule('* * * * *', alertCronJob)
+      // Bridge events are sent right after the alerts that enqueue them
+      const alertJob = cron.schedule('* * * * *', async () => {
+        await alertCronJob()
+        await bridgeDeliveryCronJob()
+      })
       const reminderJob = cron.schedule('* * * * *', reminderCronJob)
 
       log.info('Cron job started')

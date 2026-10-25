@@ -1,4 +1,5 @@
 import BadRequestError from '../../../../shared/utils/errors/BadRequestError'
+import ConflictError from '../../../../shared/utils/errors/ConflictError'
 import AlertsWebController from '../alertsWeb.controller'
 
 jest.mock('../../../../shared/middleware/auth', () => {
@@ -71,6 +72,77 @@ describe('AlertsWebController', () => {
       await expect(controller.createAlert(req, res)).rejects.toThrow(BadRequestError)
 
       expect(res.send).not.toHaveBeenCalled()
+    })
+
+    describe('with requestId', () => {
+      const requestId = '3F2B8C1E-1A2B-4C3D-8E9F-0A1B2C3D4E5F'
+
+      it('forwards the normalized request metadata', async () => {
+        const req: any = {
+          body: {
+            message: 'Alerta',
+            date: '2024-06-15T10:00:00Z',
+            requestId,
+            source: ' esp32-poc ',
+            deviceId: 'esp32-02',
+          },
+        }
+        createAlertMock.mockResolvedValue({ data: { id: 1, requestId: requestId.toLowerCase() } })
+
+        await controller.createAlert(req, res)
+
+        expect(createAlertMock).toHaveBeenCalledWith({
+          message: 'Alerta',
+          date: new Date('2024-06-15T10:00:00Z'),
+          userId: 7,
+          requestId: requestId.toLowerCase(),
+          source: 'esp32-poc',
+          deviceId: 'esp32-02',
+        })
+        expect(res.send).toHaveBeenCalledWith({ id: 1, requestId: requestId.toLowerCase() })
+      })
+
+      it('sets missing metadata to null', async () => {
+        const req: any = { body: { message: 'Alerta', date: '2024-06-15T10:00:00Z', requestId } }
+        createAlertMock.mockResolvedValue({ data: { id: 1 } })
+
+        await controller.createAlert(req, res)
+
+        expect(createAlertMock).toHaveBeenCalledWith(
+          expect.objectContaining({ source: null, deviceId: null })
+        )
+      })
+
+      it('throws ConflictError with the stored alert id on conflict', async () => {
+        const req: any = { body: { message: 'Alerta', date: '2024-06-15T10:00:00Z', requestId } }
+        createAlertMock.mockResolvedValue({
+          error: 'El requestId ya fue usado con datos distintos',
+          conflictAlertId: 12,
+        })
+
+        const error = await controller.createAlert(req, res).catch((err) => err)
+
+        expect(error).toBeInstanceOf(ConflictError)
+        expect(error.statusCode).toBe(409)
+        expect(error.errors).toEqual([
+          {
+            message: 'El requestId ya fue usado con datos distintos',
+            context: { code: 'ALERT_REQUEST_CONFLICT', alertId: 12 },
+          },
+        ])
+        expect(res.send).not.toHaveBeenCalled()
+      })
+
+      it.each([
+        ['an invalid requestId', { requestId: 'not-a-uuid' }],
+        ['source without requestId', { source: 'esp32-poc' }],
+        ['deviceId without requestId', { deviceId: 'esp32-02' }],
+      ])('rejects %s', async (_, extra) => {
+        const req: any = { body: { message: 'Alerta', date: '2024-06-15T10:00:00Z', ...extra } }
+
+        await expect(controller.createAlert(req, res)).rejects.toThrow(BadRequestError)
+        expect(createAlertMock).not.toHaveBeenCalled()
+      })
     })
   })
 

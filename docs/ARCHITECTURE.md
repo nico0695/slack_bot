@@ -219,7 +219,22 @@ Services accept `AIRepositoryType` to switch between AI providers.
 1. User creates alert with time specification (e.g., "1d14h12m")
 2. Alert stored in database with calculated trigger time
 3. Cron job checks every minute for due alerts
-4. Web Push notification sent when triggered
+4. Bridge webhook event enqueued (users with the bridge enabled), then Slack / Web Push notification sent
+5. `bridgeDeliveryCronJob` runs right after and sends queued bridge events
+
+### Bridge Integration
+
+**Components:**
+
+- `BridgeWebController` - `GET/PATCH /bridge/config`, per-user webhook config
+- `BridgeServices` - Config rules, event enqueue and delivery
+- `BridgeDeliveries` entity - Outbox, one row per alert occurrence
+- `BridgeWebhookRepository` - HTTPS client with SSRF protection
+- `bridgeDeliveryCronJob` - Sends due events with retries
+
+The secret column uses `select: false` and is only read when sending. Outbox writes are single statements without transactions (`INSERT ... ON CONFLICT DO NOTHING`, conditional `UPDATE`): on the shared SQLite connection a failed transaction rolls back concurrent writes.
+
+See [BRIDGE_INTEGRATION.md](BRIDGE_INTEGRATION.md).
 
 ### Socket.io Rooms
 
