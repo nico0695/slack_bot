@@ -112,17 +112,39 @@ Create new alert.
 ```json
 {
   "message": "Alert message",
-  "date": "2025-10-15T10:00:00Z"
+  "date": "2025-10-15T10:00:00Z",
+  "requestId": "3f2b8c1e-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+  "source": "esp32-poc",
+  "deviceId": "esp32-02"
 }
 ```
 
-**Response:**
+- `requestId` (optional, UUID): makes creation idempotent per user. Retries must reuse it.
+- `source` (optional, 1-50 chars) and `deviceId` (optional, 1-64 chars): metadata, only accepted with `requestId`.
+
+**Response (200):**
 ```json
 {
   "id": 1,
   "message": "Alert message",
   "date": "2025-10-15T10:00:00Z",
-  "userId": 123
+  "requestId": "3f2b8c1e-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+  "source": "esp32-poc",
+  "deviceId": "esp32-02"
+}
+```
+
+Repeating a request with the same `requestId` and data returns the stored alert (200), even if it was already notified.
+
+**Response (409 — `requestId` reused with different data):**
+```json
+{
+  "errors": [
+    {
+      "message": "El requestId ya fue usado con datos distintos",
+      "context": { "code": "ALERT_REQUEST_CONFLICT", "alertId": 1 }
+    }
+  ]
 }
 ```
 
@@ -134,6 +156,48 @@ Delete alert by ID.
 
 **Params:**
 - `id` - Alert ID
+
+### Bridge
+
+Per-user configuration of the bridge webhook (ESP32 integration). Always applies to the authenticated user.
+
+#### GET /bridge/config
+
+**Headers:**
+- `Authorization`: Bearer token
+
+**Response:**
+```json
+{
+  "baseUrl": "https://bridge.example.com/api",
+  "enabled": true,
+  "secretConfigured": true
+}
+```
+
+The secret is never returned.
+
+#### PATCH /bridge/config
+
+**Headers:**
+- `Authorization`: Bearer token
+
+**Request Body (all fields optional):**
+```json
+{
+  "baseUrl": "https://bridge.example.com/api",
+  "secret": "shared-secret-of-32-to-256-printable-ascii-chars",
+  "enabled": true
+}
+```
+
+- Omitted fields keep their value; `null` clears `baseUrl` or `secret`. Unknown fields are rejected.
+- Setting `baseUrl` without `enabled` enables the webhook. Clearing `baseUrl` or `secret` disables it.
+- Enabling requires `baseUrl` and `secret`, otherwise 400 without changes.
+- `baseUrl`: HTTPS, no credentials, query or fragment, not a local/internal host or private/reserved IP (unless `BRIDGE_WEBHOOK_ALLOW_PRIVATE=true`). May include a path prefix.
+- Disabling discards events still pending for the user.
+
+**Response:** same as `GET /bridge/config`.
 
 ### Tasks
 
@@ -716,6 +780,39 @@ leapRepository.generateImage({
 - Text-to-image generation
 - Style controls
 - Webhook callbacks
+
+### Bridge Webhook (outgoing)
+
+Every due alert of a user with the bridge enabled, whatever platform created it, is sent to the bridge.
+
+**Request:** `POST {baseUrl}/webhooks/alerts`
+
+**Headers:**
+- `Content-Type: application/json`
+- `X-Bridge-Webhook-Secret`: secret configured by the user
+
+**Body:**
+```json
+{
+  "version": 1,
+  "event_id": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
+  "type": "alert.triggered",
+  "alert_id": 1,
+  "scheduled_at": "2025-10-15T10:00:00.000Z",
+  "triggered_at": "2025-10-15T10:00:42.000Z",
+  "message": "Alert message",
+  "request_id": "3f2b8c1e-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+  "device_id": "esp32-02"
+}
+```
+
+`request_id` and `device_id` are present only when the alert has them. `event_id` and the body stay the same across retries; a rescheduled alert produces a new event.
+
+**Delivery:** at least once, deduplicate by `event_id`.
+- `2xx`: delivered.
+- Timeout, network error, `408`, `429`, `5xx`: retried after 1, 2, 4, 8 and then 15 minutes (`Retry-After` honored, max 15 min), up to 8 attempts (about one hour).
+- Redirects, other `4xx`: not retried.
+- Timeout 5s, redirects not followed, destinations resolving to private/reserved IPs blocked.
 
 ### Google Search API
 
