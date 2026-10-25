@@ -45,6 +45,7 @@ import ConstantsController from './modules/constants/controller/constants.contro
 import TranslateWebController from './modules/translate/controller/translateWeb.controller'
 import QrController from './modules/qr/controller/qr.controller'
 import QrWebController from './modules/qr/controller/qrWeb.controller'
+import BridgeWebController from './modules/bridge/controller/bridgeWeb.controller'
 import { slackHelperMessage } from './shared/constants/slack.constants'
 
 dotenv.config()
@@ -78,6 +79,7 @@ export default class App {
   private translateWebController: TranslateWebController
   private qrController: QrController
   private qrWebController: QrWebController
+  private bridgeWebController: BridgeWebController
 
   constructor() {
     this.usersController = container.resolve(UsersController)
@@ -101,6 +103,7 @@ export default class App {
     this.translateWebController = container.resolve(TranslateWebController)
     this.qrController = container.resolve(QrController)
     this.qrWebController = container.resolve(QrWebController)
+    this.bridgeWebController = container.resolve(BridgeWebController)
 
     this.app = express()
     this.config()
@@ -139,6 +142,7 @@ export default class App {
     this.app.use('/summary', [this.summaryWebController.router])
     this.app.use('/translate', [this.translateWebController.router])
     this.app.use('/qr', [this.qrWebController.router])
+    this.app.use('/bridge', [this.bridgeWebController.router])
   }
 
   private slackListeners(): void {

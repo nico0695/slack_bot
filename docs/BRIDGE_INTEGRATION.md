@@ -76,6 +76,7 @@ Reglas (se valida el **estado resultante** del merge; si falla → `400` sin esc
 ### Secreto
 - Lo genera el bridge; el bot sólo lo persiste. Nunca aparece en respuestas, logs ni errores (los errores de zod no incluyen el valor).
 - Se guarda en texto plano (se necesita para la cabecera). Cifrado en reposo queda fuera del MVP.
+- TypeORM usa un logger propio sobre pino (`src/config/typeormLogger.ts`) que registra las queries fallidas **sin parámetros**; el logger por defecto los imprimía y podía exponer el secreto.
 
 ## 4. Creación idempotente de alertas (`POST /alerts`)
 
@@ -200,8 +201,8 @@ Rama `feature/bridge-integration` desde `dev` → PR a `dev`. Validación en cad
 
 | Step | Contenido | Validación específica |
 |------|-----------|-----------------------|
-| 1 | Config bridge: columnas en `Users` (`select: false`), módulo `bridge` (schemas, url utils, data source de config, service, controller), ruta `/bridge`, `ConflictError` | Tests de schema/url/service/controller; `/me` sin secreto |
-| 2 | Idempotencia de alertas: columnas + índice, schema, data source (`createAlert` lanza, `findByRequestId`), service con replay/409, controller | Tests unitarios + integración SQLite en memoria (concurrencia) |
+| 1 | Config bridge: columnas en `Users` (`select: false`), módulo `bridge` (schemas, url utils, data source de config, service, controller), ruta `/bridge`, logger de TypeORM sin parámetros, fix `updateUserById` | Tests de schema/url/service/controller; `/me` sin secreto |
+| 2 | Idempotencia de alertas: columnas + índice, `ConflictError`, schema, data source (`createAlert` lanza, `findByRequestId`), service con replay/409, controller | Tests unitarios + integración SQLite en memoria (concurrencia) |
 | 3 | Outbox + encolado: entidad `BridgeDeliveries`, data source, `enqueueAlertEvents`, cambios en `alertCronJob` (orden, skip en fallo, guard) | Tests del cron y del encolado idempotente |
 | 4 | Worker de entrega: repository HTTP con agente anti-SSRF, clasificación/backoff, `bridgeDeliveryCronJob`, encadenado en `app.ts` | Tests de worker, lookup, join URL, headers |
 | 5 | Docs (`API_REFERENCE.md`, `.env.example`, esta spec como final), validación completa y PR a `dev` | Suite completa + build (`npm run build`) |

@@ -44,4 +44,14 @@ export class Users extends BaseEntity {
 
   @Column({ default: false })
   enabled: boolean
+
+  @Column({ default: null, nullable: true })
+  bridgeBaseUrl: string
+
+  @Column({ default: false })
+  bridgeWebhookEnabled: boolean
+
+  // Never loaded by default: read it only with an explicit select when sending the webhook
+  @Column({ default: null, nullable: true, select: false })
+  bridgeWebhookSecret: string
 }
