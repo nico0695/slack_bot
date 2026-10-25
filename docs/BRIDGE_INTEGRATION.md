@@ -102,7 +102,7 @@ SQLite trata los `NULL` como distintos → las alertas existentes y los clientes
 
 ### Flujo con `requestId`
 1. `SELECT` por `(userId, requestId)` (camino rápido para reintentos).
-2. Si no existe → `INSERT OR IGNORE` (una sola sentencia, sin transacción) y volver a leer la fila guardada (la propia o la de un pedido concurrente).
+2. Si no existe → `INSERT ... ON CONFLICT DO NOTHING` (una sola sentencia, sin transacción) y volver a leer la fila guardada (la propia o la de un pedido concurrente).
    No se usa "INSERT y capturar el error UNIQUE": TypeORM abre una transacción por `save()` sobre la única conexión SQLite y el `ROLLBACK` del pedido perdedor deshacía el insert del ganador (verificado en test: éxito reportado y 0 filas).
 3. Existente: comparar normalizado (`message.trim()`, `date.getTime()`, `source`, `deviceId`, con `undefined ≡ null`):
    - igual → `200` con la alerta existente (no se recalcula nada, aunque ya haya vencido o esté `sent`).
@@ -137,13 +137,13 @@ SQLite trata los `NULL` como distintos → las alertas existentes y los clientes
 
 Índice `(status, nextAttemptAt)` para la consulta del worker.
 
-Escrituras de la outbox: sentencias únicas sin transacción (`INSERT OR IGNORE`, `UPDATE` condicionales). Igual que en §4, una transacción fallida sobre la conexión SQLite compartida deshace escrituras concurrentes de otros pedidos.
+Escrituras de la outbox: sentencias únicas sin transacción (`INSERT ... ON CONFLICT DO NOTHING`, `UPDATE` condicionales). Igual que en §4, una transacción fallida sobre la conexión SQLite compartida deshace escrituras concurrentes de otros pedidos. `ON CONFLICT DO NOTHING` (lo que genera `orIgnore()` de TypeORM en SQLite) sólo omite conflictos de unicidad: cualquier otra violación (p. ej. `NOT NULL`) lanza error y la alerta no se marca `sent`.
 
 ### 5.2 Cambios en el cron de alertas
 `getAlertsByDate` agrega `requestId`, `deviceId`, `user.bridgeBaseUrl` y `user.bridgeWebhookEnabled` al `select` (nunca el secreto). El job tiene guard `isRunning`: si el tick anterior sigue corriendo, se saltea.
 
 Orden por alerta:
-1. Si el usuario tiene bridge habilitado con URL → `INSERT OR IGNORE` en outbox (idempotente por `(alertId, occurrenceAt)`; si ya existía se conserva el `eventId` y payload originales). Todas las alertas del tick usan el mismo `triggered_at`.
+1. Si el usuario tiene bridge habilitado con URL → `INSERT ... ON CONFLICT DO NOTHING` en outbox (idempotente por `(alertId, occurrenceAt)`; si ya existía se conserva el `eventId` y payload originales). Todas las alertas del tick usan el mismo `triggered_at`.
    Si el encolado **falla** → se saltea la alerta completa este tick (no Slack, no se marca `sent`), se reintenta en el próximo.
 2. Slack / Web Push sin cambios (independientes del bridge; incluso sin `targetChannel` el paso 1 ya corrió).
 3. `updateAlertAsNotified` sólo con las alertas procesadas.
@@ -152,7 +152,7 @@ No se filtra por `source`: todas las alertas vencidas del usuario habilitado gen
 
 ### 5.3 Worker de entrega (`bridgeDeliveryCronJob`)
 1. Recuperar hasta 20 filas con `status = 'pending' AND nextAttemptAt <= now` o `status = 'sending' AND lockedUntil < now`.
-2. Claim con `UPDATE ... SET status='sending', lockedUntil=now+2min WHERE id=? AND (condición anterior)`; si `affected = 0`, otra pasada la tomó.
+2. Claim con `UPDATE ... SET status='sending', lockedUntil=now+2min, attempts=attempts+1 WHERE id=? AND (condición anterior)`; si `affected = 0`, otra pasada la tomó. El intento se cuenta en el claim: si una pasada se corta antes de registrar el resultado (p. ej. error de base), el reclamo siguiente suma otro intento, y al superar el máximo se marca `failed` (`max_attempts`) sin enviar.
 3. Leer config actual del usuario (incluye secreto con select explícito). Si deshabilitado/incompleto → `failed` + `lastError: bridge_disabled` (descartada, no se reintenta). **[D5]** se usa la config vigente al enviar, no la del momento de encolar.
 4. `POST {baseUrl}/webhooks/alerts` (join conservando el prefijo de path):
    - Headers: `Content-Type: application/json`, `X-Bridge-Webhook-Secret: <secreto del destinatario>`.

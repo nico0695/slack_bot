@@ -82,6 +82,15 @@ describe('BridgeDeliveriesDataSource', () => {
     expect(await BridgeDeliveries.count()).toBe(2)
   })
 
+  it('throws on constraint violations other than the duplicated occurrence', async () => {
+    // ON CONFLICT DO NOTHING only skips uniqueness conflicts, so the event is never lost silently
+    await expect(
+      deliveriesDataSource.insertDeliveryIfAbsent({ ...delivery('event-1'), payload: null })
+    ).rejects.toThrow(/NOT NULL/)
+
+    expect(await BridgeDeliveries.count()).toBe(0)
+  })
+
   it('keeps a single row for concurrent enqueues of the same occurrence', async () => {
     await Promise.all(
       ['a', 'b', 'c'].map(async (id) => {
@@ -141,6 +150,15 @@ describe('BridgeDeliveriesDataSource', () => {
       expect([first, second]).toEqual([true, false])
       expect(stored.status).toBe('sending')
       expect(stored.lockedUntil.toISOString()).toBe(lockedUntil.toISOString())
+    })
+
+    it('counts an attempt on every claim', async () => {
+      const id = await seed('event-1', { nextAttemptAt: new Date(0), attempts: 2 })
+      const row = await BridgeDeliveries.findOneByOrFail({ id })
+
+      await deliveriesDataSource.claimDelivery(row, now, lockedUntil)
+
+      expect((await BridgeDeliveries.findOneByOrFail({ id })).attempts).toBe(3)
     })
 
     it('reclaims a sending delivery only when its lock expired', async () => {

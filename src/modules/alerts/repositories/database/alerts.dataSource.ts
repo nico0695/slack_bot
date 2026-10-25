@@ -35,7 +35,7 @@ export default class AlertsDataSource {
 
   /**
    * Insert an alert with a requestId unless the user already has one with it.
-   * A single INSERT OR IGNORE statement outside a transaction: a failed save would
+   * A single INSERT ... ON CONFLICT DO NOTHING outside a transaction: a failed save would
    * roll back the shared SQLite connection, losing a concurrent request's insert.
    * Throws when the insert fails
    * @param data IAlert - Data alert with requestId

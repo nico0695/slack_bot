@@ -169,9 +169,11 @@ export default class BridgeServices {
 
   /**
    * Send one claimed delivery and compute its next state
+   * @param attempts number - Attempts including this one, already counted by the claim
    */
   private async sendDelivery(
     delivery: BridgeDeliveries,
+    attempts: number,
     now: Date
   ): Promise<IBridgeDeliveryUpdate> {
     const config = await this.bridgeConfigDataSource.getBridgeConfig(delivery.userId)
@@ -193,7 +195,6 @@ export default class BridgeServices {
       }
     }
 
-    const attempts = delivery.attempts + 1
     const response = await this.bridgeWebhookRepository.postAlertEvent(
       config.baseUrl,
       config.secret,
@@ -234,7 +235,17 @@ export default class BridgeServices {
 
     if (!claimed) return null
 
-    const update = await this.sendDelivery(delivery, now)
+    const attempts = delivery.attempts + 1
+
+    // Only reachable when earlier runs crashed before recording their result
+    const update: IBridgeDeliveryUpdate =
+      attempts > BRIDGE_DELIVERY_MAX_ATTEMPTS
+        ? {
+            status: BridgeDeliveryStatus.FAILED,
+            lockedUntil: null,
+            lastError: BridgeDeliveryError.MAX_ATTEMPTS,
+          }
+        : await this.sendDelivery(delivery, attempts, now)
     await this.bridgeDeliveriesDataSource.updateDelivery(delivery.id, update)
 
     const logData = {
@@ -242,7 +253,7 @@ export default class BridgeServices {
       eventId: delivery.eventId,
       alertId: delivery.alertId,
       userId: delivery.userId,
-      attempts: update.attempts ?? delivery.attempts,
+      attempts,
       status: update.status,
       lastStatusCode: update.lastStatusCode,
       lastError: update.lastError,
@@ -276,7 +287,7 @@ export default class BridgeServices {
           try {
             return await this.processDelivery(delivery, now)
           } catch (error) {
-            // Left as sending: picked up again when its lock expires
+            // Left as sending: reclaimed when its lock expires, counting another attempt
             log.error({ err: error, deliveryId: delivery.id }, 'processDelivery failed')
             return null
           }

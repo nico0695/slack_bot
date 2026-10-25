@@ -13,7 +13,9 @@ import {
 @singleton()
 export default class BridgeDeliveriesDataSource {
   /**
-   * Store a delivery unless the alert occurrence already has one. Throws on failure
+   * Store a delivery unless the alert occurrence already has one. On SQLite orIgnore()
+   * emits ON CONFLICT DO NOTHING, which only skips uniqueness conflicts: any other
+   * failure (e.g. NOT NULL) throws
    * @param data IBridgeDeliveryCreate - Delivery to enqueue
    */
   async insertDeliveryIfAbsent(data: IBridgeDeliveryCreate): Promise<void> {
@@ -48,7 +50,9 @@ export default class BridgeDeliveriesDataSource {
   }
 
   /**
-   * Mark a delivery as sending if it is still in the state it was read in
+   * Mark a delivery as sending if it is still in the state it was read in, counting the
+   * attempt in the same update so runs that crash before recording a result still
+   * reach the attempts limit
    * @returns true when this call claimed it
    */
   async claimDelivery(delivery: BridgeDeliveries, now: Date, lockedUntil: Date): Promise<boolean> {
@@ -64,6 +68,7 @@ export default class BridgeDeliveriesDataSource {
     const result = await BridgeDeliveries.update(criteria, {
       status: BridgeDeliveryStatus.SENDING,
       lockedUntil,
+      attempts: () => '"attempts" + 1',
     })
 
     return result.affected === 1

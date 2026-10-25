@@ -195,4 +195,35 @@ describe('BridgeServices delivery lifecycle', () => {
     expect(delivery).toMatchObject({ status: 'failed', attempts: 8, lastError: 'max_attempts' })
     expect((now.getTime() - triggeredAt.getTime()) / minute).toBe(60)
   })
+
+  it('stops retrying an event that never records its result', async () => {
+    const userId = await createUser('bridge@example.com', 'a'.repeat(32))
+    await services.enqueueAlertEvent(alertOf(1, userId), triggeredAt)
+
+    const failingConfig = new BridgeConfigDataSource()
+    jest.spyOn(failingConfig, 'getBridgeConfig').mockRejectedValue(new Error('SQLITE_BUSY'))
+    const failingServices = new BridgeServices(failingConfig, new BridgeDeliveriesDataSource(), {
+      postAlertEvent: postAlertEventMock,
+    } as any)
+
+    // Each run crashes after the claim; the event is reclaimed when its lock expires
+    let now = triggeredAt
+    for (let run = 1; run <= 8; run++) {
+      await failingServices.processPendingDeliveries(now)
+      now = new Date(now.getTime() + 3 * minute)
+    }
+
+    expect(await deliveryOf(1)).toMatchObject({ status: 'sending', attempts: 8 })
+
+    postAlertEventMock.mockResolvedValue({ status: 202 })
+    await services.processPendingDeliveries(now)
+
+    expect(postAlertEventMock).not.toHaveBeenCalled()
+    expect(await deliveryOf(1)).toMatchObject({
+      status: 'failed',
+      attempts: 9,
+      lastError: 'max_attempts',
+      lockedUntil: null,
+    })
+  })
 })

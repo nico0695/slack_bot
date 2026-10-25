@@ -232,7 +232,7 @@ Services accept `AIRepositoryType` to switch between AI providers.
 - `BridgeWebhookRepository` - HTTPS client with SSRF protection
 - `bridgeDeliveryCronJob` - Sends due events with retries
 
-The secret column uses `select: false` and is only read when sending. Outbox writes are single statements without transactions (`INSERT OR IGNORE`, conditional `UPDATE`): on the shared SQLite connection a failed transaction rolls back concurrent writes.
+The secret column uses `select: false` and is only read when sending. Outbox writes are single statements without transactions (`INSERT ... ON CONFLICT DO NOTHING`, conditional `UPDATE`): on the shared SQLite connection a failed transaction rolls back concurrent writes.
 
 See [BRIDGE_INTEGRATION.md](BRIDGE_INTEGRATION.md).
 
