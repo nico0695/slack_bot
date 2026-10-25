@@ -91,4 +91,99 @@ describe('BridgeDeliveriesDataSource', () => {
 
     expect(await BridgeDeliveries.count()).toBe(1)
   })
+
+  describe('claiming and updating', () => {
+    const now = new Date('2026-10-25T15:11:00.000Z')
+    const lockedUntil = new Date('2026-10-25T15:13:00.000Z')
+
+    const seed = async (eventId: string, values: Partial<BridgeDeliveries>): Promise<number> => {
+      await deliveriesDataSource.insertDeliveryIfAbsent({
+        ...delivery(eventId, new Date(`2026-10-25T15:0${eventId.slice(-1)}:00.000Z`)),
+      })
+      const row = await BridgeDeliveries.findOneByOrFail({ eventId })
+      await BridgeDeliveries.update(row.id, values)
+      return row.id
+    }
+
+    it('returns pending due deliveries and sending ones with an expired lock', async () => {
+      const dueId = await seed('event-1', { nextAttemptAt: new Date('2026-10-25T15:10:59.999Z') })
+      const exactId = await seed('event-2', { nextAttemptAt: now })
+      await seed('event-3', { nextAttemptAt: new Date('2026-10-25T15:11:00.001Z') })
+      const staleId = await seed('event-4', {
+        status: 'sending',
+        lockedUntil: new Date('2026-10-25T15:10:00.000Z'),
+      })
+      await seed('event-5', { status: 'sending', lockedUntil })
+      await seed('event-6', { status: 'delivered', nextAttemptAt: new Date(0) })
+      await seed('event-7', { status: 'failed', nextAttemptAt: new Date(0) })
+
+      const due = await deliveriesDataSource.getDueDeliveries(now, 20)
+
+      const byId = (a: number, b: number): number => a - b
+      expect(due.map((row) => row.id).sort(byId)).toEqual([dueId, exactId, staleId].sort(byId))
+    })
+
+    it('limits the batch size', async () => {
+      await seed('event-1', { nextAttemptAt: new Date(0) })
+      await seed('event-2', { nextAttemptAt: new Date(0) })
+
+      expect(await deliveriesDataSource.getDueDeliveries(now, 1)).toHaveLength(1)
+    })
+
+    it('claims a pending due delivery only once', async () => {
+      const id = await seed('event-1', { nextAttemptAt: new Date(0) })
+      const [row] = await deliveriesDataSource.getDueDeliveries(now, 20)
+
+      const first = await deliveriesDataSource.claimDelivery(row, now, lockedUntil)
+      const second = await deliveriesDataSource.claimDelivery(row, now, lockedUntil)
+
+      const stored = await BridgeDeliveries.findOneByOrFail({ id })
+      expect([first, second]).toEqual([true, false])
+      expect(stored.status).toBe('sending')
+      expect(stored.lockedUntil.toISOString()).toBe(lockedUntil.toISOString())
+    })
+
+    it('reclaims a sending delivery only when its lock expired', async () => {
+      const staleId = await seed('event-1', {
+        status: 'sending',
+        lockedUntil: new Date('2026-10-25T15:10:00.000Z'),
+      })
+      const freshId = await seed('event-2', { status: 'sending', lockedUntil })
+
+      const stale = await BridgeDeliveries.findOneByOrFail({ id: staleId })
+      const fresh = await BridgeDeliveries.findOneByOrFail({ id: freshId })
+
+      expect(await deliveriesDataSource.claimDelivery(stale, now, lockedUntil)).toBe(true)
+      expect(await deliveriesDataSource.claimDelivery(fresh, now, lockedUntil)).toBe(false)
+    })
+
+    it('does not claim a pending delivery that is not due yet', async () => {
+      const id = await seed('event-1', { nextAttemptAt: new Date('2026-10-25T15:20:00.000Z') })
+      const row = await BridgeDeliveries.findOneByOrFail({ id })
+
+      expect(await deliveriesDataSource.claimDelivery(row, now, lockedUntil)).toBe(false)
+    })
+
+    it('updates the delivery state', async () => {
+      const id = await seed('event-1', { status: 'sending', lockedUntil })
+
+      await deliveriesDataSource.updateDelivery(id, {
+        status: 'delivered',
+        attempts: 1,
+        lockedUntil: null,
+        lastStatusCode: 202,
+        lastError: null,
+        deliveredAt: now,
+      })
+
+      expect(await BridgeDeliveries.findOneByOrFail({ id })).toMatchObject({
+        status: 'delivered',
+        attempts: 1,
+        lockedUntil: null,
+        lastStatusCode: 202,
+        lastError: null,
+        deliveredAt: now,
+      })
+    })
+  })
 })

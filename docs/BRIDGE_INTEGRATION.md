@@ -153,9 +153,10 @@ No se filtra por `source`: todas las alertas vencidas del usuario habilitado gen
 3. Leer config actual del usuario (incluye secreto con select explícito). Si deshabilitado/incompleto → `failed` + `lastError: bridge_disabled` (descartada, no se reintenta). **[D5]** se usa la config vigente al enviar, no la del momento de encolar.
 4. `POST {baseUrl}/webhooks/alerts` (join conservando el prefijo de path):
    - Headers: `Content-Type: application/json`, `X-Bridge-Webhook-Secret: <secreto del destinatario>`.
-   - `timeout: 5000`, `maxRedirects: 0`, `validateStatus: () => true`.
+   - `timeout: 5000`, `maxRedirects: 0`, `validateStatus: () => true`, `proxy: false` (un proxy resolvería el host por su cuenta y saltearía el `lookup`), respuesta máx. 64 KB.
+   - Certificado TLS inválido → error de red, se reintenta como cualquier fallo de conexión.
    - `httpsAgent` con `lookup` propio: resuelve DNS y rechaza IP loopback, privada, link-local, CGNAT, multicast, `0.0.0.0/8`, `::1`, `fc00::/7`, `fe80::/10`, IPv4-mapped (salvo **[D3]**). Se valida la IP real a la que se conecta (evita DNS rebinding).
-5. Resultado (fuera de transacciones):
+5. Resultado (fuera de transacciones; si el proceso se corta a mitad, la fila queda `sending` y se reintenta al vencer el lock):
 
 | Respuesta | Estado | Acción |
 |-----------|--------|--------|

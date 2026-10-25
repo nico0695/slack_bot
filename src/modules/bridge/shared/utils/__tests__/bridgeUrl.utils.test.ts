@@ -1,4 +1,17 @@
-import { getBridgeBaseUrlError, isBlockedIp, normalizeBridgeBaseUrl } from '../bridgeUrl.utils'
+import {
+  bridgeSafeLookup,
+  buildBridgeWebhookUrl,
+  getBridgeBaseUrlError,
+  isBlockedIp,
+  normalizeBridgeBaseUrl,
+} from '../bridgeUrl.utils'
+
+const lookup = async (hostname: string, options: any): Promise<any> =>
+  await new Promise((resolve) => {
+    bridgeSafeLookup(hostname, options, (err, address, family) => {
+      resolve({ err, address, family })
+    })
+  })
 
 describe('bridgeUrl.utils', () => {
   const originalAllowPrivate = process.env.BRIDGE_WEBHOOK_ALLOW_PRIVATE
@@ -92,6 +105,53 @@ describe('bridgeUrl.utils', () => {
       ['https://Bridge.Example.com:8443/api', 'https://bridge.example.com:8443/api'],
     ])('normalizes %s', (input, expected) => {
       expect(normalizeBridgeBaseUrl(input)).toBe(expected)
+    })
+  })
+
+  describe('buildBridgeWebhookUrl', () => {
+    it.each([
+      ['https://bridge.example.com', 'https://bridge.example.com/webhooks/alerts'],
+      ['https://bridge.example.com/', 'https://bridge.example.com/webhooks/alerts'],
+      ['https://bridge.example.com/api/v1', 'https://bridge.example.com/api/v1/webhooks/alerts'],
+      ['https://bridge.example.com/api/v1//', 'https://bridge.example.com/api/v1/webhooks/alerts'],
+    ])('joins %s', (baseUrl, expected) => {
+      expect(buildBridgeWebhookUrl(baseUrl)).toBe(expected)
+    })
+  })
+
+  // Uses only IP literals and localhost, resolved without network access
+  describe('bridgeSafeLookup', () => {
+    it('rejects hosts that resolve to blocked IPs', async () => {
+      const result = await lookup('localhost', { all: true })
+
+      expect(result.err.code).toBe('EBLOCKEDDESTINATION')
+    })
+
+    it('rejects blocked IPs for single address lookups', async () => {
+      const result = await lookup('10.0.0.1', {})
+
+      expect(result.err.code).toBe('EBLOCKEDDESTINATION')
+    })
+
+    it('returns all addresses when requested', async () => {
+      const result = await lookup('8.8.8.8', { all: true })
+
+      expect(result.err).toBeNull()
+      expect(result.address).toEqual([{ address: '8.8.8.8', family: 4 }])
+    })
+
+    it('returns a single address otherwise', async () => {
+      const result = await lookup('8.8.8.8', {})
+
+      expect(result).toEqual({ err: null, address: '8.8.8.8', family: 4 })
+    })
+
+    it('allows private IPs when BRIDGE_WEBHOOK_ALLOW_PRIVATE is true', async () => {
+      process.env.BRIDGE_WEBHOOK_ALLOW_PRIVATE = 'true'
+
+      const result = await lookup('127.0.0.1', {})
+
+      expect(result).toEqual({ err: null, address: '127.0.0.1', family: 4 })
     })
   })
 })

@@ -52,3 +52,29 @@ export interface IBridgeDeliveryCreate {
   payload: IBridgeAlertEventPayload
   nextAttemptAt: Date
 }
+
+// Result of a webhook POST: an HTTP status, or an error code when no response arrived
+export interface IBridgeWebhookResult {
+  status?: number
+  retryAfter?: string
+  errorCode?: string
+}
+
+export type BridgeDeliveryOutcome = 'delivered' | 'retry' | 'failed'
+
+export interface IBridgeDeliveryResult {
+  outcome: BridgeDeliveryOutcome
+  lastStatusCode: number | null
+  lastError: string | null
+  retryAfterMs?: number
+}
+
+export interface IBridgeDeliveryUpdate {
+  status: string
+  attempts?: number
+  nextAttemptAt?: Date
+  lockedUntil: Date | null
+  lastStatusCode?: number | null
+  lastError?: string | null
+  deliveredAt?: Date | null
+}

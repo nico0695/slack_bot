@@ -33,6 +33,7 @@ import { IJoinRoomData } from './modules/conversations/shared/interfaces/convers
 import { ProgressCallback } from './modules/conversations/shared/interfaces/converstions'
 import SummaryWebController from './modules/summary/controller/summary.controller'
 import { alertCronJob } from './modules/alerts/utils/cronJob'
+import { bridgeDeliveryCronJob } from './modules/bridge/utils/cronJob'
 import { reminderCronJob } from './modules/reminders/utils/cronJob'
 import { supabaseKeepAlive } from './modules/system/utils/supabaseKeepAlive'
 import AlertsWebController from './modules/alerts/controller/alertsWeb.controller'
@@ -299,7 +300,11 @@ export default class App {
 
   private cronJobs(): void {
     try {
-      const alertJob = cron.schedule('* * * * *', alertCronJob)
+      // Bridge events are sent right after the alerts that enqueue them
+      const alertJob = cron.schedule('* * * * *', async () => {
+        await alertCronJob()
+        await bridgeDeliveryCronJob()
+      })
       const reminderJob = cron.schedule('* * * * *', reminderCronJob)
 
       log.info('Cron job started')

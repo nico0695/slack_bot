@@ -1,8 +1,11 @@
+import dns, { LookupAddress } from 'dns'
 import { isIP } from 'net'
 
 import {
+  BRIDGE_BLOCKED_DESTINATION_CODE,
   BRIDGE_BLOCKED_HOSTNAMES,
   BRIDGE_BLOCKED_HOSTNAME_SUFFIXES,
+  BRIDGE_WEBHOOK_PATH,
 } from '../constants/bridge.constants'
 
 // IPv4 ranges that must never be reached from the server: [network, prefix length]
@@ -120,4 +123,45 @@ export const normalizeBridgeBaseUrl = (value: string): string => {
   url.pathname = url.pathname.replace(/\/+$/, '')
 
   return url.toString().replace(/\/+$/, '')
+}
+
+/**
+ * Build the webhook URL keeping any path prefix of the base URL
+ */
+export const buildBridgeWebhookUrl = (baseUrl: string): string =>
+  `${baseUrl.replace(/\/+$/, '')}/${BRIDGE_WEBHOOK_PATH}`
+
+/**
+ * DNS lookup for the webhook agent: rejects hosts resolving to blocked IPs. Runs on
+ * every connection, so the IP actually connected to is the one validated.
+ */
+export const bridgeSafeLookup = (
+  hostname: string,
+  options: dns.LookupOptions,
+  callback: (
+    err: NodeJS.ErrnoException | null,
+    address: string | LookupAddress[],
+    family?: number
+  ) => void
+): void => {
+  dns.lookup(hostname, { ...options, all: true }, (err, addresses: LookupAddress[]) => {
+    if (err) {
+      callback(err, [])
+      return
+    }
+
+    if (!isPrivateNetworkAllowed() && addresses.some(({ address }) => isBlockedIp(address))) {
+      const error: NodeJS.ErrnoException = new Error('Bridge destination resolves to a blocked IP')
+      error.code = BRIDGE_BLOCKED_DESTINATION_CODE
+      callback(error, [])
+      return
+    }
+
+    if (options.all) {
+      callback(null, addresses)
+      return
+    }
+
+    callback(null, addresses[0].address, addresses[0].family)
+  })
 }

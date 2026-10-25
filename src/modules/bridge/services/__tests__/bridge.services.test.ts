@@ -20,8 +20,20 @@ const bridgeConfigDataSourceMock = {
 
 const insertDeliveryIfAbsentMock = jest.fn()
 
+const getDueDeliveriesMock = jest.fn()
+const claimDeliveryMock = jest.fn()
+const updateDeliveryMock = jest.fn()
+const postAlertEventMock = jest.fn()
+
 const bridgeDeliveriesDataSourceMock = {
   insertDeliveryIfAbsent: insertDeliveryIfAbsentMock,
+  getDueDeliveries: getDueDeliveriesMock,
+  claimDelivery: claimDeliveryMock,
+  updateDelivery: updateDeliveryMock,
+}
+
+const bridgeWebhookRepositoryMock = {
+  postAlertEvent: postAlertEventMock,
 }
 
 const secret = 's'.repeat(32)
@@ -37,7 +49,8 @@ describe('BridgeServices', () => {
     jest.clearAllMocks()
     services = new BridgeServices(
       bridgeConfigDataSourceMock as any,
-      bridgeDeliveriesDataSourceMock as any
+      bridgeDeliveriesDataSourceMock as any,
+      bridgeWebhookRepositoryMock as any
     )
   })
 
@@ -225,6 +238,181 @@ describe('BridgeServices', () => {
       const result = await services.enqueueAlertEvent(alert, triggeredAt)
 
       expect(result).toEqual({ error: 'Error al encolar el evento del bridge' })
+    })
+  })
+
+  describe('processPendingDeliveries', () => {
+    const now = new Date('2026-10-25T15:11:00.000Z')
+    const minute = 60 * 1000
+    const payload = { version: 1, event_id: 'event-1' }
+    const pending = {
+      id: 1,
+      eventId: 'event-1',
+      alertId: 123,
+      userId: 7,
+      status: 'pending',
+      attempts: 0,
+      payload,
+    }
+
+    beforeEach(() => {
+      getDueDeliveriesMock.mockResolvedValue([pending])
+      claimDeliveryMock.mockResolvedValue(true)
+      getBridgeConfigMock.mockResolvedValue(fullConfig)
+    })
+
+    const lastUpdate = (): any => updateDeliveryMock.mock.calls[0][1]
+
+    it('sends the event with the config of its user and marks it delivered', async () => {
+      postAlertEventMock.mockResolvedValue({ status: 202 })
+
+      const result = await services.processPendingDeliveries(now)
+
+      expect(getDueDeliveriesMock).toHaveBeenCalledWith(now, 20)
+      expect(claimDeliveryMock).toHaveBeenCalledWith(
+        pending,
+        now,
+        new Date(now.getTime() + 2 * minute)
+      )
+      expect(getBridgeConfigMock).toHaveBeenCalledWith(7)
+      expect(postAlertEventMock).toHaveBeenCalledWith(baseUrl, secret, payload)
+      expect(updateDeliveryMock).toHaveBeenCalledWith(1, {
+        status: 'delivered',
+        attempts: 1,
+        lockedUntil: null,
+        lastStatusCode: 202,
+        lastError: null,
+        deliveredAt: now,
+      })
+      expect(result).toEqual({ data: { delivered: 1 } })
+    })
+
+    it('skips deliveries claimed by another run', async () => {
+      claimDeliveryMock.mockResolvedValue(false)
+
+      const result = await services.processPendingDeliveries(now)
+
+      expect(postAlertEventMock).not.toHaveBeenCalled()
+      expect(updateDeliveryMock).not.toHaveBeenCalled()
+      expect(result).toEqual({ data: {} })
+    })
+
+    it.each([
+      ['the user does not exist', null],
+      ['the bridge is disabled', { ...fullConfig, enabled: false }],
+      ['the secret is missing', { ...fullConfig, secret: null }],
+    ])('discards the event without sending when %s', async (_, config) => {
+      getBridgeConfigMock.mockResolvedValue(config)
+
+      await services.processPendingDeliveries(now)
+
+      expect(postAlertEventMock).not.toHaveBeenCalled()
+      expect(lastUpdate()).toEqual({
+        status: 'failed',
+        lockedUntil: null,
+        lastError: 'bridge_disabled',
+      })
+    })
+
+    it('fails without sending when the stored URL is no longer allowed', async () => {
+      getBridgeConfigMock.mockResolvedValue({ ...fullConfig, baseUrl: 'https://127.0.0.1' })
+
+      await services.processPendingDeliveries(now)
+
+      expect(postAlertEventMock).not.toHaveBeenCalled()
+      expect(lastUpdate()).toMatchObject({ status: 'failed', lastError: 'blocked_destination' })
+    })
+
+    it('schedules a retry with backoff on retryable failures', async () => {
+      getDueDeliveriesMock.mockResolvedValue([{ ...pending, attempts: 2 }])
+      postAlertEventMock.mockResolvedValue({ status: 503 })
+
+      const result = await services.processPendingDeliveries(now)
+
+      expect(lastUpdate()).toEqual({
+        status: 'pending',
+        attempts: 3,
+        lockedUntil: null,
+        lastStatusCode: 503,
+        lastError: 'http_503',
+        nextAttemptAt: new Date(now.getTime() + 4 * minute),
+      })
+      expect(result).toEqual({ data: { pending: 1 } })
+    })
+
+    it('honors Retry-After', async () => {
+      postAlertEventMock.mockResolvedValue({ status: 429, retryAfter: '30' })
+
+      await services.processPendingDeliveries(now)
+
+      expect(lastUpdate().nextAttemptAt).toEqual(new Date(now.getTime() + 30 * 1000))
+    })
+
+    it('retries timeouts without status code', async () => {
+      postAlertEventMock.mockResolvedValue({ errorCode: 'ECONNABORTED' })
+
+      await services.processPendingDeliveries(now)
+
+      expect(lastUpdate()).toMatchObject({
+        status: 'pending',
+        lastStatusCode: null,
+        lastError: 'timeout',
+      })
+    })
+
+    it('fails after the last attempt', async () => {
+      getDueDeliveriesMock.mockResolvedValue([{ ...pending, attempts: 7 }])
+      postAlertEventMock.mockResolvedValue({ status: 503 })
+
+      await services.processPendingDeliveries(now)
+
+      expect(lastUpdate()).toEqual({
+        status: 'failed',
+        attempts: 8,
+        lockedUntil: null,
+        lastStatusCode: 503,
+        lastError: 'max_attempts',
+      })
+    })
+
+    it('fails permanently on non retryable responses', async () => {
+      postAlertEventMock.mockResolvedValue({ status: 401 })
+
+      await services.processPendingDeliveries(now)
+
+      expect(lastUpdate()).toEqual({
+        status: 'failed',
+        attempts: 1,
+        lockedUntil: null,
+        lastStatusCode: 401,
+        lastError: 'http_401',
+      })
+    })
+
+    it('keeps processing the batch when one delivery throws', async () => {
+      getDueDeliveriesMock.mockResolvedValue([pending, { ...pending, id: 2, userId: 8 }])
+      getBridgeConfigMock.mockImplementation(async (userId: number) => {
+        if (userId === 7) throw new Error('db')
+        return fullConfig
+      })
+      postAlertEventMock.mockResolvedValue({ status: 200 })
+
+      const result = await services.processPendingDeliveries(now)
+
+      expect(updateDeliveryMock).toHaveBeenCalledTimes(1)
+      expect(updateDeliveryMock).toHaveBeenCalledWith(
+        2,
+        expect.objectContaining({ status: 'delivered' })
+      )
+      expect(result).toEqual({ data: { delivered: 1 } })
+    })
+
+    it('returns error when due deliveries cannot be read', async () => {
+      getDueDeliveriesMock.mockRejectedValue(new Error('db'))
+
+      const result = await services.processPendingDeliveries(now)
+
+      expect(result).toEqual({ error: 'Error al procesar los eventos del bridge' })
     })
   })
 })
