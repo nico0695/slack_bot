@@ -59,7 +59,7 @@ export default class UsersDataSources {
     try {
       await Users.update(id, data)
 
-      const user = await Users.findOne({ where: { id: data.id } })
+      const user = await Users.findOne({ where: { id } })
 
       return user
     } catch (error) {
