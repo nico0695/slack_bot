@@ -1,6 +1,6 @@
 # Integración con bridge (ESP32) — Spec técnica
 
-> Estado: **borrador para confirmar**. Las decisiones marcadas con **[D#]** usan la opción recomendada hasta que se confirme otra.
+> Estado: **decisiones D1–D6 cerradas** (ver §9).
 > Referencias: `contrato-slack-bot-bridge.md` (contrato) y `cambios-slack-bot.md` (cambios internos).
 
 ## 1. Alcance
@@ -65,13 +65,13 @@ Reglas (se valida el **estado resultante** del merge; si falla → `400` sin esc
 - Si se envía `baseUrl` no nulo y se omite `enabled` → `enabled = true`.
 - `enabled: true` exige `baseUrl` y `secret` presentes (nuevos o ya guardados).
 - `baseUrl: null` o `secret: null` → fuerza `enabled = false`.
-- Al quedar habilitado, las entregas `failed` del usuario vuelven a `pending` (forma de "reanudar tras corregir la causa").
+- Deshabilitar no reencola ni recupera nada: las entregas pendientes de ese usuario se descartan al intentar enviarlas (§5.3).
 - Respuesta: igual que el GET.
 
 ### Validación de `baseUrl`
 - `https:` obligatorio, sin `username/password`, sin `hash`, longitud ≤ 2048.
 - Host rechazado si es `localhost`, `*.localhost`, `*.local`, `*.internal` o una IP literal privada/reservada (ver §5.3).
-- Se normaliza quitando la `/` final. **[D3]** env `BRIDGE_WEBHOOK_ALLOW_PRIVATE=true` desactiva estos chequeos de host/IP (sólo dev/misma red).
+- Se normaliza quitando la `/` final. **[D3]** env `BRIDGE_WEBHOOK_ALLOW_PRIVATE=true` desactiva estos chequeos de host/IP. Default `false`; sólo hace falta si bot y bridge se despliegan juntos y el bot llama al bridge por IP privada / hostname de red Docker.
 
 ### Secreto
 - Lo genera el bridge; el bot sólo lo persiste. Nunca aparece en respuestas, logs ni errores (los errores de zod no incluyen el valor).
@@ -121,7 +121,7 @@ SQLite trata los `NULL` como distintos → las alertas existentes y los clientes
 | `userId` | integer | destinatario; sin FK |
 | `occurrenceAt` | datetime | `alert.date` al vencer → **unique `(alertId, occurrenceAt)`**: reprogramar genera nueva ocurrencia, re-ejecutar el cron no duplica |
 | `payload` | simple-json | payload final, inmutable |
-| `status` | varchar | `pending` · `sending` · `delivered` · `failed` |
+| `status` | varchar | `pending` · `sending` · `delivered` · `failed` (final, no se reanuda) |
 | `attempts` | integer | default 0 |
 | `nextAttemptAt` | datetime | |
 | `lockedUntil` | datetime nullable | claim recuperable tras reinicio |
@@ -146,7 +146,7 @@ No se filtra por `source`: todas las alertas vencidas del usuario habilitado gen
 ### 5.3 Worker de entrega (`bridgeDeliveryCronJob`)
 1. Recuperar hasta 20 filas con `status = 'pending' AND nextAttemptAt <= now` o `status = 'sending' AND lockedUntil < now`.
 2. Claim con `UPDATE ... SET status='sending', lockedUntil=now+2min WHERE id=? AND (condición anterior)`; si `affected = 0`, otra pasada la tomó.
-3. Leer config actual del usuario (incluye secreto con select explícito). Si deshabilitado/incompleto → `failed` + `lastError: bridge_disabled`. **[D5]** se usa la config vigente al enviar, no la del momento de encolar.
+3. Leer config actual del usuario (incluye secreto con select explícito). Si deshabilitado/incompleto → `failed` + `lastError: bridge_disabled` (descartada, no se reintenta). **[D5]** se usa la config vigente al enviar, no la del momento de encolar.
 4. `POST {baseUrl}/webhooks/alerts` (join conservando el prefijo de path):
    - Headers: `Content-Type: application/json`, `X-Bridge-Webhook-Secret: <secreto del destinatario>`.
    - `timeout: 5000`, `maxRedirects: 0`, `validateStatus: () => true`.
@@ -156,10 +156,10 @@ No se filtra por `source`: todas las alertas vencidas del usuario habilitado gen
 | Respuesta | Estado | Acción |
 |-----------|--------|--------|
 | `2xx` | `delivered` | `deliveredAt = now` |
-| timeout, error de red, `408`, `429`, `5xx` | `pending` | `attempts++`, `nextAttemptAt = now + min(60s·2^(attempts-1), 1h)`; respeta `Retry-After` (cap 1h) |
-| `3xx`, `400`, `401`, `403`, `404`, `409`, otro `4xx` | `failed` | visible, se reanuda vía `PATCH /bridge/config` |
+| timeout, error de red, `408`, `429`, `5xx` | `pending` | `attempts++`, `nextAttemptAt = now + min(60s·2^(attempts-1), 15min)`; respeta `Retry-After` (cap 15min) |
+| `3xx`, `400`, `401`, `403`, `404`, `409`, otro `4xx` | `failed` | final, queda registrado con `lastStatusCode` |
 | DNS/IP bloqueada | `failed` | `lastError: blocked_destination` |
-| `attempts >= 10` **[D6]** | `failed` | `lastError: max_attempts` |
+| `attempts >= 8` **[D6]** | `failed` | `lastError: max_attempts` — ventana total ≈ 1h (1+2+4+8+15+15+15 min) |
 
 ### 5.4 Payload (contrato, versión 1)
 ```json
@@ -192,7 +192,7 @@ No se filtra por `source`: todas las alertas vencidas del usuario habilitado gen
 - **Config**: sólo usuario autenticado; merge/validación rechaza sin escribir; `enabled` por defecto al asignar URL; secreto ausente en GET/PATCH/`/me`; URLs inválidas (http, credenciales, localhost, IP privada).
 - **Alertas**: cliente sin `requestId` igual que hoy; metadata sin `requestId` → 400; replay idéntico → misma alerta (también vencida); datos distintos → 409; error de DB → no 2xx. Test de integración con SQLite `:memory:` para el índice único y dos creaciones concurrentes.
 - **Encolado**: todas las alertas del usuario habilitado (con/sin metadata, con/sin canal Slack); nunca de otro usuario ni deshabilitado; doble ejecución no duplica; fallo al encolar no marca `sent`.
-- **Worker**: clasificación de respuestas, backoff y `Retry-After`, claim y recuperación de `sending` vencido, secreto del destinatario correcto, join de URL con prefijo, `maxRedirects: 0`, `lookup` bloquea IP privadas, reanudación al reconfigurar.
+- **Worker**: clasificación de respuestas, backoff y `Retry-After`, claim y recuperación de `sending` vencido, secreto del destinatario correcto, join de URL con prefijo, `maxRedirects: 0`, `lookup` bloquea IP privadas, deshabilitado → descartada sin envío.
 
 ## 8. Plan de implementación
 
@@ -203,5 +203,16 @@ Rama `feature/bridge-integration` desde `dev` → PR a `dev`. Validación en cad
 | 1 | Config bridge: columnas en `Users` (`select: false`), módulo `bridge` (schemas, url utils, data source de config, service, controller), ruta `/bridge`, `ConflictError` | Tests de schema/url/service/controller; `/me` sin secreto |
 | 2 | Idempotencia de alertas: columnas + índice, schema, data source (`createAlert` lanza, `findByRequestId`), service con replay/409, controller | Tests unitarios + integración SQLite en memoria (concurrencia) |
 | 3 | Outbox + encolado: entidad `BridgeDeliveries`, data source, `enqueueAlertEvents`, cambios en `alertCronJob` (orden, skip en fallo, guard) | Tests del cron y del encolado idempotente |
-| 4 | Worker de entrega: repository HTTP con agente anti-SSRF, clasificación/backoff, `bridgeDeliveryCronJob`, encadenado en `app.ts`, reanudación en PATCH | Tests de worker, lookup, join URL, headers |
+| 4 | Worker de entrega: repository HTTP con agente anti-SSRF, clasificación/backoff, `bridgeDeliveryCronJob`, encadenado en `app.ts` | Tests de worker, lookup, join URL, headers |
 | 5 | Docs (`API_REFERENCE.md`, `.env.example`, esta spec como final), validación completa y PR a `dev` | Suite completa + build (`npm run build`) |
+
+## 9. Decisiones cerradas
+
+| # | Decisión |
+|---|----------|
+| D1 | camelCase en el REST del bot; payload del webhook en snake_case (contrato) |
+| D2 | `PATCH /bridge/config` con merge y validación del estado resultante |
+| D3 | Bot y bridge separados por ahora; `BRIDGE_WEBHOOK_ALLOW_PRIVATE` (default `false`) queda disponible si se despliegan juntos |
+| D4 | Unicidad `(user, requestId)`; `source`/`deviceId` metadata opcional |
+| D5 | Sin reencolado: deshabilitar descarta lo pendiente; `failed` es final |
+| D6 | Timeout 5s, backoff 1m→15m, máx. 8 intentos (≈1h), luego `failed` |
