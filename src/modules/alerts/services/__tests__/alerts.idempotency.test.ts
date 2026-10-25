@@ -147,4 +147,23 @@ describe('AlertsServices idempotent creation', () => {
       Alerts.insert({ message: 'Otra', date: new Date(), user: { id: userId }, requestId })
     ).rejects.toThrow(/UNIQUE/)
   })
+
+  it('exposes request metadata and bridge flags, never the secret, to the cron', async () => {
+    await Users.update(userId, {
+      bridgeBaseUrl: 'https://bridge.example.com',
+      bridgeWebhookEnabled: true,
+      bridgeWebhookSecret: 's'.repeat(32),
+    })
+    await services.createAlert({ ...payload(), date: new Date(Date.now() - 60 * 1000) })
+
+    const [alert] = await alertsDataSource.getAlertsByDate(new Date())
+
+    expect(alert).toMatchObject({ requestId, deviceId: 'esp32-02' })
+    expect(alert.user).toMatchObject({
+      id: userId,
+      bridgeBaseUrl: 'https://bridge.example.com',
+      bridgeWebhookEnabled: true,
+    })
+    expect(JSON.stringify(alert)).not.toContain('s'.repeat(32))
+  })
 })

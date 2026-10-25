@@ -126,8 +126,11 @@ describe('AlertsDataSource', () => {
       id: true,
       message: true,
       date: true,
-      user: expect.any(Object),
+      requestId: true,
+      deviceId: true,
+      user: expect.objectContaining({ bridgeBaseUrl: true, bridgeWebhookEnabled: true }),
     })
+    expect(callArgs.select.user).not.toHaveProperty('bridgeWebhookSecret')
     expect(callArgs.relations).toEqual(['user'])
     expect(callArgs.where.sent).toBe(false)
     expect(result).toBe(alerts)

@@ -24,6 +24,8 @@ export interface IAlertToNotify extends IAlert {
     email: string
     slackId: string
     slackChannelId: string
+    bridgeBaseUrl?: string | null
+    bridgeWebhookEnabled?: boolean
 
     pwSubscription?: PushSubscription // Web push subscription
   }

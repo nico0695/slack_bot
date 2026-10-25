@@ -134,11 +134,13 @@ SQLite trata los `NULL` como distintos → las alertas existentes y los clientes
 
 Índice `(status, nextAttemptAt)` para la consulta del worker.
 
+Escrituras de la outbox: sentencias únicas sin transacción (`INSERT OR IGNORE`, `UPDATE` condicionales). Igual que en §4, una transacción fallida sobre la conexión SQLite compartida deshace escrituras concurrentes de otros pedidos.
+
 ### 5.2 Cambios en el cron de alertas
-`getAlertsByDate` agrega `user.bridgeBaseUrl` y `user.bridgeWebhookEnabled` al `select` (nunca el secreto).
+`getAlertsByDate` agrega `requestId`, `deviceId`, `user.bridgeBaseUrl` y `user.bridgeWebhookEnabled` al `select` (nunca el secreto). El job tiene guard `isRunning`: si el tick anterior sigue corriendo, se saltea.
 
 Orden por alerta:
-1. Si el usuario tiene bridge habilitado con URL → `INSERT OR IGNORE` en outbox (idempotente por `(alertId, occurrenceAt)`).
+1. Si el usuario tiene bridge habilitado con URL → `INSERT OR IGNORE` en outbox (idempotente por `(alertId, occurrenceAt)`; si ya existía se conserva el `eventId` y payload originales). Todas las alertas del tick usan el mismo `triggered_at`.
    Si el encolado **falla** → se saltea la alerta completa este tick (no Slack, no se marca `sent`), se reintenta en el próximo.
 2. Slack / Web Push sin cambios (independientes del bridge; incluso sin `targetChannel` el paso 1 ya corrió).
 3. `updateAlertAsNotified` sólo con las alertas procesadas.

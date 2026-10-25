@@ -1,10 +1,18 @@
+import { randomUUID } from 'crypto'
 import { singleton } from 'tsyringe'
 
 import { GenericResponse } from '../../../shared/interfaces/services'
 import { createModuleLogger } from '../../../config/logger'
 
 import BridgeConfigDataSource from '../repositories/database/bridgeConfig.dataSource'
+import BridgeDeliveriesDataSource from '../repositories/database/bridgeDeliveries.dataSource'
 import {
+  BRIDGE_EVENT_ALERT_TRIGGERED,
+  BRIDGE_EVENT_VERSION,
+} from '../shared/constants/bridge.constants'
+import {
+  IBridgeAlert,
+  IBridgeAlertEventPayload,
   IBridgeConfig,
   IBridgeConfigResponse,
   IBridgeConfigUpdate,
@@ -14,7 +22,10 @@ const log = createModuleLogger('bridge.service')
 
 @singleton()
 export default class BridgeServices {
-  constructor(private bridgeConfigDataSource: BridgeConfigDataSource) {}
+  constructor(
+    private bridgeConfigDataSource: BridgeConfigDataSource,
+    private bridgeDeliveriesDataSource: BridgeDeliveriesDataSource
+  ) {}
 
   private toConfigResponse(config: IBridgeConfig): IBridgeConfigResponse {
     return {
@@ -86,6 +97,62 @@ export default class BridgeServices {
     } catch (error) {
       log.error({ err: error, userId }, 'updateConfig failed')
       return { error: 'Error al actualizar la configuración del bridge' }
+    }
+  }
+
+  private buildAlertEventPayload(
+    alert: IBridgeAlert,
+    eventId: string,
+    triggeredAt: Date
+  ): IBridgeAlertEventPayload {
+    const payload: IBridgeAlertEventPayload = {
+      version: BRIDGE_EVENT_VERSION,
+      event_id: eventId,
+      type: BRIDGE_EVENT_ALERT_TRIGGERED,
+      alert_id: alert.id,
+      scheduled_at: new Date(alert.date).toISOString(),
+      triggered_at: triggeredAt.toISOString(),
+      message: alert.message,
+    }
+
+    if (alert.requestId) payload.request_id = alert.requestId
+    if (alert.deviceId) payload.device_id = alert.deviceId
+
+    return payload
+  }
+
+  /**
+   * Enqueue the webhook event of a triggered alert when its owner has the bridge enabled.
+   * Idempotent per alert occurrence, so running it again for the same alert is safe.
+   * @returns data true when enqueued, false when the bridge does not apply to the user
+   */
+  public async enqueueAlertEvent(
+    alert: IBridgeAlert,
+    triggeredAt: Date
+  ): Promise<GenericResponse<boolean>> {
+    if (!alert.user.bridgeWebhookEnabled || !alert.user.bridgeBaseUrl) {
+      return { data: false }
+    }
+
+    try {
+      const eventId = randomUUID()
+
+      await this.bridgeDeliveriesDataSource.insertDeliveryIfAbsent({
+        eventId,
+        alertId: alert.id,
+        userId: alert.user.id,
+        occurrenceAt: new Date(alert.date),
+        payload: this.buildAlertEventPayload(alert, eventId, triggeredAt),
+        nextAttemptAt: triggeredAt,
+      })
+
+      return { data: true }
+    } catch (error) {
+      log.error(
+        { err: error, alertId: alert.id, userId: alert.user.id },
+        'enqueueAlertEvent failed'
+      )
+      return { error: 'Error al encolar el evento del bridge' }
     }
   }
 }

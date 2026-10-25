@@ -18,6 +18,12 @@ const bridgeConfigDataSourceMock = {
   updateBridgeConfig: updateBridgeConfigMock,
 }
 
+const insertDeliveryIfAbsentMock = jest.fn()
+
+const bridgeDeliveriesDataSourceMock = {
+  insertDeliveryIfAbsent: insertDeliveryIfAbsentMock,
+}
+
 const secret = 's'.repeat(32)
 const baseUrl = 'https://bridge.example.com'
 
@@ -29,7 +35,10 @@ describe('BridgeServices', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    services = new BridgeServices(bridgeConfigDataSourceMock as any)
+    services = new BridgeServices(
+      bridgeConfigDataSourceMock as any,
+      bridgeDeliveriesDataSourceMock as any
+    )
   })
 
   describe('getConfig', () => {
@@ -144,6 +153,78 @@ describe('BridgeServices', () => {
       const result = await services.updateConfig(7, { baseUrl, secret })
 
       expect(result).toEqual({ error: 'Error al actualizar la configuración del bridge' })
+    })
+  })
+
+  describe('enqueueAlertEvent', () => {
+    const triggeredAt = new Date('2026-10-25T15:10:42.000Z')
+    const alert = {
+      id: 123,
+      message: 'Alerta de prueba desde ESP32',
+      date: new Date('2026-10-25T15:10:00.000Z'),
+      requestId: 'req-1',
+      deviceId: 'esp32-02',
+      user: { id: 7, bridgeBaseUrl: baseUrl, bridgeWebhookEnabled: true },
+    }
+
+    it('enqueues the event with the contract payload', async () => {
+      const result = await services.enqueueAlertEvent(alert, triggeredAt)
+
+      expect(result).toEqual({ data: true })
+      expect(insertDeliveryIfAbsentMock).toHaveBeenCalledTimes(1)
+
+      const delivery = insertDeliveryIfAbsentMock.mock.calls[0][0]
+      expect(delivery).toEqual({
+        eventId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        alertId: 123,
+        userId: 7,
+        occurrenceAt: alert.date,
+        nextAttemptAt: triggeredAt,
+        payload: {
+          version: 1,
+          event_id: delivery.eventId,
+          type: 'alert.triggered',
+          alert_id: 123,
+          scheduled_at: '2026-10-25T15:10:00.000Z',
+          triggered_at: '2026-10-25T15:10:42.000Z',
+          message: 'Alerta de prueba desde ESP32',
+          request_id: 'req-1',
+          device_id: 'esp32-02',
+        },
+      })
+    })
+
+    it('omits request_id and device_id for alerts created on other platforms', async () => {
+      await services.enqueueAlertEvent(
+        { ...alert, requestId: null, deviceId: undefined },
+        triggeredAt
+      )
+
+      const { payload } = insertDeliveryIfAbsentMock.mock.calls[0][0]
+      expect(payload).not.toHaveProperty('request_id')
+      expect(payload).not.toHaveProperty('device_id')
+    })
+
+    it.each([
+      ['disabled', { bridgeBaseUrl: baseUrl, bridgeWebhookEnabled: false }],
+      ['without URL', { bridgeBaseUrl: null, bridgeWebhookEnabled: true }],
+      ['not configured', {}],
+    ])('does nothing when the bridge is %s', async (_, bridgeUser) => {
+      const result = await services.enqueueAlertEvent(
+        { ...alert, user: { id: 7, ...bridgeUser } },
+        triggeredAt
+      )
+
+      expect(result).toEqual({ data: false })
+      expect(insertDeliveryIfAbsentMock).not.toHaveBeenCalled()
+    })
+
+    it('returns error when the insert fails', async () => {
+      insertDeliveryIfAbsentMock.mockRejectedValue(new Error('db'))
+
+      const result = await services.enqueueAlertEvent(alert, triggeredAt)
+
+      expect(result).toEqual({ error: 'Error al encolar el evento del bridge' })
     })
   })
 })
