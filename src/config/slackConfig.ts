@@ -9,6 +9,8 @@ export const connectionSlackApp = new SlackApp({
   signingSecret: process.env.SLACK_SIGNING_SECRET,
   socketMode: true,
   appToken: process.env.APP_TOKEN,
+  // Tests use fake tokens: skip the auth.test call made on initialization
+  tokenVerificationEnabled: process.env.NODE_ENV !== 'test',
 })
 
 // Regex patterns for Slack messages
