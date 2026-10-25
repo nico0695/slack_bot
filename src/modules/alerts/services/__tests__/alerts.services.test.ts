@@ -11,6 +11,8 @@ jest.mock('../../../../config/logger', () => ({
 }))
 
 const createAlertMock = jest.fn()
+const getAlertByRequestIdMock = jest.fn()
+const insertAlertIfAbsentMock = jest.fn()
 const getAlertsByUserIdMock = jest.fn()
 const getAlertByIdMock = jest.fn()
 const updateAlertMock = jest.fn()
@@ -26,6 +28,8 @@ jest.mock('../../../../shared/utils/dates.utils', () => ({
 
 const alertsDataSourceMock = {
   createAlert: createAlertMock,
+  getAlertByRequestId: getAlertByRequestIdMock,
+  insertAlertIfAbsent: insertAlertIfAbsentMock,
   getAlertsByUserId: getAlertsByUserIdMock,
   getAlertById: getAlertByIdMock,
   updateAlert: updateAlertMock,
@@ -73,32 +77,98 @@ describe('AlertsServices', () => {
     })
   })
 
-  describe('createAlert', () => {
-    it('delegates creation to datasource', async () => {
-      createAlertMock.mockResolvedValue({ id: 20 })
+  describe('createAlert with requestId', () => {
+    const date = new Date('2024-03-01T10:00:00.000Z')
+    const payload = {
+      userId: 1,
+      date,
+      message: 'Ping',
+      requestId: 'req-1',
+      source: 'esp32-poc',
+      deviceId: 'esp32-02',
+    }
+    const stored = {
+      id: 20,
+      message: 'Ping',
+      date: new Date(date),
+      requestId: 'req-1',
+      source: 'esp32-poc',
+      deviceId: 'esp32-02',
+    }
 
-      const payload = {
-        userId: 1,
-        date: new Date('2024-03-01T10:00:00.000Z'),
-        message: 'Ping',
-      }
+    it('inserts the alert and returns the stored row when the request is new', async () => {
+      getAlertByRequestIdMock.mockResolvedValueOnce(null).mockResolvedValueOnce(stored)
 
       const result = await services.createAlert(payload)
 
-      expect(createAlertMock).toHaveBeenCalledWith(payload)
-      expect(result).toEqual({ data: { id: 20 } })
+      expect(insertAlertIfAbsentMock).toHaveBeenCalledWith(payload)
+      expect(createAlertMock).not.toHaveBeenCalled()
+      expect(getAlertByRequestIdMock).toHaveBeenCalledWith(1, 'req-1')
+      expect(result).toEqual({ data: stored })
     })
 
-    it('returns error when datasource rejects', async () => {
-      createAlertMock.mockRejectedValue(new Error('boom'))
+    it('returns the stored alert on an identical retry without inserting', async () => {
+      getAlertByRequestIdMock.mockResolvedValue({ ...stored, sent: true })
 
-      const result = await services.createAlert({
-        userId: 1,
-        date: new Date(),
-        message: 'Ping',
+      const result = await services.createAlert({ ...payload, message: ' Ping ' })
+
+      expect(insertAlertIfAbsentMock).not.toHaveBeenCalled()
+      expect(result).toEqual({ data: { ...stored, sent: true } })
+    })
+
+    it.each([
+      ['message', { message: 'Other' }],
+      ['date', { date: new Date('2024-03-01T10:01:00.000Z') }],
+      ['source', { source: 'web' }],
+      ['deviceId', { deviceId: null }],
+    ])('returns a conflict when %s differs', async (_, change) => {
+      getAlertByRequestIdMock.mockResolvedValue(stored)
+
+      const result = await services.createAlert({ ...payload, ...change })
+
+      expect(insertAlertIfAbsentMock).not.toHaveBeenCalled()
+      expect(result).toEqual({
+        error: 'El requestId ya fue usado con datos distintos',
+        conflictAlertId: 20,
       })
+    })
 
-      expect(result.error).toBe('Error al crear la alerta')
+    it('returns a conflict when a concurrent request stored different data', async () => {
+      getAlertByRequestIdMock
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ ...stored, message: 'Other' })
+
+      const result = await services.createAlert(payload)
+
+      expect(result).toEqual({
+        error: 'El requestId ya fue usado con datos distintos',
+        conflictAlertId: 20,
+      })
+    })
+
+    it('returns error when the insert fails', async () => {
+      getAlertByRequestIdMock.mockResolvedValue(null)
+      insertAlertIfAbsentMock.mockRejectedValue(new Error('disk full'))
+
+      const result = await services.createAlert(payload)
+
+      expect(result).toEqual({ error: 'Error al crear la alerta' })
+    })
+
+    it('returns error when the alert is missing after insert', async () => {
+      getAlertByRequestIdMock.mockResolvedValue(null)
+
+      const result = await services.createAlert(payload)
+
+      expect(result).toEqual({ error: 'Error al crear la alerta' })
+    })
+
+    it('returns error when the lookup fails', async () => {
+      getAlertByRequestIdMock.mockRejectedValue(new Error('db'))
+
+      const result = await services.createAlert(payload)
+
+      expect(result).toEqual({ error: 'Error al crear la alerta' })
     })
   })
 

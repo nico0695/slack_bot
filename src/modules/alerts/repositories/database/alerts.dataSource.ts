@@ -11,30 +11,64 @@ export default class AlertsDataSource {
   constructor() {}
 
   /**
-   * Save alert in database
+   * Save alert in database. Throws when the insert fails
    * @param data IAlert - Data alert
    * @returns
    */
   async createAlert(data: IAlert): Promise<Alerts> {
-    try {
-      const user = new Users()
-      user.id = data.userId
+    const user = new Users()
+    user.id = data.userId
 
-      const newAlert = new Alerts()
+    const newAlert = new Alerts()
 
-      newAlert.message = data.message
-      newAlert.date = data.date
-      newAlert.user = user
-      if (data.channelId) {
-        newAlert.channelId = data.channelId
-      }
-
-      await newAlert.save()
-
-      return newAlert
-    } catch (error) {
-      return error
+    newAlert.message = data.message
+    newAlert.date = data.date
+    newAlert.user = user
+    if (data.channelId) {
+      newAlert.channelId = data.channelId
     }
+
+    await newAlert.save()
+
+    return newAlert
+  }
+
+  /**
+   * Insert an alert with a requestId unless the user already has one with it.
+   * A single INSERT OR IGNORE statement outside a transaction: a failed save would
+   * roll back the shared SQLite connection, losing a concurrent request's insert.
+   * Throws when the insert fails
+   * @param data IAlert - Data alert with requestId
+   */
+  async insertAlertIfAbsent(data: IAlert): Promise<void> {
+    await Alerts.createQueryBuilder()
+      .insert()
+      .into(Alerts)
+      .values({
+        message: data.message,
+        date: data.date,
+        user: { id: data.userId },
+        channelId: data.channelId ?? null,
+        requestId: data.requestId,
+        source: data.source ?? null,
+        deviceId: data.deviceId ?? null,
+      })
+      .orIgnore()
+      .execute()
+  }
+
+  /**
+   * Get the alert created by a request id of a user. Throws when the query fails
+   * @param userId number - User id
+   * @param requestId string - Client request id
+   * @returns
+   */
+  async getAlertByRequestId(userId: number, requestId: string): Promise<Alerts | null> {
+    return await Alerts.findOne({
+      where: { user: { id: userId }, requestId },
+      // The unique index also covers soft deleted rows
+      withDeleted: true,
+    })
   }
 
   /**

@@ -1,11 +1,18 @@
 import { PushSubscription } from 'web-push'
 
+import { Alerts } from '../../../../entities/alerts'
+import { GenericResponse } from '../../../../shared/interfaces/services'
+
 export interface IAlert {
   id?: number
   message: string
   date: Date
   userId: number
   channelId?: string | null
+
+  requestId?: string | null
+  source?: string | null
+  deviceId?: string | null
 
   sent?: boolean
 }
@@ -20,4 +27,9 @@ export interface IAlertToNotify extends IAlert {
 
     pwSubscription?: PushSubscription // Web push subscription
   }
+}
+
+export interface ICreateAlertResponse extends GenericResponse<Alerts> {
+  // Set when the requestId was already used with different data
+  conflictAlertId?: number
 }

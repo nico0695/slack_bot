@@ -99,7 +99,8 @@ SQLite trata los `NULL` como distintos → las alertas existentes y los clientes
 
 ### Flujo con `requestId`
 1. `SELECT` por `(userId, requestId)` (camino rápido para reintentos).
-2. Si no existe → `INSERT`. Si el `INSERT` falla por `SQLITE_CONSTRAINT` (carrera) → volver a leer la existente.
+2. Si no existe → `INSERT OR IGNORE` (una sola sentencia, sin transacción) y volver a leer la fila guardada (la propia o la de un pedido concurrente).
+   No se usa "INSERT y capturar el error UNIQUE": TypeORM abre una transacción por `save()` sobre la única conexión SQLite y el `ROLLBACK` del pedido perdedor deshacía el insert del ganador (verificado en test: éxito reportado y 0 filas).
 3. Existente: comparar normalizado (`message.trim()`, `date.getTime()`, `source`, `deviceId`, con `undefined ≡ null`):
    - igual → `200` con la alerta existente (no se recalcula nada, aunque ya haya vencido o esté `sent`).
    - distinto → `409`:
