@@ -1355,14 +1355,9 @@ export default class MessageProcessor {
             }
           )
         } catch (error: any) {
+          // The error may carry provider details: log it, answer a generic message
           log.error({ err: error }, '#manageAssistantVariables IMAGE generation failed')
-          responseMessage = {
-            role: roleTypes.assistant,
-            content: `❌ ${
-              String(error.message) || 'No se pudo generar la imagen. Intenta nuevamente.'
-            }`,
-            provider: ConversationProviders.ASSISTANT,
-          }
+          responseMessage = this.buildAssistantResponse(IMAGE_GENERATION_ERROR)
         }
 
         break

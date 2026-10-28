@@ -82,17 +82,18 @@ describe('AssistantSingleShotService', () => {
     expect(result.content_omitted).toBe(true)
   })
 
-  it('answers a generic completed message when the processor returns null', async () => {
+  it('reports an unconfirmed result when the processor returns null', async () => {
+    // null may also come from a technical failure or an action whose result was lost
     processAssistantMessageMock.mockResolvedValue({ response: null, shouldSkipAI: false })
 
     const result = await service.processMessage(REQUEST_ID, 'avisame mañana', 42)
 
     expect(result).toEqual({
       request_id: REQUEST_ID,
-      status: 'completed',
-      message: 'No pude entender o completar tu pedido. Probá reformularlo.',
+      status: 'unknown',
+      message: 'No se pudo confirmar el resultado.',
       content_omitted: false,
-      error: null,
+      error: { code: 'result_unconfirmed' },
     })
   })
 
@@ -187,6 +188,7 @@ describe('AssistantSingleShotService', () => {
 
   describe('with the real processor', () => {
     const createAssistantAlertMock = jest.fn()
+    const generateImageForAssistantMock = jest.fn()
 
     const buildRealProcessorService = (): AssistantSingleShotService => {
       const processor = new MessageProcessor(
@@ -197,7 +199,7 @@ describe('AssistantSingleShotService', () => {
         {} as any,
         {} as any,
         {} as any,
-        {} as any,
+        { generateImageForAssistant: generateImageForAssistantMock } as any,
         {} as any,
         {} as any,
         {} as any
@@ -238,6 +240,20 @@ describe('AssistantSingleShotService', () => {
 
       expect(result.status).toBe('unknown')
       expect(result.message).toBe('No se pudo confirmar el resultado.')
+    })
+
+    it('does not expose the provider detail when image generation fails', async () => {
+      generateImageForAssistantMock.mockRejectedValue(new Error('API rate limit exceeded'))
+
+      const result = await buildRealProcessorService().processMessage(
+        REQUEST_ID,
+        '.img un atardecer',
+        42
+      )
+
+      expect(result.status).toBe('completed')
+      expect(result.message).toBe('Error al generar la imagen. Intenta nuevamente.')
+      expect(JSON.stringify(result)).not.toContain('rate limit')
     })
   })
 })

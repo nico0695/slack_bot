@@ -68,11 +68,12 @@ Content-Type: application/json
 | Resultado del processor | `status` | `message` | `error` | HTTP |
 |-------------------------|----------|-----------|---------|------|
 | Respuesta | `completed` | `plainText` ?? `content`, normalizado (§4) | `null` | `200` |
-| `null` (faltan datos, la IA no clasificó, falló un servicio) | `completed` | `No pude entender o completar tu pedido. Probá reformularlo.` | `null` | `200` |
-| Mensaje con prefijo `+` (skip de IA) | `completed` | `Mensaje no procesado.` | `null` | `200` |
+| Mensaje con prefijo `+` (skip deliberado de IA) | `completed` | `Mensaje no procesado.` | `null` | `200` |
+| `null` (faltan datos, la IA no clasificó o falló, falló un servicio, excepción atrapada en el router) | `unknown` | `No se pudo confirmar el resultado.` | `{ "code": "result_unconfirmed" }` | `500` |
 | Excepción | `unknown` | `No se pudo confirmar el resultado.` | `{ "code": "result_unconfirmed" }` | `500` |
 
 - `completed` = respuesta utilizable, **no** "acción exitosa": incluye respuestas conversacionales y errores que los servicios ya devuelven como texto (snooze, reminders, `❌ Error al generar la imagen`), igual que en Slack.
+- `null` es `unknown`: mezcla falta de datos con fallos técnicos y con el `catch` del router, que puede ocurrir después de crear una entidad. Se prefiere no confirmar antes que presentar un fallo como respuesta.
 - Toda excepción es `unknown`: una acción pudo haberse ejecutado antes del fallo. Incluye los errores de uso que el processor lanza (`Uso: .qr <texto o URL>`), que en Slack DM también terminan en un mensaje genérico. Nunca se devuelve `error.message`.
 - El bot **no emite `failed`**; el estado queda en el contrato para errores del bridge (p. ej. STT).
 
@@ -125,11 +126,11 @@ Valores no enteros o ≤ 0 usan el default. Se leen en cada request.
 |------|-----------|
 | Errores globales | JSON roto → 400 sin eco del body; body grande → 413; `CustomError` y 500 sin cambios |
 | Texto plano | Listas (tope 10, `y N más`, vacío, URL de links), comando `alerts <scope>` con los mismos bloques, QR/imágenes omitidos; `content`/`contentBlock` idénticos; paridad Slack/texto de alertas sin cambios |
-| Fachada | Llamada única estilo DM; mapeo respuesta/`null`/`+`/excepción; sin mensaje interno; recorte y env; pedidos independientes; con processor real: alerta sin canal ni `requestId`, fallo del servicio → `unknown` |
+| Fachada | Llamada única estilo DM; mapeo respuesta/`null`/`+`/excepción; sin mensaje interno; recorte y env; pedidos independientes; con processor real: alerta sin canal ni `requestId`, fallo del servicio → `unknown`, error de imagen sin detalle del proveedor |
 | Endpoint | Unitarios: 200/500, 10 bodies inválidos sin ejecutar, límite exacto y por env. Integración (supertest con `HttpAuth`/`Permission`/`errorHandler` reales): usuario del token, 401 sin token/inválido/deshabilitado, 403 por perfil, 400 sin eco, JSON roto |
 | Arranque | Resolución del controller con el contenedor DI real: servicio inyectado y ruta registrada |
 
-Validación por commit: `npx tsc --noEmit`, `npm run lint`, `npx jest`, `npm run build` (base: 75 suites / 1015 tests; final: 80 suites / 1085 tests). Ejecutado en Node 22; producción usa Node 18 (las propiedades Unicode del normalizador existen desde Node 12).
+Validación por commit: `npx tsc --noEmit`, `npm run lint`, `npx jest`, `npm run build` (base: 75 suites / 1015 tests; final: 80 suites / 1086 tests). Ejecutado en Node 22; producción usa Node 18 (las propiedades Unicode del normalizador existen desde Node 12).
 
 **No verificado:** llamadas reales con IA, Supabase y base de datos; latencias reales; integración con el bridge y el ESP32.
 
@@ -141,18 +142,18 @@ Validación por commit: `npx tsc --noEmit`, `npm run lint`, `npx jest`, `npm run
 | A2 | `request_id` UUID estricto en minúsculas; mayúsculas → `400` |
 | A3 | Perfiles USER, USER_PREMIUM y ADMIN (como `/alerts`), usuario `enabled` |
 | A4 | Mismo flujo que Slack DM, sin cambiar la clasificación del processor |
-| A5 | `null` y `+` → `completed` con aviso; excepción → `unknown`; errores como texto de los servicios → `completed` |
+| A5 | `+` → `completed` con aviso; `null` y excepción → `unknown` (revisión del PR); errores como texto de los servicios → `completed`. El error de generación de imagen del comando `.img` responde un mensaje genérico (antes incluía `error.message`, también en Slack y web) |
 | A6 | Texto plano opcional en `IConversation` desde los mismos datos que los bloques; máximo 10 ítems |
 | A7 | Formato Slack → texto plano; links como `etiqueta: url`; sin emojis, con acentos |
 | A8 | QR, imágenes generadas y lista de imágenes → aviso + `content_omitted` |
 | A9 | Entrada y salida de hasta 2000 caracteres, configurables por env |
 | A10 | Errores del parser JSON → `400`/`413` en `errorHandler` (todas las rutas) |
-| A11 | Sin timeout en el bot; el bridge espera ~120 s |
+| A11 | Sin timeout en el bot; presupuesto de espera del bridge ~120 s, menor que el timeout de cualquier proxy delante del bot |
 
 ## 9. Notas para el bridge
 
 - Una llamada por pedido admitido. **No reenviar** ante timeout, corte, `500` o renovación de sesión: el mismo `request_id` volvería a ejecutar.
-- Timeout de cliente ~**120 s**. Un corte, timeout o error de red es resultado **no confirmado** (`unknown`), nunca "falló sin efectos". Verificar que ningún proxy delante del bot corte antes.
+- **Presupuesto de espera:** timeout de cliente ~**120 s**, siempre **menor** que el timeout de cualquier proxy entre bridge y bot (si el proxy corta antes, p. ej. Cloudflare a 100 s, bajar el del bridge por debajo de ese valor). Un corte, timeout o error de red es resultado **no confirmado** (`unknown`), nunca "falló sin efectos".
 - Revisar retries por defecto del cliente HTTP y del refresh de sesión: no heredar los del flujo de alerta de prueba.
 - Leer el envelope sólo cuando el body lo trae (`200`, y `500` de la fachada). Los errores previos al handler usan el formato global (§3) y no implican nada sobre efectos salvo lo indicado ahí.
 - `message` ya llega normalizado y acotado; mostrarlo tal cual. `content_omitted` indica que se omitió o recortó contenido.
@@ -160,7 +161,8 @@ Validación por commit: `npx tsc --noEmit`, `npm run lint`, `npx jest`, `npm run
 
 ## 10. Pendientes
 
-- **Proxy delante del bot:** confirmar su timeout frente a los ~120 s (p. ej. Cloudflare corta a 100 s).
+- **Proxy delante del bot:** confirmar su timeout y fijar el presupuesto del bridge por debajo (§9).
+- **Contrato compartido:** sincronizar `contratos.md` con estas decisiones (snake_case, `null` → `unknown`, el bot no emite `failed`, límites de 2000, formatos de error previos al handler).
 - **Charset del ESP32:** se asume UTF-8 con acentos y sin emojis; confirmar con la fuente real.
 - **Observaciones fuera de alcance (sin cambios):**
   - el socket `send_assistant_message` toma el `userId` del cliente sin autenticar;

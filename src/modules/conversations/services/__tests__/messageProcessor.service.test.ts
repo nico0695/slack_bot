@@ -257,7 +257,7 @@ describe('MessageProcessor - image handling', () => {
     expect(result.response).toBeTruthy()
   })
 
-  it('handles image generation errors gracefully', async () => {
+  it('handles image generation errors with a generic message, hiding the internal detail', async () => {
     imagesServicesMock.generateImageForAssistant.mockRejectedValue(
       new Error('API rate limit exceeded')
     )
@@ -269,7 +269,8 @@ describe('MessageProcessor - image handling', () => {
       false
     )
 
-    expect(result.response?.content).toContain('API rate limit exceeded')
+    expect(result.response?.content).toBe('❌ Error al generar la imagen. Intenta nuevamente.')
+    expect(result.response?.content).not.toContain('API rate limit exceeded')
   })
 })
 

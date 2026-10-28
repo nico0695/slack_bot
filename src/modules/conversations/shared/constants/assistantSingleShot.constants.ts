@@ -7,7 +7,6 @@ export enum AssistantSingleShotStatus {
 export const ASSISTANT_RESULT_UNCONFIRMED_CODE = 'result_unconfirmed'
 
 export const assistantSingleShotMessages = {
-  noResponse: 'No pude entender o completar tu pedido. Probá reformularlo.',
   skipped: 'Mensaje no procesado.',
   emptyResponse: 'La respuesta no tiene contenido para mostrar en este dispositivo.',
   unconfirmed: 'No se pudo confirmar el resultado.',

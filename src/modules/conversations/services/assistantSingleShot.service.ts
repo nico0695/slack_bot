@@ -42,7 +42,9 @@ export default class AssistantSingleShotService {
       if (processed.shouldSkipAI) {
         result = this.completed(requestId, assistantSingleShotMessages.skipped)
       } else if (!processed.response) {
-        result = this.completed(requestId, assistantSingleShotMessages.noResponse)
+        // null mixes missing data with technical failures and lost results: stay conservative
+        log.warn({ requestId, userId }, 'Assistant single-shot got no response')
+        result = this.unconfirmed(requestId)
       } else {
         const { plainText, content, contentOmitted } = processed.response
         result = this.completed(requestId, plainText ?? content, contentOmitted ?? false)
@@ -50,13 +52,7 @@ export default class AssistantSingleShotService {
     } catch (error) {
       // An action may have run before the failure: never report it as not executed
       log.error({ err: error, requestId, userId }, 'Assistant single-shot processing failed')
-      result = {
-        request_id: requestId,
-        status: AssistantSingleShotStatus.UNKNOWN,
-        message: assistantSingleShotMessages.unconfirmed,
-        content_omitted: false,
-        error: { code: ASSISTANT_RESULT_UNCONFIRMED_CODE },
-      }
+      result = this.unconfirmed(requestId)
     }
 
     log.info(
@@ -72,6 +68,14 @@ export default class AssistantSingleShotService {
 
     return result
   }
+
+  private unconfirmed = (requestId: string): IAssistantSingleShotResult => ({
+    request_id: requestId,
+    status: AssistantSingleShotStatus.UNKNOWN,
+    message: assistantSingleShotMessages.unconfirmed,
+    content_omitted: false,
+    error: { code: ASSISTANT_RESULT_UNCONFIRMED_CODE },
+  })
 
   private completed = (
     requestId: string,

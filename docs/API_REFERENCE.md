@@ -108,7 +108,7 @@ Single-shot assistant request for clients without Slack or chat history (bridge 
 }
 ```
 
-- `status`: `completed` (usable answer, not necessarily a successful action) or `unknown` (processing failed and an action may have run; `error: { "code": "result_unconfirmed" }`).
+- `status`: `completed` (usable answer, not necessarily a successful action) or `unknown` (no answer or processing failed, and an action may have run; `error: { "code": "result_unconfirmed" }`).
 - `message`: plain text without Slack formatting or emojis, at most `ASSISTANT_REST_MAX_OUTPUT_CHARS` (default 2000) characters.
 - `content_omitted`: `true` when images, QR codes or text beyond the limit were left out.
 - Validation (`400`), auth (`401`), permission (`403`), malformed JSON (`400`) and oversized body (`413`) errors keep the global error formats and do not run the assistant.
