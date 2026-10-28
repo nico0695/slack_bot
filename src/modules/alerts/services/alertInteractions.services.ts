@@ -1,6 +1,7 @@
 import { singleton } from 'tsyringe'
 
 import AlertsServices from './alerts.services'
+import { Alerts } from '../../../entities/alerts'
 import { snoozePresets } from '../shared/constants/snoozeCatalog'
 
 import { RedisRepository } from '../../conversations/repositories/redis/conversations.redis'
@@ -106,6 +107,19 @@ export default class AlertInteractionsService {
     scope: TAlertScope,
     channelId: string | null
   ): Promise<string | { blocks: any[] }> => {
+    const result = await this.getAlertsByScope(userId, scope, channelId)
+
+    return typeof result === 'string' ? result : slackMsgUtils.msgAlertsList(result)
+  }
+
+  /**
+   * Alerts of the scope, or the message to show when there are none or the lookup fails
+   */
+  public getAlertsByScope = async (
+    userId: number,
+    scope: TAlertScope,
+    channelId: string | null
+  ): Promise<string | Alerts[]> => {
     const alertsRes = await this.alertsServices.getAlertsByUserId(userId, {
       channelId,
     })
@@ -152,7 +166,7 @@ export default class AlertInteractionsService {
       return emptyMessage
     }
 
-    return slackMsgUtils.msgAlertsList(filtered)
+    return filtered
   }
 
   private applySnooze = async (

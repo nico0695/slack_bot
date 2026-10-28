@@ -31,7 +31,8 @@ describe('ConversationsWebController', () => {
     jest.clearAllMocks()
     controller = new ConversationsWebController(
       conversationServicesMock as any,
-      usersServicesMock as any
+      usersServicesMock as any,
+      {} as any
     )
   })
 
