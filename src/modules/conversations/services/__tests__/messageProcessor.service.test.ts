@@ -34,7 +34,7 @@ const alertsServicesMock = {
 const alertInteractionsServiceMock = {
   snoozeAlert: jest.fn(),
   repeatAlert: jest.fn(),
-  listAlertsByScope: jest.fn(),
+  getAlertsByScope: jest.fn(),
   getDefaultSnoozeMinutes: jest.fn(),
   setDefaultSnoozeMinutes: jest.fn(),
 }
@@ -1096,7 +1096,7 @@ describe('MessageProcessor - alert commands delegate to AlertInteractionsService
     alertInteractionsServiceMock.getDefaultSnoozeMinutes.mockResolvedValue(10)
     alertInteractionsServiceMock.snoozeAlert.mockResolvedValue('ok')
     alertInteractionsServiceMock.repeatAlert.mockResolvedValue('ok')
-    alertInteractionsServiceMock.listAlertsByScope.mockResolvedValue('ok')
+    alertInteractionsServiceMock.getAlertsByScope.mockResolvedValue('ok')
   })
 
   describe('snooze #id [N][m|h] (AC-10, RF-4.2/AC-B4)', () => {
@@ -1502,13 +1502,13 @@ describe('MessageProcessor - alert commands delegate to AlertInteractionsService
     ])('maps "alerts %s" to the %s scope', async (typed, scope) => {
       await processor.processAssistantMessage(`alerts ${typed}`, 42, 'C1', true)
 
-      expect(alertInteractionsServiceMock.listAlertsByScope).toHaveBeenCalledWith(42, scope, 'C1')
+      expect(alertInteractionsServiceMock.getAlertsByScope).toHaveBeenCalledWith(42, scope, 'C1')
     })
 
     it('passes a null channel scope outside a channel context', async () => {
       await processor.processAssistantMessage('alerts pending', 42, 'D1', false)
 
-      expect(alertInteractionsServiceMock.listAlertsByScope).toHaveBeenCalledWith(
+      expect(alertInteractionsServiceMock.getAlertsByScope).toHaveBeenCalledWith(
         42,
         'pending',
         null
@@ -1528,5 +1528,153 @@ describe('MessageProcessor - alert commands delegate to AlertInteractionsService
 
       expect(alertInteractionsServiceMock.setDefaultSnoozeMinutes).toHaveBeenCalledWith(42, 120)
     })
+  })
+})
+
+describe('MessageProcessor - plain-text fallback', () => {
+  let processor: MessageProcessor
+
+  const alerts = [
+    { id: 1, message: 'Llamar al médico', date: new Date('2999-01-01T13:00:00.000Z'), sent: false },
+    { id: 2, message: 'Pagar luz', date: new Date('2999-01-02T13:00:00.000Z'), sent: false },
+  ]
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    redisRepositoryMock.getAlertSnoozeConfig.mockResolvedValue({ defaultSnoozeMinutes: 10 })
+    alertsServicesMock.getAlertsByUserId.mockResolvedValue({ data: [] })
+    tasksServicesMock.getTasksByUserId.mockResolvedValue({ data: [] })
+    notesServicesMock.getNotesByUserId.mockResolvedValue({ data: [] })
+    linksServicesMock.getLinksByUserId.mockResolvedValue({ data: [] })
+    processor = buildProcessor()
+  })
+
+  describe('classifier lists', () => {
+    it('lists the alerts while keeping content and blocks', async () => {
+      mockClassification({ intent: 'alert.list' })
+      alertsServicesMock.getAlertsByUserId.mockResolvedValue({ data: alerts })
+
+      const { response } = await processor.processAssistantMessage('mis alertas', 42)
+
+      expect(response?.content).toBe('Mostrando 2 alertas')
+      expect(response?.contentBlock).toEqual({ blocks: [] })
+      const lines = response?.plainText?.split('\n')
+      expect(lines?.[0]).toBe('Mostrando 2 alertas')
+      expect(lines?.[1]).toMatch(/^#1 - Llamar al médico \(.+\)$/)
+      expect(lines?.[2]).toMatch(/^#2 - Pagar luz \(.+\)$/)
+      expect(response?.contentOmitted).toBeUndefined()
+    })
+
+    it('caps the task list and counts the hidden ones', async () => {
+      mockClassification({ intent: 'task.list' })
+      const tasks = Array.from({ length: 12 }, (_, i) => ({
+        id: i + 1,
+        title: `Tarea ${i + 1}`,
+        description: '',
+        createdAt: new Date(2026, 0, i + 1),
+      }))
+      tasksServicesMock.getTasksByUserId.mockResolvedValue({ data: tasks })
+
+      const { response } = await processor.processAssistantMessage('mis tareas', 42)
+
+      const lines = response?.plainText?.split('\n')
+      expect(lines).toHaveLength(12)
+      expect(lines?.[1]).toBe('#1 - Tarea 1')
+      expect(lines?.[11]).toBe('y 2 más')
+    })
+
+    it('uses the empty text when there are no notes', async () => {
+      mockClassification({ intent: 'note.list', successMessage: 'Estas son tus notas' })
+
+      const { response } = await processor.processAssistantMessage('mis notas', 42)
+
+      expect(response?.content).toBe('Estas son tus notas')
+      expect(response?.plainText).toBe('No tienes notas')
+    })
+
+    it('keeps the url of each link', async () => {
+      mockClassification({ intent: 'link.list' })
+      linksServicesMock.getLinksByUserId.mockResolvedValue({
+        data: [{ id: 3, url: 'https://docs.example.com', title: 'Docs' }],
+      })
+
+      const { response } = await processor.processAssistantMessage('mis links', 42)
+
+      expect(response?.plainText).toBe('Mostrando 1 links\n#3 - Docs: https://docs.example.com')
+    })
+  })
+
+  it('lists the alerts of an "alerts <scope>" command with the same blocks', async () => {
+    alertsServicesMock.getAlertsByUserId.mockResolvedValue({ data: alerts })
+
+    const { response } = await processor.processAssistantMessage('alerts pending', 42)
+
+    expect(response?.content).toBe('Alertas pendientes al detalle.')
+    expect(response?.contentBlock).toEqual({ blocks: [] })
+    expect(response?.plainText?.split('\n')).toHaveLength(3)
+    expect(response?.plainText).toContain('#2 - Pagar luz')
+  })
+
+  it.each([
+    ['the .qr command', '.qr https://example.com', undefined],
+    ['the qr.generate intent', 'haceme un qr de example.com', { intent: 'qr.generate', text: 'x' }],
+  ])('omits the QR image of %s', async (_label, message, classification) => {
+    if (classification) mockClassification(classification)
+    qrServicesMock.generateQr.mockResolvedValue({ data: { qrBase64: 'data:image/png;base64,abc' } })
+
+    const { response } = await processor.processAssistantMessage(message, 42)
+
+    expect(response?.content).toBe('data:image/png;base64,abc')
+    expect(response?.plainText).toBe(
+      'Se generó el código QR, pero no se puede mostrar en este dispositivo.'
+    )
+    expect(response?.contentOmitted).toBe(true)
+  })
+
+  it('omits generated images', async () => {
+    mockClassification({ intent: 'image.create', prompt: 'a dog' })
+    imagesServicesMock.generateImageForAssistant.mockResolvedValue({
+      images: [
+        { url: 'https://example.com/1.png', id: '1', createdAt: new Date() },
+        { url: 'https://example.com/2.png', id: '2', createdAt: new Date() },
+      ],
+      provider: 'openai',
+    })
+
+    const { response } = await processor.processAssistantMessage('dibuja un perro', 42)
+
+    expect(response?.content).toContain('Generated 2 images')
+    expect(response?.plainText).toBe(
+      'Se generaron 2 imágenes con openai, pero no se pueden mostrar en este dispositivo.'
+    )
+    expect(response?.contentOmitted).toBe(true)
+  })
+
+  it.each([
+    ['the .img -l command', '.img -l', undefined],
+    ['the image.list intent', 'mis imágenes', { intent: 'image.list' }],
+  ])('omits the image list of %s', async (_label, message, classification) => {
+    if (classification) mockClassification(classification)
+    imagesServicesMock.getImages.mockResolvedValue({
+      data: { data: [{ imageUrl: 'https://example.com/1.png', prompt: 'gato', provider: 'x' }] },
+    })
+
+    const { response } = await processor.processAssistantMessage(message, 42)
+
+    expect(response?.content).toContain('https://example.com/1.png')
+    expect(response?.plainText).toBe('La lista de imágenes no está disponible en este dispositivo.')
+    expect(response?.contentOmitted).toBe(true)
+  })
+
+  it('adds no plain text to plain responses', async () => {
+    aiRepositoryMock.chatCompletion
+      .mockResolvedValueOnce({ content: JSON.stringify({ intent: 'question' }) })
+      .mockResolvedValueOnce({ role: 'assistant', content: 'Respuesta', provider: 'assistant' })
+
+    const { response } = await processor.processAssistantMessage('¿qué es un ESP32?', 42)
+
+    expect(response?.content).toBe('Respuesta')
+    expect(response?.plainText).toBeUndefined()
+    expect(response?.contentOmitted).toBeUndefined()
   })
 })

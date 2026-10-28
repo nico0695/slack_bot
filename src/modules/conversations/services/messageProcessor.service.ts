@@ -44,6 +44,16 @@ import {
 } from '../../images/shared/constants/imageOptions.constants'
 
 import { buildUserDataContext, formatConversationHistory } from '../shared/utils/userContext.utils'
+import {
+  alertPlainTextLine,
+  formatPlainTextList,
+  generatedImagesOmittedText,
+  IMAGES_LIST_OMITTED_TEXT,
+  linkPlainTextLine,
+  notePlainTextLine,
+  QR_OMITTED_TEXT,
+  taskPlainTextLine,
+} from '../shared/utils/plainText.utils'
 import { parseSnoozeDuration } from '../shared/utils/snoozeDuration.utils'
 
 import { formatDateToText, resolveNextCalendarDayAt } from '../../../shared/utils/dates.utils'
@@ -328,6 +338,8 @@ export default class MessageProcessor {
     return {
       role: roleTypes.assistant,
       content,
+      plainText: generatedImagesOmittedText(images.length, provider),
+      contentOmitted: true,
       provider: ConversationProviders.ASSISTANT,
     }
   }
@@ -813,7 +825,7 @@ export default class MessageProcessor {
         scope = 'pending'
       }
 
-      const result = await this.alertInteractionsService.listAlertsByScope(
+      const result = await this.alertInteractionsService.getAlertsByScope(
         userId,
         scope,
         scopeChannelId
@@ -834,7 +846,10 @@ export default class MessageProcessor {
           ? 'Alertas marcadas como resueltas.'
           : 'Alertas atrasadas que necesitan atención.'
 
-      return this.buildAssistantResponse(summary, result)
+      return {
+        ...this.buildAssistantResponse(summary, slackMsgUtils.msgAlertsList(result)),
+        plainText: formatPlainTextList(summary, result.map(alertPlainTextLine), summary),
+      }
     }
 
     const preferMatch = lower.match(
@@ -1276,6 +1291,8 @@ export default class MessageProcessor {
           responseMessage = {
             role: roleTypes.assistant,
             content: `Tus imágenes recientes:\n${imagesList}`,
+            plainText: IMAGES_LIST_OMITTED_TEXT,
+            contentOmitted: true,
             provider: ConversationProviders.ASSISTANT,
           }
 
@@ -1439,6 +1456,8 @@ export default class MessageProcessor {
         responseMessage = {
           role: roleTypes.assistant,
           content: qrResult.data.qrBase64,
+          plainText: QR_OMITTED_TEXT,
+          contentOmitted: true,
           provider: ConversationProviders.ASSISTANT,
         }
         break
@@ -1557,10 +1576,16 @@ export default class MessageProcessor {
           if (alerts.error) return null
           const alertsList = alerts.data ?? []
           const contentBlock = slackMsgUtils.msgAlertsList(alertsList)
+          const content = parsed.successMessage || `Mostrando ${alerts.data?.length || 0} alertas`
           return {
             role: roleTypes.assistant,
-            content: parsed.successMessage || `Mostrando ${alerts.data?.length || 0} alertas`,
+            content,
             contentBlock,
+            plainText: formatPlainTextList(
+              content,
+              alertsList.map(alertPlainTextLine),
+              'No tienes alertas'
+            ),
             provider: ConversationProviders.ASSISTANT,
           }
         }
@@ -1605,14 +1630,20 @@ export default class MessageProcessor {
           )
           if (tasks.error) return null
           const contentBlock = slackMsgUtils.msgTasksList(tasks.data ?? [])
+          const content =
+            parsed.successMessage ||
+            (normalizedTag
+              ? `Mostrando ${tasksCountText} tareas con tag "${tagLabel}"`
+              : `Mostrando ${tasksCountText} tareas`)
           return {
             role: roleTypes.assistant,
-            content:
-              parsed.successMessage ||
-              (normalizedTag
-                ? `Mostrando ${tasksCountText} tareas con tag "${tagLabel}"`
-                : `Mostrando ${tasksCountText} tareas`),
+            content,
             contentBlock,
+            plainText: formatPlainTextList(
+              content,
+              (tasks.data ?? []).map(taskPlainTextLine),
+              'No tienes tareas'
+            ),
             provider: ConversationProviders.ASSISTANT,
           }
         }
@@ -1652,14 +1683,20 @@ export default class MessageProcessor {
           const notesCountText = totalNotes.toString()
           if (notes.error) return null
           const contentBlock = slackMsgUtils.msgNotesList(notes.data ?? [])
+          const content =
+            parsed.successMessage ||
+            (normalizedTag
+              ? `Mostrando ${notesCountText} notas con tag "${noteTagLabel}"`
+              : `Mostrando ${notesCountText} notas`)
           return {
             role: roleTypes.assistant,
-            content:
-              parsed.successMessage ||
-              (normalizedTag
-                ? `Mostrando ${notesCountText} notas con tag "${noteTagLabel}"`
-                : `Mostrando ${notesCountText} notas`),
+            content,
             contentBlock,
+            plainText: formatPlainTextList(
+              content,
+              (notes.data ?? []).map(notePlainTextLine),
+              'No tienes notas'
+            ),
             provider: ConversationProviders.ASSISTANT,
           }
         }
@@ -1698,14 +1735,20 @@ export default class MessageProcessor {
           const linksCountText = totalLinks.toString()
           if (links.error) return null
           const contentBlock = slackMsgUtils.msgLinksList(links.data ?? [])
+          const content =
+            parsed.successMessage ||
+            (normalizedTag
+              ? `Mostrando ${linksCountText} links con tag "${linkTagLabel}"`
+              : `Mostrando ${linksCountText} links`)
           return {
             role: roleTypes.assistant,
-            content:
-              parsed.successMessage ||
-              (normalizedTag
-                ? `Mostrando ${linksCountText} links con tag "${linkTagLabel}"`
-                : `Mostrando ${linksCountText} links`),
+            content,
             contentBlock,
+            plainText: formatPlainTextList(
+              content,
+              (links.data ?? []).map(linkPlainTextLine),
+              'No tienes links'
+            ),
             provider: ConversationProviders.ASSISTANT,
           }
         }
@@ -2002,6 +2045,8 @@ export default class MessageProcessor {
           return {
             role: roleTypes.assistant,
             content: `Tus últimas imágenes (${images.data.data.length}):\n${imagesList}`,
+            plainText: IMAGES_LIST_OMITTED_TEXT,
+            contentOmitted: true,
             provider: ConversationProviders.ASSISTANT,
           }
         }
@@ -2058,6 +2103,8 @@ export default class MessageProcessor {
           return {
             role: roleTypes.assistant,
             content: qrResult.data.qrBase64,
+            plainText: QR_OMITTED_TEXT,
+            contentOmitted: true,
             provider: ConversationProviders.ASSISTANT,
           }
         }

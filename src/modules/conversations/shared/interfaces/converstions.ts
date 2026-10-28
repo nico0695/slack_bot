@@ -5,6 +5,8 @@ export interface IConversation {
   role: roleTypes
   content: string
   contentBlock?: { blocks: any[] } // For slack block messages
+  plainText?: string // Text version for clients without blocks; ignored by Slack and web
+  contentOmitted?: boolean // plainText leaves out content those clients cannot show
   provider: ConversationProviders
 }
 

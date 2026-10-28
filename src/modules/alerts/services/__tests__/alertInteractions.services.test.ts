@@ -567,4 +567,27 @@ describe('AlertInteractionsService', () => {
       )
     })
   })
+
+  describe('getAlertsByScope', () => {
+    it('returns the filtered alerts without building Slack blocks', async () => {
+      const alerts = [
+        { id: 1, sent: false, date: new Date('2999-01-01T00:00:00.000Z') },
+        { id: 2, sent: true, date: new Date('2020-01-01T00:00:00.000Z') },
+      ]
+      getAlertsByUserIdMock.mockResolvedValue({ data: alerts })
+
+      const result = await service.getAlertsByScope(11, 'pending', null)
+
+      expect(result).toEqual([alerts[0]])
+      expect(slackMsgUtilsMock.msgAlertsList).not.toHaveBeenCalled()
+    })
+
+    it('returns the message when there is nothing to list', async () => {
+      getAlertsByUserIdMock.mockResolvedValue({ data: [] })
+
+      await expect(service.getAlertsByScope(11, 'all', null)).resolves.toBe(
+        'No tienes alertas guardadas.'
+      )
+    })
+  })
 })
