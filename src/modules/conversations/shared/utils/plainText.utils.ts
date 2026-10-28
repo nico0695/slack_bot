@@ -52,3 +52,57 @@ export const notePlainTextLine = (note: {
 
 export const linkPlainTextLine = (link: { id: number; url: string; title?: string }): string =>
   `#${link.id} - ${link.title ? `${link.title}: ${link.url}` : link.url}`
+
+export const TRUNCATED_NOTICE = '\n… (respuesta recortada)'
+
+// Pictographs plus the skin tones, flag letters, joiners and variation selectors around them.
+// Built from strings so the invisible code points stay escaped in the source.
+const EMOJI_PATTERN = new RegExp(
+  [
+    '\\p{Extended_Pictographic}',
+    '\\p{Emoji_Modifier}',
+    '\\p{Regional_Indicator}',
+    '\\u200D',
+    '\\uFE0E',
+    '\\uFE0F',
+    '\\u20E3',
+  ].join('|'),
+  'gu'
+)
+
+/**
+ * Slack mrkdwn to plain text: links become "label: url", formatting marks and emojis go away
+ */
+export const normalizePlainText = (text: string): string =>
+  text
+    .replace(/<([^<>|\s]+)\|([^<>]+)>/g, '$2: $1')
+    .replace(/<(https?:\/\/[^<>\s]+)>/g, '$1')
+    .replace(/\*{1,2}([^*\n]+?)\*{1,2}/g, '$1')
+    .replace(/(^|[\s(])_([^_\n]+)_(?=$|[\s).,:;!?])/gm, '$1$2')
+    .replace(/(^|[\s(])~([^~\n]+)~(?=$|[\s).,:;!?])/gm, '$1$2')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(EMOJI_PATTERN, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+/**
+ * Cut to `maxChars` characters (not UTF-16 units), notice included
+ */
+export const truncatePlainText = (
+  text: string,
+  maxChars: number
+): { text: string; truncated: boolean } => {
+  const chars = Array.from(text)
+
+  if (chars.length <= maxChars) {
+    return { text, truncated: false }
+  }
+
+  const keep = Math.max(maxChars - Array.from(TRUNCATED_NOTICE).length, 0)
+
+  return { text: chars.slice(0, keep).join('').trimEnd() + TRUNCATED_NOTICE, truncated: true }
+}

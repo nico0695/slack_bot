@@ -3,9 +3,12 @@ import {
   formatPlainTextList,
   generatedImagesOmittedText,
   linkPlainTextLine,
+  normalizePlainText,
   notePlainTextLine,
   PLAIN_TEXT_LIST_MAX_ITEMS,
   taskPlainTextLine,
+  TRUNCATED_NOTICE,
+  truncatePlainText,
 } from '../plainText.utils'
 
 jest.mock('../../../../../shared/utils/dates.utils', () => ({
@@ -75,5 +78,60 @@ describe('plainText utils', () => {
     expect(generatedImagesOmittedText(3, 'gemini')).toBe(
       'Se generaron 3 imágenes con gemini, pero no se pueden mostrar en este dispositivo.'
     )
+  })
+})
+
+describe('normalizePlainText', () => {
+  it('removes Slack bold, italic, strike and code marks', () => {
+    expect(normalizePlainText('• Id: _#12_ - *Llamar*: ~viejo~ `code` **Nota:** fin')).toBe(
+      '• Id: #12 - Llamar: viejo code Nota: fin'
+    )
+  })
+
+  it('keeps underscores and asterisks that are not formatting', () => {
+    expect(normalizePlainText('https://a.com/my_page_x y 5 * 3')).toBe(
+      'https://a.com/my_page_x y 5 * 3'
+    )
+  })
+
+  it('turns Slack links into label and url', () => {
+    expect(normalizePlainText('Ver <https://a.com/x_y|Docs> o <https://b.com>')).toBe(
+      'Ver Docs: https://a.com/x_y o https://b.com'
+    )
+  })
+
+  it('removes emojis, including joined and modified ones, keeping accents', () => {
+    expect(normalizePlainText('✅ Listo 🤷‍♂️ 👍🏽 canción ñandú 😅')).toBe('Listo canción ñandú')
+  })
+
+  it('removes flags and keeps the digit of a keycap', () => {
+    expect(normalizePlainText('Hola \u{1F1E6}\u{1F1F7} paso 1\uFE0F\u20E3')).toBe('Hola paso 1')
+  })
+
+  it('tidies the spaces and blank lines left behind', () => {
+    expect(normalizePlainText('  ❌ Error  al   generar \n\n\n\nfin  ')).toBe(
+      'Error al generar\n\nfin'
+    )
+  })
+})
+
+describe('truncatePlainText', () => {
+  it('leaves text within the limit untouched', () => {
+    expect(truncatePlainText('hola', 10)).toEqual({ text: 'hola', truncated: false })
+  })
+
+  it('cuts to the limit including the notice', () => {
+    const { text, truncated } = truncatePlainText('a'.repeat(100), 50)
+
+    expect(truncated).toBe(true)
+    expect(Array.from(text)).toHaveLength(50)
+    expect(text.endsWith(TRUNCATED_NOTICE)).toBe(true)
+  })
+
+  it('counts characters, not UTF-16 units', () => {
+    expect(truncatePlainText('ñ'.repeat(10), 10)).toEqual({
+      text: 'ñ'.repeat(10),
+      truncated: false,
+    })
   })
 })
