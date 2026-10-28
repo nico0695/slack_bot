@@ -80,6 +80,39 @@ Close a conversation channel.
 }
 ```
 
+#### POST /conversations/assistant
+Single-shot assistant request for clients without Slack or chat history (bridge / ESP32): one message, one final answer in the same request. Same processing as a Slack DM, for the authenticated user, without channel or history. Full spec: [ASSISTANT_REST.md](ASSISTANT_REST.md).
+
+**Headers:**
+- `Authorization`: Bearer token (Supabase session of an enabled user; profiles USER, USER_PREMIUM, ADMIN)
+
+**Request Body (snake_case, no other fields allowed):**
+```json
+{
+  "request_id": "7d9c2b13-2b56-4c88-9b38-f2d9d987a013",
+  "message": "Avisame mañana a las diez que tengo que llamar al médico"
+}
+```
+
+- `request_id`: lowercase canonical UUID, used only for correlation (no deduplication: the same id sent twice runs twice).
+- `message`: 1 to `ASSISTANT_REST_MAX_INPUT_CHARS` (default 2000) characters after trim.
+
+**Response:** `200` when `completed`, `500` when `unknown`
+```json
+{
+  "request_id": "7d9c2b13-2b56-4c88-9b38-f2d9d987a013",
+  "status": "completed",
+  "message": "Alerta creada correctamente para el 29 de octubre de 2026, 10:00 con id: #12",
+  "content_omitted": false,
+  "error": null
+}
+```
+
+- `status`: `completed` (usable answer, not necessarily a successful action) or `unknown` (no answer or processing failed, and an action may have run; `error: { "code": "result_unconfirmed" }`).
+- `message`: plain text without Slack formatting or emojis, at most `ASSISTANT_REST_MAX_OUTPUT_CHARS` (default 2000) characters.
+- `content_omitted`: `true` when images, QR codes or text beyond the limit were left out.
+- Validation (`400`), auth (`401`), permission (`403`), malformed JSON (`400`) and oversized body (`413`) errors keep the global error formats and do not run the assistant.
+
 ### Alerts
 
 #### GET /alerts

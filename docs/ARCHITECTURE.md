@@ -236,6 +236,18 @@ The secret column uses `select: false` and is only read when sending. Outbox wri
 
 See [BRIDGE_INTEGRATION.md](BRIDGE_INTEGRATION.md).
 
+### Assistant REST (single-shot)
+
+**Components:**
+
+- `ConversationsWebController.assistantMessage` - `POST /conversations/assistant`, auth + strict body validation
+- `AssistantSingleShotService` - Runs `MessageProcessor` like a Slack DM (no channel, no history, no Redis) and returns the `{ request_id, status, message, content_omitted, error }` envelope
+- `plainText.utils` - Plain-text lists, Slack-format/emoji removal and length cap for clients without blocks
+
+`IConversation.plainText` / `contentOmitted` are optional and ignored by Slack and web. One execution per request: no retries, no deduplication by `request_id`.
+
+See [ASSISTANT_REST.md](ASSISTANT_REST.md).
+
 ### Socket.io Rooms
 
 **Public Channels:**
