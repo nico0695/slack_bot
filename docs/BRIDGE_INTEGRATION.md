@@ -220,7 +220,7 @@ Además, fuera del plan original: `slackConfig` deshabilita la verificación del
 
 | # | Decisión |
 |---|----------|
-| D1 | camelCase en el REST del bot; payload del webhook en snake_case (contrato) |
+| D1 | camelCase en el REST del bot; payload del webhook en snake_case (contrato). Excepción: `POST /conversations/assistant` usa snake_case según el contrato V2 (ver `ASSISTANT_REST.md`, A1) |
 | D2 | `PATCH /bridge/config` con merge y validación del estado resultante |
 | D3 | Bot y bridge separados por ahora; `BRIDGE_WEBHOOK_ALLOW_PRIVATE` (default `false`) queda disponible si se despliegan juntos |
 | D4 | Unicidad `(user, requestId)`; `source`/`deviceId` metadata opcional |
