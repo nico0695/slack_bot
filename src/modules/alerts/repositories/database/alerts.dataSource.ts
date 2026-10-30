@@ -137,6 +137,41 @@ export default class AlertsDataSource {
     }
   }
 
+  /**
+   * Get an alert of a user. Throws when the query fails
+   * @param alertId number - Alert id
+   * @param userId number - Owner id
+   */
+  async findAlertById(alertId: number, userId: number): Promise<Alerts | null> {
+    return await Alerts.findOne({
+      where: { id: alertId, user: { id: userId } },
+    })
+  }
+
+  /**
+   * Move an alert to `target` and leave it pending, only while its date is still
+   * `expected`. A single conditional UPDATE, outside a transaction for the same reason
+   * as `insertAlertIfAbsent`. Throws when the query fails
+   * @returns true when the alert was updated
+   */
+  async rescheduleIfScheduledAt(
+    alertId: number,
+    userId: number,
+    expected: Date,
+    target: Date
+  ): Promise<boolean> {
+    const result = await Alerts.createQueryBuilder()
+      .update(Alerts)
+      .set({ date: target, sent: false })
+      .where('id = :alertId', { alertId })
+      .andWhere('userId = :userId', { userId })
+      .andWhere('date = :expected', { expected })
+      .andWhere('deletedAt IS NULL')
+      .execute()
+
+    return (result.affected ?? 0) > 0
+  }
+
   async getAlertsByDate(date: Date): Promise<IAlertToNotify[]> {
     try {
       const alerts = await Alerts.find({

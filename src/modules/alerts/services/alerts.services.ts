@@ -6,7 +6,9 @@ import {
   IAlertToNotify,
   IAlert,
   ICreateAlertResponse,
+  TSnoozeAlertResult,
 } from '../shared/interfaces/alerts.interfaces'
+import { resolveSnoozeTarget } from '../shared/constants/snoozeCatalog'
 
 import AlertsDataSource from '../repositories/database/alerts.dataSource'
 import { UsersRedis } from '../../users/repositories/redis/users.redis'
@@ -220,6 +222,47 @@ export default class AlertsServices {
         error: 'Error al reagendar la alerta',
       }
     }
+  }
+
+  /**
+   * Snooze an alert by preset only while its date is still `expectedScheduledAt`.
+   * Rejections are results; database failures throw, so callers can tell a
+   * rejection from an unconfirmed outcome
+   * @param presetKey string - A snooze catalog key
+   * @param expectedScheduledAt Date - Alert date the caller saw
+   */
+  public async snoozeAlertByPreset(
+    alertId: number,
+    userId: number,
+    presetKey: string,
+    expectedScheduledAt: Date
+  ): Promise<TSnoozeAlertResult> {
+    const target = resolveSnoozeTarget(presetKey, expectedScheduledAt, new Date())
+
+    if (!target) {
+      throw new Error(`Unknown snooze preset: ${presetKey}`)
+    }
+
+    const updated = await this.alertsDataSource.rescheduleIfScheduledAt(
+      alertId,
+      userId,
+      expectedScheduledAt,
+      target
+    )
+
+    if (updated) {
+      log.info({ alertId, userId, presetKey }, 'Alert snoozed')
+      return { status: 'snoozed', alertId, scheduledAt: target }
+    }
+
+    const current = await this.alertsDataSource.findAlertById(alertId, userId)
+
+    if (!current) {
+      return { status: 'not_found' }
+    }
+
+    log.info({ alertId, userId, presetKey }, 'Alert snooze rejected, schedule changed')
+    return { status: 'schedule_changed' }
   }
 
   public async markAlertResolved(

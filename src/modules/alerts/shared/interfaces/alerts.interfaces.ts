@@ -35,3 +35,9 @@ export interface ICreateAlertResponse extends GenericResponse<Alerts> {
   // Set when the requestId was already used with different data
   conflictAlertId?: number
 }
+
+export type TSnoozeAlertResult =
+  | { status: 'snoozed'; alertId: number; scheduledAt: Date }
+  | { status: 'not_found' }
+  // The alert date no longer matches the expected one
+  | { status: 'schedule_changed' }
