@@ -40,7 +40,7 @@ export const alertCronJob = async (): Promise<void> => {
       return
     }
 
-    const processedIds = await Promise.all(
+    const processedAlerts = await Promise.all(
       alerts?.data.map(async (alert) => {
         // Enqueue first: if it fails the alert stays unsent and the whole alert is retried
         // next tick, so the bridge event is never lost and Slack/Web Push are not repeated
@@ -85,19 +85,26 @@ export const alertCronJob = async (): Promise<void> => {
           }
         }
 
-        return alert.id
+        return { id: alert.id, date: alert.date }
       })
     )
 
-    const notifiedIds = processedIds.filter((id) => id !== null)
+    const notified = processedAlerts.filter((item) => item !== null)
 
-    if (notifiedIds.length > 0) {
-      await alertsServices.updateAlertAsNotified(notifiedIds)
+    if (notified.length > 0) {
+      // Conditional on the date read here, so a snooze made meanwhile is not lost
+      const markResponse = await alertsServices.updateAlertAsNotified(notified)
+
+      if (markResponse.error) {
+        // Some alerts may be marked already; the unmarked ones are notified again next tick
+        log.error({ count: notified.length }, 'Failed to mark alerts as notified')
+        return
+      }
     }
 
     const durationMs = Date.now() - startTime
     log.info(
-      { count: notifiedIds.length, skipped: alerts.data.length - notifiedIds.length, durationMs },
+      { count: notified.length, skipped: alerts.data.length - notified.length, durationMs },
       'Alerts notified successfully'
     )
   } catch (error) {

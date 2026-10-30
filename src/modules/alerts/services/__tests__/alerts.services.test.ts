@@ -296,16 +296,17 @@ describe('AlertsServices', () => {
     it('returns success flag', async () => {
       updateAlertAsNotifiedMock.mockResolvedValue(undefined)
 
-      const result = await services.updateAlertAsNotified([1, 2])
+      const alerts = [{ id: 1, date: new Date() }]
+      const result = await services.updateAlertAsNotified(alerts)
 
-      expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([1, 2])
+      expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith(alerts)
       expect(result).toEqual({ data: true })
     })
 
     it('returns error when update fails', async () => {
       updateAlertAsNotifiedMock.mockRejectedValue(new Error('fail'))
 
-      const result = await services.updateAlertAsNotified([1])
+      const result = await services.updateAlertAsNotified([{ id: 1, date: new Date() }])
 
       expect(result.error).toBe('Error al actualizar la alerta')
     })

@@ -2,18 +2,25 @@ import { singleton } from 'tsyringe'
 
 import AlertsServices from './alerts.services'
 import { Alerts } from '../../../entities/alerts'
-import { snoozePresets } from '../shared/constants/snoozeCatalog'
+import { findSnoozePreset } from '../shared/constants/snoozeCatalog'
 
 import { RedisRepository } from '../../conversations/repositories/redis/conversations.redis'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
+import { createModuleLogger } from '../../../config/logger'
+
+const log = createModuleLogger('alertInteractions.service')
 
 const MINUTE_IN_MS = 60 * 1000
 
 const DAILY_MINUTES = 24 * 60
 const WEEKLY_MINUTES = 7 * 24 * 60
 
-/** Not a `snoozePresets` entry: it has no fixed target-date rule to render. */
+/** Not a snooze catalog entry: it has no fixed target-date rule to render. */
 export const SNOOZE_DEFAULT_PRESET_KEY = 'snooze_default'
+
+export const SNOOZE_SCHEDULE_CHANGED_MESSAGE = 'This alert changed. Try again.'
+
+const SNOOZE_FAILED_MESSAGE = 'No se pudo reprogramar la alerta. 😅'
 
 export type TAlertScope = 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved'
 
@@ -55,7 +62,8 @@ export default class AlertInteractionsService {
 
   /**
    * Callers supply exactly one of `minutes` or `presetKey`.
-   * Base rule, matching `AlertsServices.rescheduleAlert`:
+   * Catalog presets go through the shared `AlertsServices.snoozeAlertByPreset`.
+   * Minutes keep the `AlertsServices.rescheduleAlert` base rule:
    * new date is `max(now, alert_date) + minutes`.
    */
   public snoozeAlert = async (
@@ -63,6 +71,14 @@ export default class AlertInteractionsService {
     userId: number,
     options: ISnoozeAlertOptions
   ): Promise<string | { blocks: any[] }> => {
+    if (options.minutes === undefined && options.presetKey !== undefined) {
+      const preset = findSnoozePreset(options.presetKey)
+
+      if (preset) {
+        return await this.applyPresetSnooze(alertId, userId, preset.key)
+      }
+    }
+
     const resolution = await this.resolveSnoozeMinutes(alertId, userId, options)
 
     if ('error' in resolution) {
@@ -169,6 +185,46 @@ export default class AlertInteractionsService {
     return filtered
   }
 
+  /**
+   * The expected date is the one just read: Slack messages carry no date, but a
+   * concurrent change between this read and the update is still not overwritten
+   */
+  private applyPresetSnooze = async (
+    alertId: number,
+    userId: number,
+    presetKey: string
+  ): Promise<string | { blocks: any[] }> => {
+    const alertRes = await this.alertsServices.getAlertById(alertId, userId)
+
+    if (alertRes.error || !alertRes.data) {
+      return alertRes.error ?? SNOOZE_FAILED_MESSAGE
+    }
+
+    try {
+      const result = await this.alertsServices.snoozeAlertByPreset(
+        alertId,
+        userId,
+        presetKey,
+        new Date(alertRes.data.date)
+      )
+
+      if (result.status === 'not_found') {
+        return 'No se encontró la alerta solicitada'
+      }
+
+      if (result.status === 'schedule_changed') {
+        return SNOOZE_SCHEDULE_CHANGED_MESSAGE
+      }
+
+      return slackMsgUtils.msgAlertDetail(
+        Object.assign(alertRes.data, { date: result.scheduledAt, sent: false })
+      )
+    } catch (error) {
+      log.error({ err: error, alertId, userId, presetKey }, 'applyPresetSnooze failed')
+      return SNOOZE_FAILED_MESSAGE
+    }
+  }
+
   private applySnooze = async (
     alertId: number,
     userId: number,
@@ -221,22 +277,8 @@ export default class AlertInteractionsService {
       return { minutes: await this.getDefaultSnoozeMinutes(userId) }
     }
 
-    const preset = snoozePresets.find((item) => item.key === options.presetKey)
-
-    if (!preset) {
-      return { error: 'Acción no reconocida.' }
-    }
-
-    const baseResolution = await this.resolveSnoozeBase(alertId, userId)
-
-    if ('error' in baseResolution) {
-      return { error: baseResolution.error }
-    }
-
-    const { base } = baseResolution
-    const target = preset.resolveTargetDate(base)
-
-    return { minutes: (target.getTime() - base.getTime()) / MINUTE_IN_MS }
+    // Catalog presets were dispatched by `snoozeAlert` already
+    return { error: 'Acción no reconocida.' }
   }
 
   /**

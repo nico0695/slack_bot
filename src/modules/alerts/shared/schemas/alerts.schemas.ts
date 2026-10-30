@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { snoozePresets } from '../constants/snoozeCatalog'
 
 export const createAlertSchema = z
   .object({
@@ -16,3 +17,27 @@ export const createAlertSchema = z
     message: 'source y deviceId requieren requestId',
     path: ['requestId'],
   })
+
+// Visible catalog presets only: the hidden 09:00 preset is not part of the REST contract
+const restSnoozePresetKeys = snoozePresets.map((preset) => preset.key)
+
+export const snoozeAlertParamsSchema = z.object({
+  id: z
+    .string()
+    .regex(/^[1-9]\d*$/)
+    .transform(Number)
+    .refine(Number.isSafeInteger, { message: 'Expected a safe integer' }),
+})
+
+export const snoozeAlertBodySchema = z
+  .object({
+    preset: z.string().refine((key) => restSnoozePresetKeys.includes(key), {
+      message: 'Unknown snooze preset',
+    }),
+    // UTC only, ending in Z
+    expected_scheduled_at: z
+      .string()
+      .datetime()
+      .transform((value) => new Date(value)),
+  })
+  .strict()

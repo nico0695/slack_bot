@@ -1,4 +1,5 @@
 import { alertCronJob } from '../cronJob'
+import { createModuleLogger } from '../../../../config/logger'
 
 const mockAlertsFns = {
   getAlertsToNotify: jest.fn(),
@@ -29,6 +30,8 @@ jest.mock('tsyringe', () => ({
 
 const getAlertsToNotifyMock = mockAlertsFns.getAlertsToNotify
 const updateAlertAsNotifiedMock = mockAlertsFns.updateAlertAsNotified
+// Alerts are marked with the date they were read with
+const notified = (...ids: number[]): any[] => ids.map((id) => expect.objectContaining({ id }))
 const enqueueAlertEventMock = mockAlertsFns.enqueueAlertEvent
 const postMessageMock = jest.fn()
 const sendNotificationMock = jest.fn()
@@ -66,6 +69,19 @@ describe('alertCronJob', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     enqueueAlertEventMock.mockResolvedValue({ data: false })
+    updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
+  })
+
+  it('reports a failed notified mark instead of logging success', async () => {
+    const log = createModuleLogger('alerts.cron')
+    const alert: any = { id: 6, message: 'Ping', user: { id: 9 } }
+    getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
+    updateAlertAsNotifiedMock.mockResolvedValue({ error: 'Error al actualizar la alerta' })
+
+    await alertCronJob()
+
+    expect(log.error).toHaveBeenCalledWith({ count: 1 }, 'Failed to mark alerts as notified')
+    expect(log.info).not.toHaveBeenCalledWith(expect.anything(), 'Alerts notified successfully')
   })
 
   it('returns early when alert service responds with error', async () => {
@@ -98,7 +114,7 @@ describe('alertCronJob', () => {
     msgAlertDetailMock.mockReturnValue({ blocks: ['block-data'] })
     postMessageMock.mockResolvedValue(undefined)
     sendNotificationMock.mockResolvedValue(undefined)
-    updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+    updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
 
     await alertCronJob()
     await new Promise((resolve) => setImmediate(resolve))
@@ -110,7 +126,7 @@ describe('alertCronJob', () => {
       blocks: ['block-data'],
     })
     expect(sendNotificationMock).toHaveBeenCalledWith(alert.user.pwSubscription, expect.any(String))
-    expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([1])
+    expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith(notified(1))
   })
 
   it('skips slack delivery when channel missing but updates notification state', async () => {
@@ -124,14 +140,14 @@ describe('alertCronJob', () => {
       },
     }
     getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
-    updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+    updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
 
     await alertCronJob()
     await new Promise((resolve) => setImmediate(resolve))
 
     expect(postMessageMock).not.toHaveBeenCalled()
     expect(sendNotificationMock).not.toHaveBeenCalled()
-    expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([2])
+    expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith(notified(2))
   })
 
   it('sends slack message without web push when subscription absent', async () => {
@@ -146,14 +162,14 @@ describe('alertCronJob', () => {
     }
     getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
     msgAlertDetailMock.mockReturnValue({ blocks: [] })
-    updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+    updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
 
     await alertCronJob()
     await new Promise((resolve) => setImmediate(resolve))
 
     expect(postMessageMock).toHaveBeenCalled()
     expect(sendNotificationMock).not.toHaveBeenCalled()
-    expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([3])
+    expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith(notified(3))
   })
 
   describe('bridge events', () => {
@@ -171,7 +187,7 @@ describe('alertCronJob', () => {
     beforeEach(() => {
       msgAlertDetailMock.mockReturnValue({ blocks: [] })
       postMessageMock.mockResolvedValue(undefined)
-      updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+      updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
     })
 
     it('enqueues every alert with the same trigger time, also without Slack channel', async () => {
@@ -185,7 +201,7 @@ describe('alertCronJob', () => {
       expect(enqueueAlertEventMock).toHaveBeenCalledWith(noChannelAlert, expect.any(Date))
       const [[, firstDate], [, secondDate]] = enqueueAlertEventMock.mock.calls
       expect(firstDate).toBe(secondDate)
-      expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([4, 5])
+      expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith(notified(4, 5))
     })
 
     it('skips Slack and keeps the alert unsent when enqueuing fails', async () => {
@@ -197,7 +213,7 @@ describe('alertCronJob', () => {
       await alertCronJob()
 
       expect(postMessageMock).not.toHaveBeenCalled()
-      expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith([5])
+      expect(updateAlertAsNotifiedMock).toHaveBeenCalledWith(notified(5))
     })
 
     it('does not mark anything when every enqueue fails', async () => {

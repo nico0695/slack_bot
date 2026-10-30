@@ -35,3 +35,15 @@ export interface ICreateAlertResponse extends GenericResponse<Alerts> {
   // Set when the requestId was already used with different data
   conflictAlertId?: number
 }
+
+// Alert processed by the cron, with the date it was read with
+export interface INotifiedAlert {
+  id: number
+  date: Date
+}
+
+export type TSnoozeAlertResult =
+  | { status: 'snoozed'; alertId: number; scheduledAt: Date }
+  | { status: 'not_found' }
+  // The alert date no longer matches the expected one
+  | { status: 'schedule_changed' }

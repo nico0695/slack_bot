@@ -9,7 +9,7 @@ import AlertsServices from '../../alerts/services/alerts.services'
 import AlertInteractionsService, {
   SNOOZE_DEFAULT_PRESET_KEY,
 } from '../../alerts/services/alertInteractions.services'
-import { snoozePresets } from '../../alerts/shared/constants/snoozeCatalog'
+import { findSnoozePreset } from '../../alerts/shared/constants/snoozeCatalog'
 import TasksServices from '../../tasks/services/tasks.services'
 import NotesServices from '../../notes/services/notes.services'
 import LinksServices from '../../links/services/links.services'
@@ -117,10 +117,7 @@ export default class ConversationsServices {
 
   /** Any operation `AlertInteractionsService.snoozeAlert` can resolve. */
   private isSnoozeOperation = (operation: string): boolean => {
-    return (
-      operation === SNOOZE_DEFAULT_PRESET_KEY ||
-      snoozePresets.some((preset) => preset.key === operation)
-    )
+    return operation === SNOOZE_DEFAULT_PRESET_KEY || findSnoozePreset(operation) !== undefined
   }
 
   private getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
