@@ -28,9 +28,11 @@ const rescheduleAlertMock = jest.fn()
 const createFollowUpAlertMock = jest.fn()
 const getAlertsByUserIdMock = jest.fn()
 const getAlertByIdMock = jest.fn()
+const snoozeAlertByPresetMock = jest.fn()
 
 const alertsServicesMock = {
   rescheduleAlert: rescheduleAlertMock,
+  snoozeAlertByPreset: snoozeAlertByPresetMock,
   createFollowUpAlert: createFollowUpAlertMock,
   getAlertsByUserId: getAlertsByUserIdMock,
   getAlertById: getAlertByIdMock,
@@ -138,43 +140,62 @@ describe('AlertInteractionsService', () => {
     })
   })
 
-  describe('snoozeAlert - relative presets and base rule', () => {
-    it.each([
-      ['snooze_5m', 5],
-      ['snooze_1h', 60],
-    ])(
-      'reschedules %s with exactly the legacy minute amount (%i)',
-      async (presetKey, expectedMinutes) => {
-        // Catalog presets resolve their target against max(now, alert_date), so the
-        // alert row is read first (design decision 5). The amount handed to
-        // rescheduleAlert must still be the exact legacy number.
-        jest.useFakeTimers().setSystemTime(argentinaDate(2026, 8, 1, 12, 0))
-        getAlertByIdMock.mockResolvedValue({
-          data: { id: 3, date: argentinaDate(2026, 7, 30, 8, 0) },
+  describe('snoozeAlert - catalog presets', () => {
+    const alertDate = new Date('2026-08-01T15:00:00.000Z')
+
+    beforeEach(() => {
+      getAlertByIdMock.mockResolvedValue({ data: { id: 3, message: 'Ping', date: alertDate } })
+    })
+
+    it.each(['snooze_5m', 'snooze_1h', 'snooze_tomorrow_same_time', 'snooze_tomorrow'])(
+      'delegates %s to the shared operation with the date just read',
+      async (presetKey) => {
+        const target = new Date('2026-08-02T15:00:00.000Z')
+        snoozeAlertByPresetMock.mockResolvedValue({
+          status: 'snoozed',
+          alertId: 3,
+          scheduledAt: target,
         })
-        rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
 
         const result = await service.snoozeAlert(3, 11, { presetKey, updatePreference: false })
 
-        expect(getAlertByIdMock).toHaveBeenCalledWith(3, 11)
-        expect(rescheduleAlertMock).toHaveBeenCalledWith(3, 11, expectedMinutes)
+        expect(snoozeAlertByPresetMock).toHaveBeenCalledWith(3, 11, presetKey, alertDate)
+        expect(slackMsgUtilsMock.msgAlertDetail).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 3, date: target, sent: false })
+        )
+        expect(rescheduleAlertMock).not.toHaveBeenCalled()
         expect(saveAlertSnoozeConfigMock).not.toHaveBeenCalled()
         expect(result).toEqual({ blocks: [] })
       }
     )
 
-    it('reschedules a future-dated alert with the same legacy amount (base = alert_date)', async () => {
-      jest.useFakeTimers().setSystemTime(argentinaDate(2026, 8, 1, 12, 0))
-      getAlertByIdMock.mockResolvedValue({
-        data: { id: 3, date: argentinaDate(2026, 8, 3, 18, 30) },
+    it.each([
+      ['schedule_changed', 'This alert changed. Try again.'],
+      ['not_found', 'No se encontró la alerta solicitada'],
+    ])('answers a %s rejection with a message', async (status, message) => {
+      snoozeAlertByPresetMock.mockResolvedValue({ status })
+
+      const result = await service.snoozeAlert(3, 11, {
+        presetKey: 'snooze_5m',
+        updatePreference: false,
       })
-      rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
 
-      await service.snoozeAlert(3, 11, { presetKey: 'snooze_5m', updatePreference: false })
-
-      expect(rescheduleAlertMock).toHaveBeenCalledWith(3, 11, 5)
+      expect(result).toBe(message)
     })
 
+    it('answers the generic message when the operation fails', async () => {
+      snoozeAlertByPresetMock.mockRejectedValue(new Error('db error'))
+
+      const result = await service.snoozeAlert(3, 11, {
+        presetKey: 'snooze_5m',
+        updatePreference: false,
+      })
+
+      expect(result).toBe('No se pudo reprogramar la alerta. 😅')
+    })
+  })
+
+  describe('snoozeAlert - relative presets and base rule', () => {
     it('reschedules with an explicit minutes amount (text-command path)', async () => {
       rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
 
@@ -332,84 +353,34 @@ describe('AlertInteractionsService', () => {
   })
 
   describe('snoozeAlert - tomorrow preset dispatch (AC-8)', () => {
-    it('routes through resolveTargetDate to next-calendar-day 09:00 AR', async () => {
-      const now = argentinaDate(2026, 8, 1, 22, 0)
-      jest.useFakeTimers().setSystemTime(now)
+    it.each([
+      ['an overdue alert', argentinaDate(2026, 7, 30, 8, 0), argentinaDate(2026, 8, 1, 22, 0), 2],
+      [
+        'before 09:00, never the same day',
+        argentinaDate(2026, 7, 30, 8, 0),
+        argentinaDate(2026, 8, 1, 8, 0),
+        2,
+      ],
+      [
+        'a future alert (base = alert_date)',
+        argentinaDate(2026, 8, 3, 18, 30),
+        argentinaDate(2026, 8, 1, 12, 0),
+        4,
+      ],
+    ])(
+      'resolves the hidden 09:00 preset to the next calendar day for %s',
+      (_case, scheduledAt, now, day) => {
+        const target = resolveSnoozeTarget('snooze_tomorrow', scheduledAt, now)
 
-      getAlertByIdMock.mockResolvedValue({
-        data: { id: 3, date: argentinaDate(2026, 7, 30, 8, 0) },
-      })
-      rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
-
-      await service.snoozeAlert(3, 11, {
-        presetKey: 'snooze_tomorrow',
-        updatePreference: false,
-      })
-
-      expect(getAlertByIdMock).toHaveBeenCalledWith(3, 11)
-
-      const minutes = rescheduleAlertMock.mock.calls[0][2]
-      const resolved = new Date(now.getTime() + minutes * 60 * 1000)
-
-      expect(argentinaWallClock(resolved)).toEqual({
-        year: 2026,
-        month: 8,
-        day: 2,
-        hour: 9,
-        minute: 0,
-      })
-    })
-
-    it('resolves to the NEXT day even before 09:00, never the same day', async () => {
-      const now = argentinaDate(2026, 8, 1, 8, 0)
-      jest.useFakeTimers().setSystemTime(now)
-
-      getAlertByIdMock.mockResolvedValue({
-        data: { id: 3, date: argentinaDate(2026, 7, 30, 8, 0) },
-      })
-      rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
-
-      await service.snoozeAlert(3, 11, {
-        presetKey: 'snooze_tomorrow',
-        updatePreference: false,
-      })
-
-      const minutes = rescheduleAlertMock.mock.calls[0][2]
-      const resolved = new Date(now.getTime() + minutes * 60 * 1000)
-
-      expect(argentinaWallClock(resolved)).toEqual({
-        year: 2026,
-        month: 8,
-        day: 2,
-        hour: 9,
-        minute: 0,
-      })
-    })
-
-    it('resolves from the alert date when the alert is in the future (base = alert_date)', async () => {
-      const now = argentinaDate(2026, 8, 1, 12, 0)
-      const alertDate = argentinaDate(2026, 8, 3, 18, 30)
-      jest.useFakeTimers().setSystemTime(now)
-
-      getAlertByIdMock.mockResolvedValue({ data: { id: 3, date: alertDate } })
-      rescheduleAlertMock.mockResolvedValue({ data: { id: 3 } })
-
-      await service.snoozeAlert(3, 11, {
-        presetKey: 'snooze_tomorrow',
-        updatePreference: false,
-      })
-
-      const minutes = rescheduleAlertMock.mock.calls[0][2]
-      const resolved = new Date(alertDate.getTime() + minutes * 60 * 1000)
-
-      expect(argentinaWallClock(resolved)).toEqual({
-        year: 2026,
-        month: 8,
-        day: 4,
-        hour: 9,
-        minute: 0,
-      })
-    })
+        expect(argentinaWallClock(target)).toEqual({
+          year: 2026,
+          month: 8,
+          day,
+          hour: 9,
+          minute: 0,
+        })
+      }
+    )
 
     it('surfaces the alert lookup error instead of rescheduling', async () => {
       getAlertByIdMock.mockResolvedValue({ error: 'No se encontró la alerta solicitada' })

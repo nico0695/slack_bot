@@ -19,7 +19,10 @@ import {
   LISTING_SNOOZE_SLOTS,
   SNOOZE_SLOTS,
 } from '../slackMessages.utils'
-import { snoozePresets } from '../../../modules/alerts/shared/constants/snoozeCatalog'
+import {
+  resolveSnoozeTarget,
+  snoozePresets,
+} from '../../../modules/alerts/shared/constants/snoozeCatalog'
 import AlertInteractionsService from '../../../modules/alerts/services/alertInteractions.services'
 import { Alerts } from '../../../entities/alerts'
 
@@ -40,11 +43,15 @@ jest.mock('../../../modules/alerts/shared/constants/snoozeCatalog', () => {
     },
   ]
 
+  const findSnoozePreset = (key: string): any =>
+    [...mockedPresets, ...actual.hiddenSnoozePresets].find((preset) => preset.key === key)
+
   return {
     ...actual,
     snoozePresets: mockedPresets,
-    findSnoozePreset: (key: string): any =>
-      [...mockedPresets, ...actual.hiddenSnoozePresets].find((preset) => preset.key === key),
+    findSnoozePreset,
+    resolveSnoozeTarget: (key: string, scheduledAt: Date, now: Date): Date | null =>
+      findSnoozePreset(key)?.resolveTargetDate({ now, scheduledAt }) ?? null,
   }
 })
 
@@ -121,11 +128,12 @@ describe('AC-7: adding a catalog preset requires no other source change', () => 
   })
 
   describe('(c) the real dispatch resolves the new preset', () => {
-    const rescheduleAlertMock = jest.fn()
+    const snoozeAlertByPresetMock = jest.fn()
     const getAlertByIdMock = jest.fn()
 
     const alertsServicesMock = {
-      rescheduleAlert: rescheduleAlertMock,
+      rescheduleAlert: jest.fn(),
+      snoozeAlertByPreset: snoozeAlertByPresetMock,
       createFollowUpAlert: jest.fn(),
       getAlertsByUserId: jest.fn(),
       getAlertById: getAlertByIdMock,
@@ -141,11 +149,14 @@ describe('AC-7: adding a catalog preset requires no other source change', () => 
     })
 
     it('snoozes by the new preset without any change to the service', async () => {
-      const now = new Date('2099-06-10T12:00:00Z')
-      jest.useFakeTimers().setSystemTime(now)
+      const date = new Date('2099-06-10T12:00:00Z')
 
-      getAlertByIdMock.mockResolvedValue({ data: buildAlert({ date: now }) })
-      rescheduleAlertMock.mockResolvedValue({ data: buildAlert() })
+      getAlertByIdMock.mockResolvedValue({ data: buildAlert({ date }) })
+      snoozeAlertByPresetMock.mockResolvedValue({
+        status: 'snoozed',
+        alertId: 8,
+        scheduledAt: new Date(date.getTime() + 180 * MINUTE_IN_MS),
+      })
 
       const service = new AlertInteractionsService(
         alertsServicesMock as any,
@@ -160,14 +171,11 @@ describe('AC-7: adding a catalog preset requires no other source change', () => 
       // A preset the service does not recognise returns this string instead of
       // rescheduling, so asserting its absence proves the dispatch resolved.
       expect(result).not.toBe('Acción no reconocida.')
-      expect(rescheduleAlertMock).toHaveBeenCalledTimes(1)
-
-      const [, , minutes] = rescheduleAlertMock.mock.calls[0]
-      expect(minutes).toBe((180 * MINUTE_IN_MS) / MINUTE_IN_MS)
-
+      expect(snoozeAlertByPresetMock).toHaveBeenCalledWith(8, 11, 'snooze_3h', date)
+      expect(resolveSnoozeTarget('snooze_3h', date, date)).toEqual(
+        new Date(date.getTime() + 180 * MINUTE_IN_MS)
+      )
       expect(redisRepositoryMock.saveAlertSnoozeConfig).not.toHaveBeenCalled()
-
-      jest.useRealTimers()
     })
   })
 })
