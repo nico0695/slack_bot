@@ -190,6 +190,51 @@ Delete alert by ID.
 **Params:**
 - `id` - Alert ID
 
+#### POST /alerts/:id/snooze
+Snooze an alert of the authenticated user by preset, only while its date is still the one the caller saw. Used by the bridge (ESP32). Synchronous, no retries. Details: [ALERT_SNOOZE.md](ALERT_SNOOZE.md).
+
+**Headers:**
+- `Authorization`: Bearer token
+- `Content-Type`: `application/json`
+
+**Params:**
+- `id` - Alert ID, a positive safe integer
+
+**Request Body (snake_case, bridge contract):**
+```json
+{
+  "preset": "snooze_tomorrow_same_time",
+  "expected_scheduled_at": "2030-01-01T18:00:00.000Z"
+}
+```
+
+- `preset`: `snooze_5m`, `snooze_1h` or `snooze_tomorrow_same_time`.
+- `expected_scheduled_at`: the alert date carried by the event (`scheduled_at` of the bridge webhook). UTC ISO 8601 ending in `Z`.
+- Both fields are required; any other field is rejected.
+
+**Response (200):**
+```json
+{
+  "alert_id": 12,
+  "scheduled_at": "2030-01-02T18:00:00.000Z"
+}
+```
+
+`scheduled_at` is the committed date. The alert is left pending (`sent=false`).
+
+**Errors** (`errors[0].context.code`):
+
+| Status | Code | Case |
+|--------|------|------|
+| `400` | `INVALID_SNOOZE_REQUEST` | Invalid id, preset or date, missing or unknown field |
+| `401` | — | Missing or invalid token, or disabled user (existing auth format) |
+| `403` | — | Profile without access (existing auth format) |
+| `404` | `ALERT_NOT_FOUND` | Alert missing or owned by another user |
+| `409` | `ALERT_SCHEDULE_CHANGED` | The alert date no longer matches `expected_scheduled_at`; nothing changed |
+| `500` | — | Unexpected failure; the snooze may or may not have been applied |
+
+Malformed JSON keeps the global `400` format without `context.code`.
+
 ### Bridge
 
 Per-user configuration of the bridge webhook (ESP32 integration). Always applies to the authenticated user.

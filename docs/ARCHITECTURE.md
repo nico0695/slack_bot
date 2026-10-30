@@ -222,6 +222,8 @@ Services accept `AIRepositoryType` to switch between AI providers.
 4. Bridge webhook event enqueued (users with the bridge enabled), then Slack / Web Push notification sent
 5. `bridgeDeliveryCronJob` runs right after and sends queued bridge events
 
+Snooze presets are shared by Slack and `POST /alerts/:id/snooze` (bridge), applied with a conditional update on the expected date. See [ALERT_SNOOZE.md](ALERT_SNOOZE.md).
+
 ### Bridge Integration
 
 **Components:**
