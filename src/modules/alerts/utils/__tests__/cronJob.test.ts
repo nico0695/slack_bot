@@ -1,4 +1,5 @@
 import { alertCronJob } from '../cronJob'
+import { createModuleLogger } from '../../../../config/logger'
 
 const mockAlertsFns = {
   getAlertsToNotify: jest.fn(),
@@ -68,6 +69,19 @@ describe('alertCronJob', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     enqueueAlertEventMock.mockResolvedValue({ data: false })
+    updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
+  })
+
+  it('reports a failed notified mark instead of logging success', async () => {
+    const log = createModuleLogger('alerts.cron')
+    const alert: any = { id: 6, message: 'Ping', user: { id: 9 } }
+    getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
+    updateAlertAsNotifiedMock.mockResolvedValue({ error: 'Error al actualizar la alerta' })
+
+    await alertCronJob()
+
+    expect(log.error).toHaveBeenCalledWith({ count: 1 }, 'Failed to mark alerts as notified')
+    expect(log.info).not.toHaveBeenCalledWith(expect.anything(), 'Alerts notified successfully')
   })
 
   it('returns early when alert service responds with error', async () => {
@@ -100,7 +114,7 @@ describe('alertCronJob', () => {
     msgAlertDetailMock.mockReturnValue({ blocks: ['block-data'] })
     postMessageMock.mockResolvedValue(undefined)
     sendNotificationMock.mockResolvedValue(undefined)
-    updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+    updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
 
     await alertCronJob()
     await new Promise((resolve) => setImmediate(resolve))
@@ -126,7 +140,7 @@ describe('alertCronJob', () => {
       },
     }
     getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
-    updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+    updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
 
     await alertCronJob()
     await new Promise((resolve) => setImmediate(resolve))
@@ -148,7 +162,7 @@ describe('alertCronJob', () => {
     }
     getAlertsToNotifyMock.mockResolvedValue({ data: [alert] })
     msgAlertDetailMock.mockReturnValue({ blocks: [] })
-    updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+    updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
 
     await alertCronJob()
     await new Promise((resolve) => setImmediate(resolve))
@@ -173,7 +187,7 @@ describe('alertCronJob', () => {
     beforeEach(() => {
       msgAlertDetailMock.mockReturnValue({ blocks: [] })
       postMessageMock.mockResolvedValue(undefined)
-      updateAlertAsNotifiedMock.mockResolvedValue(undefined)
+      updateAlertAsNotifiedMock.mockResolvedValue({ data: true })
     })
 
     it('enqueues every alert with the same trigger time, also without Slack channel', async () => {

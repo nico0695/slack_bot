@@ -158,6 +158,14 @@ describe('AlertsDataSource', () => {
     expect(updateSpy).toHaveBeenCalledWith({ id: 1, date, sent: false }, { sent: true })
   })
 
+  it('throws when marking an alert as notified fails', async () => {
+    jest.spyOn(Alerts, 'update').mockRejectedValue(new Error('db error'))
+
+    await expect(dataSource.updateAlertAsNotified([{ id: 1, date: new Date() }])).rejects.toThrow(
+      'db error'
+    )
+  })
+
   describe('deleteAlerts', () => {
     it('returns affected rows count', async () => {
       jest.spyOn(Alerts, 'delete').mockResolvedValue({ affected: 2 } as any)

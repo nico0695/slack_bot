@@ -204,15 +204,13 @@ export default class AlertsDataSource {
 
   /**
    * Mark alerts as notified, each only while it still has the date the cron read.
-   * An alert snoozed meanwhile keeps its new date pending
+   * An alert snoozed meanwhile keeps its new date pending.
+   * Throws on the first failed update: alerts marked before it stay marked and the
+   * rest are notified again on the next tick
    */
   async updateAlertAsNotified(alerts: INotifiedAlert[]): Promise<void> {
-    try {
-      for (const alert of alerts) {
-        await Alerts.update({ id: alert.id, date: alert.date, sent: false }, { sent: true })
-      }
-    } catch (error) {
-      return error
+    for (const alert of alerts) {
+      await Alerts.update({ id: alert.id, date: alert.date, sent: false }, { sent: true })
     }
   }
 

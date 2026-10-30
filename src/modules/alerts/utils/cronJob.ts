@@ -93,7 +93,13 @@ export const alertCronJob = async (): Promise<void> => {
 
     if (notified.length > 0) {
       // Conditional on the date read here, so a snooze made meanwhile is not lost
-      await alertsServices.updateAlertAsNotified(notified)
+      const markResponse = await alertsServices.updateAlertAsNotified(notified)
+
+      if (markResponse.error) {
+        // Some alerts may be marked already; the unmarked ones are notified again next tick
+        log.error({ count: notified.length }, 'Failed to mark alerts as notified')
+        return
+      }
     }
 
     const durationMs = Date.now() - startTime

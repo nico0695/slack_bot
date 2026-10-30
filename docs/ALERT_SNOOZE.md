@@ -37,6 +37,8 @@ Slack buttons use the same operation with the date just read as the expected one
 
 `alertCronJob` marks each processed alert as notified only while it still has the date it read (`WHERE id AND date AND sent = false`). Before, it marked by id, so an alert snoozed while the cron was posting it was set to `sent = true` and never fired again.
 
+If marking fails, the error is logged and the alerts left unmarked are notified again on the next tick (Slack / Web Push repeat; bridge events stay deduplicated per occurrence).
+
 ## Decisions and known limits
 
 - A disabled user gets `401`, the existing `@HttpAuth` behavior (also in [ASSISTANT_REST.md](ASSISTANT_REST.md)), not the `403` of the first contract draft.
