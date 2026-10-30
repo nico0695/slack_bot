@@ -1,9 +1,18 @@
-import { resolveNextCalendarDayAt } from '../../../../shared/utils/dates.utils'
+import {
+  resolveNextCalendarDayAt,
+  resolveTomorrowAtSameLocalTime,
+} from '../../../../shared/utils/dates.utils'
 
 const MINUTE_IN_MS = 60 * 1000
 
 const TOMORROW_HOUR = 9
 const TOMORROW_MINUTE = 0
+
+/** Inputs every preset rule may use: the server clock and the alert's current date. */
+export interface ISnoozeContext {
+  now: Date
+  scheduledAt: Date
+}
 
 /**
  * `snooze_5m` / `snooze_1h` action values must stay byte-identical: messages
@@ -17,7 +26,7 @@ export interface ISnoozePreset {
   key: string
   label: string
   actionValue: (id: number) => string
-  resolveTargetDate: (base: Date) => Date
+  resolveTargetDate: (context: ISnoozeContext) => Date
 }
 
 /**
@@ -30,10 +39,13 @@ export interface IPreferencePreset {
   label: string
 }
 
-const relativeMinutes = (minutes: number): ((base: Date) => Date) => {
-  return (base: Date): Date => new Date(base.getTime() + minutes * MINUTE_IN_MS)
+/** Relative rule: `max(now, scheduledAt) + minutes`. */
+const relativeMinutes = (minutes: number): ((context: ISnoozeContext) => Date) => {
+  return ({ now, scheduledAt }: ISnoozeContext): Date =>
+    new Date(Math.max(now.getTime(), scheduledAt.getTime()) + minutes * MINUTE_IN_MS)
 }
 
+/** Visible presets, in menu order. Also the exact set accepted by the REST endpoint. */
 export const snoozePresets: ISnoozePreset[] = [
   {
     key: 'snooze_5m',
@@ -48,13 +60,46 @@ export const snoozePresets: ISnoozePreset[] = [
     resolveTargetDate: relativeMinutes(60),
   },
   {
+    key: 'snooze_tomorrow_same_time',
+    label: 'Same time tomorrow',
+    actionValue: (id: number): string => `alert:snooze_tomorrow_same_time:${id}`,
+    resolveTargetDate: ({ now, scheduledAt }: ISnoozeContext): Date =>
+      resolveTomorrowAtSameLocalTime(scheduledAt, now),
+  },
+]
+
+/**
+ * Presets no menu renders. `snooze_tomorrow` (09:00) is still used by the
+ * `snooze #id mañana` text command.
+ */
+export const hiddenSnoozePresets: ISnoozePreset[] = [
+  {
     key: 'snooze_tomorrow',
     label: 'Mañana 9:00',
     actionValue: (id: number): string => `alert:snooze_tomorrow:${id}`,
-    resolveTargetDate: (base: Date): Date =>
-      resolveNextCalendarDayAt(base, TOMORROW_HOUR, TOMORROW_MINUTE),
+    resolveTargetDate: ({ now, scheduledAt }: ISnoozeContext): Date =>
+      resolveNextCalendarDayAt(
+        scheduledAt > now ? scheduledAt : now,
+        TOMORROW_HOUR,
+        TOMORROW_MINUTE
+      ),
   },
 ]
+
+export const findSnoozePreset = (key: string): ISnoozePreset | undefined =>
+  [...snoozePresets, ...hiddenSnoozePresets].find((preset) => preset.key === key)
+
+/**
+ * Target date of a preset, or null when the key is unknown
+ * @param key string - Preset key
+ * @param scheduledAt Date - Current alert date
+ * @param now Date - Server clock
+ */
+export const resolveSnoozeTarget = (key: string, scheduledAt: Date, now: Date): Date | null => {
+  const preset = findSnoozePreset(key)
+
+  return preset ? preset.resolveTargetDate({ now, scheduledAt }) : null
+}
 
 export const preferencePresets: IPreferencePreset[] = [
   { key: 'set_snooze_5m', minutes: 5, label: '5 minutos' },

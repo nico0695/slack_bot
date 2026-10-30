@@ -79,6 +79,17 @@ export function resolveNextCalendarDayAt(base: Date, hour: number, minute = 0): 
 }
 
 /**
+ * Resolve the Argentina calendar day after `now`, at the Argentina local hour and
+ * minute of `scheduledAt`. Seconds and milliseconds are dropped. The day comes from
+ * `now`, never from `scheduledAt`: an old or future-dated alert still lands tomorrow.
+ */
+export function resolveTomorrowAtSameLocalTime(scheduledAt: Date, now: Date): Date {
+  const scheduledParts = getArgentinaDateParts(scheduledAt)
+
+  return resolveNextCalendarDayAt(now, scheduledParts.hour, scheduledParts.minute)
+}
+
+/**
  * Format text to date
  * @param dateText string - YYYY-MM-DD HH:mm[:ss] interpreted as Argentina local time OR relative 9w9d9h9m (optionals)
  * @returns Date

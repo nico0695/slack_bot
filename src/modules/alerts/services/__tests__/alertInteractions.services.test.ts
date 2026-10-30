@@ -1,5 +1,10 @@
 import AlertInteractionsService, { SNOOZE_DEFAULT_PRESET_KEY } from '../alertInteractions.services'
-import { snoozePresets, preferencePresets } from '../../shared/constants/snoozeCatalog'
+import {
+  snoozePresets,
+  hiddenSnoozePresets,
+  resolveSnoozeTarget,
+  preferencePresets,
+} from '../../shared/constants/snoozeCatalog'
 import * as slackMsgUtilsMock from '../../../../shared/utils/slackMessages.utils'
 import { resolveNextCalendarDayAt } from '../../../../shared/utils/dates.utils'
 
@@ -122,8 +127,9 @@ describe('AlertInteractionsService', () => {
       expect(snoozePresets.map((preset) => preset.key)).toEqual([
         'snooze_5m',
         'snooze_1h',
-        'snooze_tomorrow',
+        'snooze_tomorrow_same_time',
       ])
+      expect(hiddenSnoozePresets.map((preset) => preset.key)).toEqual(['snooze_tomorrow'])
       expect(preferencePresets.map((preset) => preset.key)).toEqual([
         'set_snooze_5m',
         'set_snooze_10m',
@@ -214,7 +220,9 @@ describe('AlertInteractionsService', () => {
       expect(base).toEqual(now)
 
       const preset = snoozePresets.find((item) => item.key === 'snooze_5m') as any
-      expect(preset.resolveTargetDate(base).getTime() - base.getTime()).toBe(5 * 60 * 1000)
+      expect(
+        preset.resolveTargetDate({ now, scheduledAt: alertDate }).getTime() - base.getTime()
+      ).toBe(5 * 60 * 1000)
     })
 
     it('applies the relative preset delta on top of max(now, alert_date) - alert in the future', () => {
@@ -225,13 +233,60 @@ describe('AlertInteractionsService', () => {
       expect(base).toEqual(alertDate)
 
       const preset = snoozePresets.find((item) => item.key === 'snooze_1h') as any
-      expect(argentinaWallClock(preset.resolveTargetDate(base))).toEqual({
-        year: 2026,
-        month: 8,
-        day: 3,
-        hour: 9,
-        minute: 0,
+      expect(argentinaWallClock(preset.resolveTargetDate({ now, scheduledAt: alertDate }))).toEqual(
+        {
+          year: 2026,
+          month: 8,
+          day: 3,
+          hour: 9,
+          minute: 0,
+        }
+      )
+    })
+  })
+
+  describe('resolveSnoozeTarget - snooze_tomorrow_same_time', () => {
+    const resolve = (scheduledAt: Date, now: Date): Date =>
+      resolveSnoozeTarget('snooze_tomorrow_same_time', scheduledAt, now)
+
+    it('keeps the scheduled local time, not the click time', () => {
+      const result = resolve(argentinaDate(2026, 8, 1, 15, 0), argentinaDate(2026, 8, 1, 15, 20))
+
+      expect(result).toEqual(argentinaDate(2026, 8, 2, 15, 0))
+    })
+
+    it('lands tomorrow relative to now for an older notice, with seconds and ms dropped', () => {
+      const scheduledAt = new Date('2026-07-29T08:30:45.123-03:00')
+
+      const result = resolve(scheduledAt, argentinaDate(2026, 8, 1, 10, 0))
+
+      expect(result.toISOString()).toBe(argentinaDate(2026, 8, 2, 8, 30).toISOString())
+    })
+
+    it('lands tomorrow even when the alert is further in the future', () => {
+      const result = resolve(argentinaDate(2026, 8, 6, 15, 0), argentinaDate(2026, 8, 1, 10, 0))
+
+      expect(result).toEqual(argentinaDate(2026, 8, 2, 15, 0))
+    })
+
+    it('uses the Argentina calendar day, not the UTC one', () => {
+      // 23:30 in Argentina is already the next day in UTC
+      const result = resolve(
+        argentinaDate(2026, 12, 31, 23, 30),
+        argentinaDate(2026, 12, 31, 23, 40)
+      )
+
+      expect(argentinaWallClock(result)).toEqual({
+        year: 2027,
+        month: 1,
+        day: 1,
+        hour: 23,
+        minute: 30,
       })
+    })
+
+    it('returns null for an unknown preset', () => {
+      expect(resolveSnoozeTarget('snooze_3h', new Date(), new Date())).toBeNull()
     })
   })
 

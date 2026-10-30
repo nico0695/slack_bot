@@ -323,14 +323,14 @@ describe('alert snooze render paths (S6)', () => {
           expect(getOptionLabels(accessory)).toEqual([
             'Snooze 5 min',
             'Snooze 1 hora',
-            'Mañana 9:00',
+            'Same time tomorrow',
             'Marcar resuelta',
             'Eliminar',
           ])
           expect(getOptionValues(accessory)).toEqual([
             'alert:snooze_5m:42',
             'alert:snooze_1h:42',
-            'alert:snooze_tomorrow:42',
+            'alert:snooze_tomorrow_same_time:42',
             'alert:resolve:42',
             'alert:delete:42',
           ])

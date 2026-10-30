@@ -26,44 +26,25 @@ import { Alerts } from '../../../entities/alerts'
 const MINUTE_IN_MS = 60 * 1000
 
 jest.mock('../../../modules/alerts/shared/constants/snoozeCatalog', () => {
-  const relativeMinutes =
-    (minutes: number) =>
-    (base: Date): Date =>
-      new Date(base.getTime() + minutes * 60 * 1000)
+  const actual = jest.requireActual('../../../modules/alerts/shared/constants/snoozeCatalog')
+
+  const mockedPresets = [
+    ...actual.snoozePresets,
+    // The entry under test: added to the catalog and nowhere else.
+    {
+      key: 'snooze_3h',
+      label: 'Snooze 3 horas',
+      actionValue: (id: number): string => `alert:snooze_3h:${id}`,
+      resolveTargetDate: ({ now, scheduledAt }: { now: Date; scheduledAt: Date }): Date =>
+        new Date(Math.max(now.getTime(), scheduledAt.getTime()) + 180 * 60 * 1000),
+    },
+  ]
 
   return {
-    snoozePresets: [
-      {
-        key: 'snooze_5m',
-        label: 'Snooze 5 min',
-        actionValue: (id: number): string => `alert:snooze_5m:${id}`,
-        resolveTargetDate: relativeMinutes(5),
-      },
-      {
-        key: 'snooze_1h',
-        label: 'Snooze 1 hora',
-        actionValue: (id: number): string => `alert:snooze_1h:${id}`,
-        resolveTargetDate: relativeMinutes(60),
-      },
-      {
-        key: 'snooze_tomorrow',
-        label: 'Mañana 9:00',
-        actionValue: (id: number): string => `alert:snooze_tomorrow:${id}`,
-        resolveTargetDate: relativeMinutes(600),
-      },
-      // The entry under test: added to the catalog and nowhere else.
-      {
-        key: 'snooze_3h',
-        label: 'Snooze 3 horas',
-        actionValue: (id: number): string => `alert:snooze_3h:${id}`,
-        resolveTargetDate: relativeMinutes(180),
-      },
-    ],
-    preferencePresets: [
-      { key: 'set_snooze_5m', minutes: 5, label: '5 minutos' },
-      { key: 'set_snooze_10m', minutes: 10, label: '10 minutos' },
-      { key: 'set_snooze_30m', minutes: 30, label: '30 minutos' },
-    ],
+    ...actual,
+    snoozePresets: mockedPresets,
+    findSnoozePreset: (key: string): any =>
+      [...mockedPresets, ...actual.hiddenSnoozePresets].find((preset) => preset.key === key),
   }
 })
 

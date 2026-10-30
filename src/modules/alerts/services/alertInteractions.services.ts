@@ -2,7 +2,7 @@ import { singleton } from 'tsyringe'
 
 import AlertsServices from './alerts.services'
 import { Alerts } from '../../../entities/alerts'
-import { snoozePresets } from '../shared/constants/snoozeCatalog'
+import { findSnoozePreset } from '../shared/constants/snoozeCatalog'
 
 import { RedisRepository } from '../../conversations/repositories/redis/conversations.redis'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
@@ -12,7 +12,7 @@ const MINUTE_IN_MS = 60 * 1000
 const DAILY_MINUTES = 24 * 60
 const WEEKLY_MINUTES = 7 * 24 * 60
 
-/** Not a `snoozePresets` entry: it has no fixed target-date rule to render. */
+/** Not a snooze catalog entry: it has no fixed target-date rule to render. */
 export const SNOOZE_DEFAULT_PRESET_KEY = 'snooze_default'
 
 export type TAlertScope = 'pending' | 'all' | 'snoozed' | 'overdue' | 'resolved'
@@ -30,7 +30,7 @@ export interface ISnoozeAlertOptions {
 
 type TMinutesResolution = { minutes: number } | { error: string }
 
-type TBaseResolution = { base: Date } | { error: string }
+type TBaseResolution = { base: Date; now: Date; scheduledAt: Date } | { error: string }
 
 /**
  * Single home for the alert interactions `conversations.services.ts` (Slack
@@ -221,7 +221,7 @@ export default class AlertInteractionsService {
       return { minutes: await this.getDefaultSnoozeMinutes(userId) }
     }
 
-    const preset = snoozePresets.find((item) => item.key === options.presetKey)
+    const preset = findSnoozePreset(options.presetKey)
 
     if (!preset) {
       return { error: 'Acción no reconocida.' }
@@ -233,8 +233,8 @@ export default class AlertInteractionsService {
       return { error: baseResolution.error }
     }
 
-    const { base } = baseResolution
-    const target = preset.resolveTargetDate(base)
+    const { base, now, scheduledAt } = baseResolution
+    const target = preset.resolveTargetDate({ now, scheduledAt })
 
     return { minutes: (target.getTime() - base.getTime()) / MINUTE_IN_MS }
   }
@@ -253,6 +253,6 @@ export default class AlertInteractionsService {
     const now = new Date()
     const alertDate = new Date(alertRes.data.date)
 
-    return { base: alertDate > now ? alertDate : now }
+    return { base: alertDate > now ? alertDate : now, now, scheduledAt: alertDate }
   }
 }
