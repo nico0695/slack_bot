@@ -145,13 +145,17 @@ describe('AlertsDataSource', () => {
     expect(result).toBe(error)
   })
 
-  it('marks alerts as notified by ids', async () => {
+  it('marks each alert as notified only while it keeps the date read', async () => {
     const updateSpy = jest.spyOn(Alerts, 'update').mockResolvedValue({} as any)
+    const date = new Date('2030-01-01T18:00:00.000Z')
 
-    await dataSource.updateAlertAsNotified([1, 2, 3])
+    await dataSource.updateAlertAsNotified([
+      { id: 1, date },
+      { id: 2, date },
+    ])
 
-    const callArgs = updateSpy.mock.calls[0]
-    expect(callArgs[1]).toEqual({ sent: true })
+    expect(updateSpy).toHaveBeenCalledTimes(2)
+    expect(updateSpy).toHaveBeenCalledWith({ id: 1, date, sent: false }, { sent: true })
   })
 
   describe('deleteAlerts', () => {

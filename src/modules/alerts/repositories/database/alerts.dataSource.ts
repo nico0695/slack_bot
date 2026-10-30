@@ -1,10 +1,10 @@
-import { FindOptionsWhere, In, IsNull, LessThan } from 'typeorm'
+import { FindOptionsWhere, IsNull, LessThan } from 'typeorm'
 import { singleton } from 'tsyringe'
 
 import { Alerts } from '../../../../entities/alerts'
 import { Users } from '../../../../entities/users'
 
-import { IAlertToNotify, IAlert } from '../../shared/interfaces/alerts.interfaces'
+import { IAlertToNotify, IAlert, INotifiedAlert } from '../../shared/interfaces/alerts.interfaces'
 
 @singleton()
 export default class AlertsDataSource {
@@ -202,9 +202,15 @@ export default class AlertsDataSource {
     }
   }
 
-  async updateAlertAsNotified(alerts: number[]): Promise<void> {
+  /**
+   * Mark alerts as notified, each only while it still has the date the cron read.
+   * An alert snoozed meanwhile keeps its new date pending
+   */
+  async updateAlertAsNotified(alerts: INotifiedAlert[]): Promise<void> {
     try {
-      await Alerts.update({ id: In(alerts) }, { sent: true })
+      for (const alert of alerts) {
+        await Alerts.update({ id: alert.id, date: alert.date, sent: false }, { sent: true })
+      }
     } catch (error) {
       return error
     }

@@ -6,6 +6,7 @@ import {
   IAlertToNotify,
   IAlert,
   ICreateAlertResponse,
+  INotifiedAlert,
   TSnoozeAlertResult,
 } from '../shared/interfaces/alerts.interfaces'
 import { resolveSnoozeTarget } from '../shared/constants/snoozeCatalog'
@@ -352,15 +353,18 @@ export default class AlertsServices {
     }
   }
 
-  public async updateAlertAsNotified(alertId: number[]): Promise<GenericResponse<boolean>> {
+  public async updateAlertAsNotified(alerts: INotifiedAlert[]): Promise<GenericResponse<boolean>> {
     try {
-      await this.alertsDataSource.updateAlertAsNotified(alertId)
+      await this.alertsDataSource.updateAlertAsNotified(alerts)
 
       return {
         data: true,
       }
     } catch (error) {
-      log.error({ err: error, alertId }, 'updateAlertAsNotified failed')
+      log.error(
+        { err: error, alertIds: alerts.map((alert) => alert.id) },
+        'updateAlertAsNotified failed'
+      )
       return {
         error: 'Error al actualizar la alerta',
       }

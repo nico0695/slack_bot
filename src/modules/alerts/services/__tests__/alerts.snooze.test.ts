@@ -121,6 +121,23 @@ describe('AlertsServices snoozeAlertByPreset', () => {
     expect(stored.sent).toBe(true)
   })
 
+  it('keeps a snooze made after the cron read the alert pending', async () => {
+    await Alerts.update(alertId, { sent: false })
+    // The cron read the alert with its original date, then the user snoozed it
+    const readByCron = [{ id: alertId, date: scheduledAt }]
+    await services.snoozeAlertByPreset(alertId, userId, 'snooze_1h', scheduledAt)
+
+    await services.updateAlertAsNotified(readByCron)
+
+    const stored = await reload()
+    expect(stored.sent).toBe(false)
+    expect(stored.date).toEqual(new Date('2099-01-01T19:00:00.123Z'))
+
+    // Without a snooze in between, the cron still marks it as notified
+    await services.updateAlertAsNotified([{ id: alertId, date: stored.date }])
+    expect((await reload()).sent).toBe(true)
+  })
+
   it('lets only one of two concurrent snoozes with the same expected date win', async () => {
     const results = await Promise.all([
       services.snoozeAlertByPreset(alertId, userId, 'snooze_1h', scheduledAt),

@@ -36,6 +36,12 @@ export interface ICreateAlertResponse extends GenericResponse<Alerts> {
   conflictAlertId?: number
 }
 
+// Alert processed by the cron, with the date it was read with
+export interface INotifiedAlert {
+  id: number
+  date: Date
+}
+
 export type TSnoozeAlertResult =
   | { status: 'snoozed'; alertId: number; scheduledAt: Date }
   | { status: 'not_found' }
