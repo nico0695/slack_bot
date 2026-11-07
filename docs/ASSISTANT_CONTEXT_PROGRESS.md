@@ -1,8 +1,8 @@
 # Assistant context implementation progress
 
 - Status: running
-- Active stage: 0 / baseline and stage 1 preparation
-- Checkpoint UTC: 2026-11-07T03:47:00Z
+- Active stage: 2–4 / transport integration, socket review and question context
+- Checkpoint UTC: 2026-11-07T03:56:13Z
 - Backend branch: `feature/assistant-shared-context` from `dev` (`8dcfa149863b26ed0645767c237dd6646e6e351c`)
 - Web branch: `feature/assistant-shared-context` from `dev` (`396588c91bdd641f5840d4b7c92d2a375d9ce29f`)
 - Specification: `docs/ASSISTANT_CONTEXT.md`
@@ -19,11 +19,14 @@
 ## Current work
 
 - Install dependencies and record baseline checks. Backend uses npm lockfile; web has pnpm lockfile and no npm lockfile.
-- Stage 1 personal service and Redis methods/tests are being prepared locally; not yet reviewed or committed.
+- Stage 1 service and Redis implementation reviewed and verified in an isolated snapshot.
+- Stage 2 integration passed its first 121 focused tests and independent runtime review; final rerun pending concurrent question-context fixture updates.
+- Stage 3 socket authentication passed focused tests; review identified unsafe retry wording, being fixed. Account-lifecycle socket isolation is being strengthened before checkpoint.
+- Stage 4 question-context and classifier changes are being tested.
 
 ## Next steps
 
-1. Finish stage 1 targeted tests and independent review; apply verified fixes and checkpoint.
+1. Stage 1 complete in the accompanying checkpoint commit; do not reimplement.
 2. Integrate Slack/REST/web without double-writing AI context or broadcasting cross-transport.
 3. Add assistant-only socket authentication and frontend session/reconnect handling.
 4. Add bounded question data/history and classifier diagnostics/output allowance.
@@ -31,7 +34,7 @@
 
 ## Verification
 
-Baseline checks pending. No implementation tests, live provider calls or hardware tests claimed.
+Backend clean dev baseline: TypeScript and ESLint passed; 82 suites / 1114 tests passed. Stage 1 isolated snapshot: TypeScript, ESLint and 44 targeted tests passed. Stage 1 independent review found unpadded base64; fixed with a regression test and bounded text retained. Web baseline TypeScript passed; frozen pnpm install has a pre-existing overrides mismatch. Live provider and hardware checks not run.
 
 ## Recovery and automation
 

@@ -1,8 +1,10 @@
 import { singleton } from 'tsyringe'
 import { createModuleLogger } from '../../../../config/logger'
 import { IConversation, IConversationFlow } from '../../shared/interfaces/converstions'
-import { rConversationFlow, rAlertSnoozeConfig } from './redis.constants'
+import { rConversationFlow, rAlertSnoozeConfig, rPersonalAssistantKey } from './redis.constants'
 import { RedisConfig } from '../../../../config/redisConfig'
+import { roleTypes } from '../../shared/constants/openai'
+import { ConversationProviders } from '../../shared/constants/conversationFlow'
 
 const log = createModuleLogger('conversations.redis')
 
@@ -19,6 +21,47 @@ export class RedisRepository {
 
   constructor() {
     this.redisClient = RedisConfig.getClient()
+  }
+
+  getPersonalAssistantMessages = async (userId: number): Promise<IConversation[] | null> => {
+    try {
+      const response = await this.redisClient.get(rPersonalAssistantKey(userId))
+      if (response === null) return []
+
+      const history: unknown = JSON.parse(response)
+      if (
+        !Array.isArray(history) ||
+        !history.every(
+          (entry) =>
+            entry !== null &&
+            typeof entry === 'object' &&
+            (entry.role === roleTypes.user || entry.role === roleTypes.assistant) &&
+            typeof entry.content === 'string' &&
+            entry.provider === ConversationProviders.ASSISTANT
+        )
+      ) {
+        log.warn('Personal assistant history is invalid')
+        return null
+      }
+      return history.map(({ role, content, provider }) => ({ role, content, provider }))
+    } catch {
+      log.warn('Personal assistant history is unavailable')
+      return null
+    }
+  }
+
+  savePersonalAssistantMessages = async (
+    userId: number,
+    history: IConversation[]
+  ): Promise<boolean> => {
+    try {
+      const value = history.map(({ role, content, provider }) => ({ role, content, provider }))
+      await this.redisClient.set(rPersonalAssistantKey(userId), JSON.stringify(value))
+      return true
+    } catch {
+      log.warn('Personal assistant history could not be saved')
+      return false
+    }
   }
 
   saveConversationMessages = async (key: string, value: IConversation[]): Promise<boolean> => {

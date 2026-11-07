@@ -1,5 +1,6 @@
 import {
   rConversationKey,
+  rPersonalAssistantKey,
   rConversationFlow,
   rAlertSnoozeConfig,
   conversationFlowPrefix,
@@ -20,5 +21,11 @@ describe('redis.constants', () => {
 
   it('generates alert snooze config key', () => {
     expect(rAlertSnoozeConfig(5)).toBe('cb_alert_snooze_5')
+  })
+
+  it('uses unpadded internal IDs for shared personal assistant keys', () => {
+    expect(rPersonalAssistantKey(1)).toBe('cb_assistant_user_1')
+    expect(rPersonalAssistantKey(91)).toBe('cb_assistant_user_91')
+    expect(rPersonalAssistantKey(1)).not.toBe(rPersonalAssistantKey(91))
   })
 })

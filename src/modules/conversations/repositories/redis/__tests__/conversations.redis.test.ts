@@ -164,4 +164,60 @@ describe('RedisRepository', () => {
     expect(result).toBe(true)
     expect(delMock).toHaveBeenCalledWith('cb_fs_channel-1')
   })
+
+  describe('personal assistant history', () => {
+    const history = [
+      { role: 'user', content: 'question', provider: 'assistant' },
+      { role: 'assistant', content: 'answer', provider: 'assistant' },
+    ]
+
+    it('distinguishes missing history from an unavailable read', async () => {
+      getMock.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('private data'))
+      expect(await repository.getPersonalAssistantMessages(1)).toEqual([])
+      expect(await repository.getPersonalAssistantMessages(1)).toBeNull()
+      expect(getMock).toHaveBeenCalledWith('cb_assistant_user_1')
+      expect(mockLogFns.warn).toHaveBeenCalledWith('Personal assistant history is unavailable')
+    })
+
+    it.each([
+      'invalid json',
+      '{}',
+      '[null]',
+      '[{"role":"system","content":"x","provider":"assistant"}]',
+      '[{"role":"user","content":1,"provider":"assistant"}]',
+    ])('treats corrupt history as unavailable: %s', async (raw) => {
+      getMock.mockResolvedValue(raw)
+      expect(await repository.getPersonalAssistantMessages(1)).toBeNull()
+    })
+
+    it('reads valid history and strips unrelated metadata', async () => {
+      getMock.mockResolvedValue(
+        JSON.stringify(history.map((entry) => ({ ...entry, contentBlock: { blocks: [] } })))
+      )
+      expect(await repository.getPersonalAssistantMessages(91)).toEqual(history)
+      expect(getMock).toHaveBeenCalledWith('cb_assistant_user_91')
+    })
+
+    it('saves just role, content, provider with no expiration', async () => {
+      setMock.mockResolvedValue('OK')
+      expect(
+        await repository.savePersonalAssistantMessages(
+          1,
+          history.map((entry) => ({
+            ...entry,
+            plainText: 'unused',
+            contentBlock: { blocks: [] },
+          })) as any
+        )
+      ).toBe(true)
+      expect(setMock).toHaveBeenCalledWith('cb_assistant_user_1', JSON.stringify(history))
+      expect(setMock.mock.calls[0]).toHaveLength(2)
+    })
+
+    it('returns false for write failures without logging private error details', async () => {
+      setMock.mockRejectedValue(new Error('private data'))
+      expect(await repository.savePersonalAssistantMessages(1, [])).toBe(false)
+      expect(mockLogFns.warn).toHaveBeenCalledWith('Personal assistant history could not be saved')
+    })
+  })
 })
