@@ -1,21 +1,17 @@
 import { Router } from 'express'
+import { Socket } from 'socket.io'
 import { injectable } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import GenericController from '../../../shared/modules/genericController'
-import { HttpAuth, Permission } from '../../../shared/middleware/auth'
+import { HttpAuth, Permission, getAuthenticatedUser } from '../../../shared/middleware/auth'
 import { Profiles } from '../../../shared/constants/auth.constants'
 import { validateBody } from '../../../shared/utils/validation'
 import ConversationsServices from '../services/conversations.services'
 import AssistantSingleShotService from '../services/assistantSingleShot.service'
 
-import {
-  IConversation,
-  IUserConversation,
-  ProgressCallback,
-} from '../shared/interfaces/converstions'
-import { ChannelType, ConversationProviders } from '../shared/constants/conversationFlow'
-import { roleTypes } from '../shared/constants/openai'
+import { IConversation, IUserConversation } from '../shared/interfaces/converstions'
+import { ChannelType } from '../shared/constants/conversationFlow'
 import UsersServices from '../../users/services/users.services'
 import {
   AssistantSingleShotStatus,
@@ -88,24 +84,15 @@ export default class ConversationsWebController extends GenericController {
     }
   }
 
-  public joinAssistantChannel = async (data: {
-    channel: string
-    username: string
-  }): Promise<{
+  public joinAssistantChannel = async (
+    userId: number
+  ): Promise<{
     message: string
     conversation: IUserConversation[]
-  }> => {
-    try {
-      const conversationFlow = await this.conversationServices.showConversationFlowWeb(data.channel)
-
-      return {
-        message: 'Conversación iniciada',
-        conversation: conversationFlow?.conversation ?? [],
-      }
-    } catch (error) {
-      log.error({ err: error }, 'joinAssistantChannel failed')
-    }
-  }
+  }> => ({
+    message: 'Conversación iniciada',
+    conversation: await this.conversationServices.getWebAssistantHistory(userId),
+  })
 
   public generateConversation = async (data: {
     username: string
@@ -139,36 +126,75 @@ export default class ConversationsWebController extends GenericController {
     }
   }
 
-  public conversationAssistantFlow = async (
-    userId: number,
-    message: string,
-    onProgress?: ProgressCallback
-  ): Promise<IConversation | null> => {
-    try {
-      const userData = await this.usersServices.getUserById(userId)
+  /** Assistant events use verified identities; generic anonymous chat stays independent. */
+  public registerAssistantSocket = (socket: Socket): void => {
+    let generation = 0
+    let userId: number | undefined
+    const invalidate = (): void => {
+      generation++
+      userId = undefined
+    }
+    const isCurrent = (version: number): boolean => generation === version && socket.connected
+    const reject = (): void => {
+      socket.emit('assistant_error', { message: 'No se pudo procesar la solicitud del asistente.' })
+    }
+    const allowed = (profile: Profiles | undefined): boolean =>
+      profile !== undefined &&
+      [Profiles.USER, Profiles.USER_PREMIUM, Profiles.ADMIN].includes(profile)
 
-      if (!userData.data) {
-        return {
-          role: roleTypes.assistant,
-          content: 'No se pudo obtener el usuario 🤷‍♂️',
-          provider: ConversationProviders.ASSISTANT,
+    socket.on('join_assistant_room', async (data) => {
+      invalidate()
+      const version = generation
+      try {
+        const user = await getAuthenticatedUser(data?.accessToken)
+        if (!isCurrent(version)) return
+        if (!allowed(user.profile)) throw new Error('Assistant access denied')
+        userId = user.id
+        const response = await this.joinAssistantChannel(user.id)
+        if (isCurrent(version)) socket.emit('join_assistant_response', response)
+      } catch {
+        if (isCurrent(version)) {
+          invalidate()
+          reject()
         }
       }
+    })
 
-      const result = await this.conversationServices.generateAssistantConversation(
-        message,
-        userId,
-        userId.toString().padStart(8, '9'),
-        ConversationProviders.WEB,
-        false,
-        onProgress
-      )
+    socket.on('send_assistant_message', async (data, acknowledge) => {
+      const version = generation
+      const ack = (result: { ok: boolean; skipped?: boolean }): void => {
+        if (isCurrent(version) && typeof acknowledge === 'function') acknowledge(result)
+      }
+      try {
+        const user = await getAuthenticatedUser(data?.accessToken)
+        if (!isCurrent(version)) return
+        if (userId !== user.id || !allowed(user.profile)) {
+          throw new Error('Assistant session mismatch')
+        }
+        if (typeof data?.message !== 'string' || !data.message.trim()) {
+          throw new Error('Invalid assistant message')
+        }
+        const result = await this.conversationServices.generateAssistantConversation(
+          data.message.trim(),
+          user.id,
+          (progress) => {
+            if (isCurrent(version)) socket.emit('receive_assistant_progress', progress)
+          }
+        )
+        if (!isCurrent(version)) return
+        if (result.response) socket.emit('receive_assistant_message', result.response)
+        else if (!result.skipped) reject()
+        ack({ ok: Boolean(result.response) || result.skipped, skipped: result.skipped })
+      } catch {
+        if (isCurrent(version)) {
+          reject()
+          ack({ ok: false })
+        }
+      }
+    })
 
-      return result.response
-    } catch (error) {
-      log.error({ err: error }, 'conversationAssistantFlow failed')
-      return null
-    }
+    socket.on('leave_assistant_room', invalidate)
+    socket.on('disconnect', invalidate)
   }
 
   public showChannels = async (req: any, res: any): Promise<void> => {

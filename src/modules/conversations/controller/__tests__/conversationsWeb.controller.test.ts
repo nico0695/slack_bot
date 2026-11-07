@@ -14,6 +14,7 @@ const conversationServicesMock = {
   generateConversationFlow: generateConversationFlowMock,
   sendMessageToConversationFlow: sendMessageToConversationFlowMock,
   generateAssistantConversation: generateAssistantConversationMock,
+  getWebAssistantHistory: jest.fn(),
   showChannelsConversationFlow: showChannelsConversationFlowMock,
   endConversationFlow: endConversationFlowMock,
 }
@@ -52,13 +53,13 @@ describe('ConversationsWebController', () => {
   })
 
   it('joins assistant channel returning cached flow', async () => {
-    showConversationFlowWebMock.mockResolvedValue({
-      conversation: [{ role: 'assistant', content: 'hola' }],
-    })
+    conversationServicesMock.getWebAssistantHistory.mockResolvedValue([
+      { role: 'assistant', content: 'hola' },
+    ])
 
-    const result = await controller.joinAssistantChannel({ channel: 'ch', username: 'nick' })
+    const result = await controller.joinAssistantChannel(42)
 
-    expect(showConversationFlowWebMock).toHaveBeenCalledWith('ch')
+    expect(conversationServicesMock.getWebAssistantHistory).toHaveBeenCalledWith(42)
     expect(result).toEqual({
       message: 'Conversación iniciada',
       conversation: [{ role: 'assistant', content: 'hola' }],
@@ -91,65 +92,6 @@ describe('ConversationsWebController', () => {
       })
 
       expect(sendMessageToConversationFlowMock).toHaveBeenCalledWith('hi', 'nick', 'general')
-      expect(result).toBeNull()
-    })
-  })
-
-  describe('conversationAssistantFlow', () => {
-    it('returns message when user not found', async () => {
-      getUserByIdMock.mockResolvedValue({ data: null })
-
-      const result = await controller.conversationAssistantFlow(42, 'hola')
-
-      expect(result).toEqual({
-        role: 'assistant',
-        content: 'No se pudo obtener el usuario 🤷‍♂️',
-        provider: 'assistant',
-      })
-    })
-
-    it('returns assistant response when available', async () => {
-      getUserByIdMock.mockResolvedValue({ data: { id: 42 } })
-      const assistantResponse = {
-        role: 'assistant',
-        content: 'todo listo',
-        provider: 'assistant',
-      }
-      generateAssistantConversationMock.mockResolvedValue({
-        response: assistantResponse,
-        skipped: false,
-      })
-
-      const result = await controller.conversationAssistantFlow(42, 'hola')
-
-      expect(generateAssistantConversationMock).toHaveBeenCalledWith(
-        'hola',
-        42,
-        '99999942',
-        'web',
-        false,
-        undefined
-      )
-      expect(result).toBe(assistantResponse)
-    })
-
-    it('returns null when message is skipped with + prefix', async () => {
-      getUserByIdMock.mockResolvedValue({ data: { id: 42 } })
-      generateAssistantConversationMock.mockResolvedValue({
-        response: null,
-        skipped: true,
-      })
-
-      const result = await controller.conversationAssistantFlow(42, '+nota importante')
-
-      expect(generateAssistantConversationMock).toHaveBeenCalledWith(
-        '+nota importante',
-        42,
-        '99999942',
-        'web',
-        false,
-        undefined
-      )
       expect(result).toBeNull()
     })
   })

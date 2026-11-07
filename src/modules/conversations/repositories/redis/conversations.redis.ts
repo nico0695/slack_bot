@@ -1,7 +1,16 @@
 import { singleton } from 'tsyringe'
 import { createModuleLogger } from '../../../../config/logger'
-import { IConversation, IConversationFlow } from '../../shared/interfaces/converstions'
-import { rConversationFlow, rAlertSnoozeConfig, rPersonalAssistantKey } from './redis.constants'
+import {
+  IConversation,
+  IConversationFlow,
+  IUserConversation,
+} from '../../shared/interfaces/converstions'
+import {
+  rConversationFlow,
+  rAlertSnoozeConfig,
+  rPersonalAssistantKey,
+  rWebAssistantKey,
+} from './redis.constants'
 import { RedisConfig } from '../../../../config/redisConfig'
 import { roleTypes } from '../../shared/constants/openai'
 import { ConversationProviders } from '../../shared/constants/conversationFlow'
@@ -60,6 +69,46 @@ export class RedisRepository {
       return true
     } catch {
       log.warn('Personal assistant history could not be saved')
+      return false
+    }
+  }
+
+  getWebAssistantMessages = async (userId: number): Promise<IUserConversation[] | null> => {
+    try {
+      const response = await this.redisClient.get(rWebAssistantKey(userId))
+      if (response === null) return []
+      const history: unknown = JSON.parse(response)
+      if (
+        !Array.isArray(history) ||
+        !history.every(
+          (entry) =>
+            entry !== null &&
+            typeof entry === 'object' &&
+            (entry.role === roleTypes.user || entry.role === roleTypes.assistant) &&
+            typeof entry.content === 'string' &&
+            (entry.provider === ConversationProviders.WEB ||
+              entry.provider === ConversationProviders.ASSISTANT)
+        )
+      ) {
+        log.warn('Web assistant history is invalid')
+        return null
+      }
+      return history
+    } catch {
+      log.warn('Web assistant history is unavailable')
+      return null
+    }
+  }
+
+  saveWebAssistantMessages = async (
+    userId: number,
+    history: IUserConversation[]
+  ): Promise<boolean> => {
+    try {
+      await this.redisClient.set(rWebAssistantKey(userId), JSON.stringify(history.slice(-20)))
+      return true
+    } catch {
+      log.warn('Web assistant history could not be saved')
       return false
     }
   }

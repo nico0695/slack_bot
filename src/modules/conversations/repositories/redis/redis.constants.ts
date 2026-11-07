@@ -13,3 +13,5 @@ export const rPersonalConversationFlow = (userId: string): string =>
 export const rAlertSnoozeConfig = (userId: number): string => `cb_alert_snooze_${userId}`
 
 export const rPersonalAssistantKey = (userId: number): string => `cb_assistant_user_${userId}`
+
+export const rWebAssistantKey = (userId: number): string => `cb_assistant_web_user_${userId}`

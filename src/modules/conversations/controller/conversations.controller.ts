@@ -6,6 +6,7 @@ import GenericController from '../../../shared/modules/genericController'
 
 import ConversationsServices from '../services/conversations.services'
 import MessageProcessor from '../services/messageProcessor.service'
+import PersonalAssistantService from '../services/personalAssistant.service'
 import ConversationFlowManager from '../services/conversationFlowManager.service'
 
 import { roleTypes } from '../shared/constants/openai'
@@ -23,7 +24,8 @@ export default class ConversationsController extends GenericController {
   constructor(
     private conversationServices: ConversationsServices,
     private messageProcessor: MessageProcessor,
-    private flowManager: ConversationFlowManager
+    private flowManager: ConversationFlowManager,
+    private personalAssistantService: PersonalAssistantService
   ) {
     super()
 
@@ -220,14 +222,16 @@ export default class ConversationsController extends GenericController {
     const scopedChannelId =
       typeof channelId === 'string' && channelId.trim().length > 0 ? channelId.trim() : undefined
     const onProgress: ProgressCallback = (msg) => say(msg)
-    const result = await this.messageProcessor.processAssistantMessage(
-      message,
-      userId,
-      scopedChannelId,
-      isChannelContext,
-      undefined,
-      onProgress
-    )
+    const result = isPersonal
+      ? await this.personalAssistantService.processMessage(message, userId, onProgress)
+      : await this.messageProcessor.processAssistantMessage(
+          message,
+          userId,
+          scopedChannelId,
+          isChannelContext,
+          undefined,
+          onProgress
+        )
 
     if (result.response) {
       say(result.response.contentBlock ?? result.response.content)

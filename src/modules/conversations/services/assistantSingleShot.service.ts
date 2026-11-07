@@ -1,7 +1,7 @@
 import { injectable } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
-import MessageProcessor from './messageProcessor.service'
+import PersonalAssistantService from './personalAssistant.service'
 
 import { IAssistantSingleShotResult } from '../shared/interfaces/assistantSingleShot.interfaces'
 import {
@@ -15,12 +15,12 @@ import { normalizePlainText, truncatePlainText } from '../shared/utils/plainText
 const log = createModuleLogger('conversations.assistantSingleShot')
 
 /**
- * One assistant request and one final answer for clients without Slack or chat history:
- * same processing as a Slack DM, no conversation stored, no channel, no retries.
+ * One assistant request and one final answer using shared personal context:
+ * same processing as a Slack DM, no channel and no retries.
  */
 @injectable()
 export default class AssistantSingleShotService {
-  constructor(private messageProcessor: MessageProcessor) {}
+  constructor(private personalAssistantService: PersonalAssistantService) {}
 
   processMessage = async (
     requestId: string,
@@ -31,13 +31,7 @@ export default class AssistantSingleShotService {
     let result: IAssistantSingleShotResult
 
     try {
-      const processed = await this.messageProcessor.processAssistantMessage(
-        message,
-        userId,
-        undefined,
-        false,
-        undefined
-      )
+      const processed = await this.personalAssistantService.processMessage(message, userId)
 
       if (processed.shouldSkipAI) {
         result = this.completed(requestId, assistantSingleShotMessages.skipped)

@@ -30,7 +30,6 @@ import ImagesWebController from './modules/images/controller/imagesWeb.controlle
 import TextToSpeechWebController from './modules/textToSpeech/controller/textToSpeechWeb.controller'
 
 import { IJoinRoomData } from './modules/conversations/shared/interfaces/conversationSocket'
-import { ProgressCallback } from './modules/conversations/shared/interfaces/converstions'
 import SummaryWebController from './modules/summary/controller/summary.controller'
 import { alertCronJob } from './modules/alerts/utils/cronJob'
 import { bridgeDeliveryCronJob } from './modules/bridge/utils/cronJob'
@@ -243,58 +242,7 @@ export default class App {
         socketLog.debug({ reason }, 'User disconnected')
       })
 
-      socket.on('join_assistant_room', async (data) => {
-        const { username, channel: channelId }: IJoinRoomData = data
-
-        if (!channelId) {
-          socketLog.warn('join_assistant_room: No channelId provided')
-          return
-        }
-
-        const channel = channelId.toString().padStart(8, '9')
-
-        void socket.join(channel) // Join the user to a socket room
-
-        const joinResponse = await this.conversationWebController.joinAssistantChannel({
-          username,
-          channel,
-        })
-
-        socket.emit('join_assistant_response', joinResponse) // Send message to user that joined
-      })
-
-      socket.on('send_assistant_message', async (data) => {
-        const { message, userId } = data
-
-        const channel = userId?.toString().padStart(8, '9')
-
-        const onProgress: ProgressCallback = (progressMessage) => {
-          io.in(channel).emit('receive_assistant_progress', progressMessage)
-        }
-
-        const conversationResponse = await this.conversationWebController.conversationAssistantFlow(
-          userId,
-          message,
-          onProgress
-        )
-
-        if (conversationResponse) {
-          io.in(channel).emit('receive_assistant_message', conversationResponse) // Send message to all users in channel, including sender
-        }
-      })
-
-      socket.on('leave_assistant_room', async (data) => {
-        const { channel: channelId }: IJoinRoomData = data
-
-        if (!channelId) {
-          socketLog.warn('leave_assistant_room: No channelId provided')
-          return
-        }
-
-        const channel = channelId.toString().padStart(8, '9')
-
-        void socket.leave(channel)
-      })
+      this.conversationWebController.registerAssistantSocket(socket)
     })
   }
 

@@ -1,7 +1,7 @@
 # Assistant context implementation progress
 
 - Status: running
-- Active stage: 2–4 / transport integration, socket review and question context
+- Active stage: 5 / final checks and pull requests
 - Checkpoint UTC: 2026-11-07T03:56:13Z
 - Backend branch: `feature/assistant-shared-context` from `dev` (`8dcfa149863b26ed0645767c237dd6646e6e351c`)
 - Web branch: `feature/assistant-shared-context` from `dev` (`396588c91bdd641f5840d4b7c92d2a375d9ce29f`)
@@ -20,9 +20,9 @@
 
 - Install dependencies and record baseline checks. Backend uses npm lockfile; web has pnpm lockfile and no npm lockfile.
 - Stage 1 service and Redis implementation reviewed and verified in an isolated snapshot.
-- Stage 2 integration passed its first 121 focused tests and independent runtime review; final rerun pending concurrent question-context fixture updates.
-- Stage 3 socket authentication passed focused tests; review identified unsafe retry wording, being fixed. Account-lifecycle socket isolation is being strengthened before checkpoint.
-- Stage 4 question-context and classifier changes are being tested.
+- Stage 2 transport integration passed focused tests and independent review; shared Slack/REST/web regression confirms separate web-visible history.
+- Stage 3 socket authentication and frontend lifecycle reviewed; fixed unknown-outcome retry wording and isolated assistant transport per account. Seven frontend lifecycle regressions pass, including buffered old-account events.
+- Stage 4 reviewed; fixed sent-alert omission by fetching both statuses. 175 focused tests pass; current model retained pending live evaluation.
 
 ## Next steps
 

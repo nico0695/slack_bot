@@ -1,8 +1,7 @@
-import { injectable, inject } from 'tsyringe'
+import { singleton, inject } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import { GlobalConstants } from '../../../shared/constants/global'
-import { IoServer } from '../../../config/socketConfig'
 
 import UsersServices from '../../users/services/users.services'
 import AlertsServices from '../../alerts/services/alerts.services'
@@ -39,7 +38,7 @@ import { ChannelType, ConversationProviders } from '../shared/constants/conversa
 import { formatDateToText } from '../../../shared/utils/dates.utils'
 import { assistantPromptLite } from '../shared/constants/prompt.constants'
 import * as slackMsgUtils from '../../../shared/utils/slackMessages.utils'
-import MessageProcessor from './messageProcessor.service'
+import PersonalAssistantService from './personalAssistant.service'
 
 const log = createModuleLogger('conversations.service')
 
@@ -50,9 +49,10 @@ export enum AIRepositoryType {
   GEMINI = 'GEMINI',
 }
 
-@injectable()
+@singleton()
 export default class ConversationsServices {
   private maxContextMessages = 20
+  private readonly pendingWebTurns = new Map<number, Promise<void>>()
 
   constructor(
     @inject('AIRepository') private aiRepository: OpenaiRepository | GeminiRepository,
@@ -63,7 +63,7 @@ export default class ConversationsServices {
     private tasksServices: TasksServices,
     private notesServices: NotesServices,
     private linksServices: LinksServices,
-    private messageProcessor: MessageProcessor,
+    private personalAssistantService: PersonalAssistantService,
     private remindersServices: RemindersServices
   ) {}
 
@@ -162,131 +162,64 @@ export default class ConversationsServices {
     }
   }
 
-  private getOrInitConversationFlow = async (channelId?: string): Promise<IConversationFlow> => {
-    let conversationFlow = await this.redisRepository.getConversationFlow(channelId)
-
-    if (conversationFlow === null) {
-      const newConversation: IConversationFlow = {
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        chanelId: channelId ?? '',
-        conversation: [],
-        channelType: ChannelType.ASSISTANT,
-        socketChannel: channelId,
-      }
-
-      const response = await this.redisRepository.saveConversationFlow(channelId, newConversation)
-
-      if (!response) {
-        return null
-      }
-
-      conversationFlow = newConversation
+  getWebAssistantHistory = async (userId: number): Promise<IUserConversation[]> => {
+    try {
+      return (await this.redisRepository.getWebAssistantMessages(userId)) ?? []
+    } catch {
+      return []
     }
-
-    // TODO: update socketChannel when the user joins.
-    if (!conversationFlow.socketChannel) {
-      const newConversation: IConversationFlow = {
-        ...conversationFlow,
-        socketChannel: channelId,
-      }
-
-      await this.redisRepository.saveConversationFlow(channelId, newConversation)
-
-      conversationFlow = newConversation
-    }
-
-    return conversationFlow
   }
 
   generateAssistantConversation = async (
     message: string,
     userId: number,
-    channelId: string,
-    provider: ConversationProviders,
-    isChannelContext = false,
     onProgress?: ProgressCallback
   ): Promise<IAssistantResponse> => {
+    // Preserve web display turns as well as AI turns when sends overlap.
+    const previous = this.pendingWebTurns.get(userId) ?? Promise.resolve()
+    let release!: () => void
+    const current = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    this.pendingWebTurns.set(userId, current)
+    await previous
+
     try {
-      // Check the skip flag before any other processing.
-      const shouldSkip = this.messageProcessor.shouldSkipAI(message)
-      const cleanMessage = shouldSkip ? this.messageProcessor.cleanSkipFlag(message) : message
-
-      const conversationFlow = await this.getOrInitConversationFlow(channelId)
-
-      const newConversation: IUserConversation = {
-        role: roleTypes.user,
-        content: cleanMessage,
-        userId,
-        provider,
-      }
-
-      if (provider === ConversationProviders.SLACK && conversationFlow.socketChannel) {
-        const io = IoServer.io
-        if (io) {
-          io.in(conversationFlow.socketChannel).emit('receive_assistant_message', newConversation)
+      const result = await this.personalAssistantService.processMessage(message, userId, onProgress)
+      // An unavailable display history must never be overwritten with an empty history.
+      try {
+        const stored = await this.redisRepository.getWebAssistantMessages(userId)
+        if (stored !== null) {
+          const userMessage: IUserConversation = {
+            role: roleTypes.user,
+            content: result.shouldSkipAI ? message.replace(/^\+/, '').trimStart() : message,
+            userId,
+            provider: ConversationProviders.WEB,
+          }
+          const updated = [...stored, userMessage]
+          if (result.response) updated.push(result.response)
+          await this.redisRepository.saveWebAssistantMessages(
+            userId,
+            updated.slice(-this.maxContextMessages)
+          )
         }
+      } catch {
+        log.warn('Web assistant history could not be saved')
       }
-
-      const { conversation: conversationStored } = conversationFlow
-
-      // Save skipped messages without generating a response.
-      if (shouldSkip) {
-        const updatedConversation = [
-          ...conversationStored.slice(-(this.maxContextMessages - 1)),
-          newConversation,
-        ]
-
-        await this.redisRepository.saveConversationFlow(channelId, {
-          ...conversationFlow,
-          conversation: updatedConversation,
-          updatedAt: new Date(),
-        })
-
-        return { response: null, skipped: true }
-      }
-
-      const trimmedChannelId = channelId.trim()
-
-      const result = await this.messageProcessor.processAssistantMessage(
-        cleanMessage,
-        userId,
-        trimmedChannelId,
-        isChannelContext,
-        conversationStored,
-        onProgress
-      )
-      const responseMessage = result.response
-
-      // Keep only the last N messages in history.
-      const updatedConversation = [
-        ...conversationStored.slice(-(this.maxContextMessages - 1)),
-        newConversation,
-      ]
-
-      if (responseMessage) {
-        updatedConversation.push(responseMessage)
-      }
-
-      const newConversationGenerated: IConversationFlow = {
-        ...conversationFlow,
-        conversation: updatedConversation,
-        updatedAt: new Date(),
-      }
-
-      await this.redisRepository.saveConversationFlow(channelId, newConversationGenerated)
-
-      return { response: responseMessage, skipped: false }
+      return { response: result.response, skipped: result.shouldSkipAI }
     } catch (error) {
       log.error({ err: error }, 'generateAssistantConversation failed')
       return {
         response: {
           role: roleTypes.assistant,
-          content: error.message ?? 'Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️',
+          content: 'Ups! Ocurrió un error al procesar tu solicitud 🤷‍♂️',
           provider: ConversationProviders.ASSISTANT,
         },
         skipped: false,
       }
+    } finally {
+      release()
+      if (this.pendingWebTurns.get(userId) === current) this.pendingWebTurns.delete(userId)
     }
   }
 

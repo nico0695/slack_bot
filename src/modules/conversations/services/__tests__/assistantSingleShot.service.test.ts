@@ -1,5 +1,6 @@
 import AssistantSingleShotService from '../assistantSingleShot.service'
 import MessageProcessor from '../messageProcessor.service'
+import PersonalAssistantService from '../personalAssistant.service'
 import { ConversationProviders } from '../../shared/constants/conversationFlow'
 import { roleTypes } from '../../shared/constants/openai'
 
@@ -25,7 +26,7 @@ describe('AssistantSingleShotService', () => {
     jest.clearAllMocks()
     process.env = { ...originalEnv }
     service = new AssistantSingleShotService({
-      processAssistantMessage: processAssistantMessageMock,
+      processMessage: processAssistantMessageMock,
     } as any)
   })
 
@@ -33,7 +34,7 @@ describe('AssistantSingleShotService', () => {
     process.env = originalEnv
   })
 
-  it('processes once like a Slack DM: no channel, no channel context, no history', async () => {
+  it('delegates once to shared personal context', async () => {
     processAssistantMessageMock.mockResolvedValue({
       response: buildResponse({ content: 'Hola' }),
       shouldSkipAI: false,
@@ -42,13 +43,7 @@ describe('AssistantSingleShotService', () => {
     await service.processMessage(REQUEST_ID, 'hola', 42)
 
     expect(processAssistantMessageMock).toHaveBeenCalledTimes(1)
-    expect(processAssistantMessageMock).toHaveBeenCalledWith(
-      'hola',
-      42,
-      undefined,
-      false,
-      undefined
-    )
+    expect(processAssistantMessageMock).toHaveBeenCalledWith('hola', 42)
   })
 
   it('returns the response as a completed result', async () => {
@@ -166,7 +161,7 @@ describe('AssistantSingleShotService', () => {
     })
   })
 
-  it('keeps two requests independent', async () => {
+  it('keeps request envelopes separate for different users', async () => {
     processAssistantMessageMock
       .mockResolvedValueOnce({ response: buildResponse({ content: 'uno' }), shouldSkipAI: false })
       .mockResolvedValueOnce({ response: null, shouldSkipAI: false })
@@ -176,23 +171,18 @@ describe('AssistantSingleShotService', () => {
 
     expect(first.message).toBe('uno')
     expect(second.request_id).toBe('0b7a9d3e-1c2f-4a5b-8c6d-7e8f9a0b1c2d')
-    expect(processAssistantMessageMock).toHaveBeenNthCalledWith(
-      2,
-      'dos',
-      7,
-      undefined,
-      false,
-      undefined
-    )
+    expect(processAssistantMessageMock).toHaveBeenNthCalledWith(2, 'dos', 7)
   })
 
   describe('with the real processor', () => {
     const createAssistantAlertMock = jest.fn()
     const generateImageForAssistantMock = jest.fn()
 
+    const chatCompletion = jest.fn()
+
     const buildRealProcessorService = (): AssistantSingleShotService => {
       const processor = new MessageProcessor(
-        { chatCompletion: jest.fn() } as any,
+        { chatCompletion } as any,
         { createAssistantAlert: createAssistantAlertMock } as any,
         {} as any,
         {} as any,
@@ -204,8 +194,31 @@ describe('AssistantSingleShotService', () => {
         {} as any,
         {} as any
       )
-      return new AssistantSingleShotService(processor)
+      const history = new Map<number, any[]>()
+      return new AssistantSingleShotService(
+        new PersonalAssistantService(processor, {
+          getPersonalAssistantMessages: async (userId: number) => history.get(userId) ?? [],
+          savePersonalAssistantMessages: async (userId: number, messages: any[]) => {
+            history.set(userId, messages)
+            return true
+          },
+        } as any)
+      )
     }
+
+    it('supplies the previous REST exchange to a follow-up intent classification', async () => {
+      chatCompletion
+        .mockResolvedValueOnce(buildResponse({ content: '{"intent":"question"}' }))
+        .mockResolvedValueOnce(buildResponse({ content: 'La clave es girasol.' }))
+        .mockResolvedValueOnce(buildResponse({ content: '{"intent":"question"}' }))
+        .mockResolvedValueOnce(buildResponse({ content: 'girasol' }))
+      const restService = buildRealProcessorService()
+      await restService.processMessage(REQUEST_ID, 'mi clave es girasol', 42)
+      await restService.processMessage('followup', 'cuál era mi clave', 42)
+      const followupClassification = chatCompletion.mock.calls[2][0]
+      expect(JSON.stringify(followupClassification)).toContain('mi clave es girasol')
+      expect(JSON.stringify(followupClassification)).toContain('La clave es girasol.')
+    })
 
     it('creates alerts for the user without channel or request id', async () => {
       createAssistantAlertMock.mockResolvedValue({

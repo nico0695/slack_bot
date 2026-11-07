@@ -28,9 +28,14 @@ const conversationsServicesMock = {
   handleAction: handleActionMock,
 }
 
-const messageProcessorMock = {}
+const messageProcessorMock = {
+  processAssistantMessage: jest.fn(),
+  shouldSkipAI: jest.fn(),
+  cleanSkipFlag: jest.fn(),
+}
+const personalAssistantMock = { processMessage: jest.fn() }
 
-const flowManagerMock = {}
+const flowManagerMock = { isFlowActive: jest.fn(), startFlow: jest.fn() }
 
 describe('ConversationsController', () => {
   let controller: ConversationsController
@@ -40,9 +45,67 @@ describe('ConversationsController', () => {
     controller = new ConversationsController(
       conversationsServicesMock as any,
       messageProcessorMock as any,
-      flowManagerMock as any
+      flowManagerMock as any,
+      personalAssistantMock as any
     )
     controller.userData = { id: 123 } as any
+  })
+
+  describe('normal assistant routing', () => {
+    it('uses shared personal context and origin-only progress for normal DMs', async () => {
+      flowManagerMock.isFlowActive.mockResolvedValue(false)
+      personalAssistantMock.processMessage.mockImplementation(
+        async (_message, _userId, progress) => {
+          progress('working')
+          return { response: { content: 'done' } }
+        }
+      )
+      const say = jest.fn()
+      await controller.conversationFlow({
+        payload: { text: 'hello', user: 'U1', channel: 'D1', channel_type: 'im' },
+        body: {},
+        say,
+      })
+      expect(personalAssistantMock.processMessage).toHaveBeenCalledWith(
+        'hello',
+        123,
+        expect.any(Function)
+      )
+      expect(messageProcessorMock.processAssistantMessage).not.toHaveBeenCalled()
+      expect(say.mock.calls).toEqual([['working'], ['done']])
+    })
+
+    it('retains direct processor and channel scope for channel messages', async () => {
+      flowManagerMock.isFlowActive.mockResolvedValue(false)
+      messageProcessorMock.processAssistantMessage.mockResolvedValue({
+        response: { content: 'channel answer' },
+      })
+      await controller.conversationFlow({
+        payload: { text: 'hello', user: 'U1', channel: ' C1 ', channel_type: 'channel' },
+        body: {},
+        say: jest.fn(),
+      })
+      expect(messageProcessorMock.processAssistantMessage).toHaveBeenCalledWith(
+        'hello',
+        123,
+        'C1',
+        true,
+        undefined,
+        expect.any(Function)
+      )
+      expect(personalAssistantMock.processMessage).not.toHaveBeenCalled()
+    })
+
+    it('keeps an explicit DM START flow separate from personal context', async () => {
+      flowManagerMock.startFlow.mockResolvedValue('started')
+      await controller.conversationFlow({
+        payload: { text: 'start conversation', user: 'U1', channel: 'D1', channel_type: 'im' },
+        body: {},
+        say: jest.fn(),
+      })
+      expect(flowManagerMock.startFlow).toHaveBeenCalled()
+      expect(personalAssistantMock.processMessage).not.toHaveBeenCalled()
+    })
   })
 
   describe('parseSlackAction', () => {
@@ -319,7 +382,8 @@ describe('ConversationsController', () => {
       const realController = new ConversationsController(
         realServices,
         messageProcessorMock as any,
-        flowManagerMock as any
+        flowManagerMock as any,
+        personalAssistantMock as any
       )
       realController.userData = { id: 123 } as any
 

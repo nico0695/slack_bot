@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import UsersServices from '../../modules/users/services/users.services'
 import { Profiles } from '../constants/auth.constants'
 import { createModuleLogger } from '../../config/logger'
+import { IUsers } from '../../modules/users/interfaces/users.interfaces'
 
 const log = createModuleLogger('middleware.auth')
 
@@ -18,6 +19,33 @@ const supabase = (() => {
     log.error({ err: error }, 'Supabase client initialization failed')
   }
 })()
+
+/** Resolve one authenticated identity without storing it on a shared controller. */
+export async function getAuthenticatedUser(token: unknown): Promise<IUsers & { id: number }> {
+  if (typeof token !== 'string' || !token.trim()) {
+    throw new UnauthorizedError({ message: 'Unauthorized' })
+  }
+
+  const response = await supabase.auth.getUser(token.replace(/^Bearer\s+/i, '').trim())
+  const identity = response.data?.user
+  if (response.error || !identity) {
+    throw new UnauthorizedError({ message: 'Unauthorized' })
+  }
+
+  const { data: user } = await userServices.getOrCreateUserSupabase({
+    email: identity.email,
+    supabaseId: identity.id,
+  })
+  if (
+    !user?.enabled ||
+    typeof user.id !== 'number' ||
+    !Number.isSafeInteger(user.id) ||
+    user.id < 1
+  ) {
+    throw new UnauthorizedError({ message: 'Unauthorized' })
+  }
+  return { ...user, id: user.id }
+}
 
 export const verifyToken = async (
   req: Request,
@@ -55,30 +83,7 @@ export function HttpAuth(target: any, propertyKey: string, descriptor: PropertyD
   descriptor.value = async function (...args: any[]) {
     const [req] = args
 
-    const token = req.headers.authorization
-
-    if (!token) {
-      throw new UnauthorizedError({ message: 'Unauthorized' })
-    }
-
-    const supabaseResponse = await supabase.auth.getUser(token.replace('Bearer ', ''))
-
-    const supabaseUser = supabaseResponse.data?.user
-
-    if (supabaseResponse.error || !supabaseUser) {
-      throw new UnauthorizedError({ message: 'Unauthorized' })
-    }
-
-    const { data: user } = await userServices.getOrCreateUserSupabase({
-      email: supabaseUser.email,
-      supabaseId: supabaseUser.id,
-    })
-
-    if (!user.enabled) {
-      throw new UnauthorizedError({ message: 'Unauthorized' })
-    }
-
-    this.userData = user
+    this.userData = await getAuthenticatedUser(req.headers.authorization)
 
     return originalMethod.apply(this, args)
   }

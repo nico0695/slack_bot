@@ -9,7 +9,7 @@ Entrada REST al mismo assistant que usan Slack y la web: el bridge envía el tex
 | Incluye | Fuera de alcance |
 |---------|------------------|
 | `POST /conversations/assistant` autenticado | Audio, STT, firmware, bridge |
-| Fachada single-shot sobre el processor existente | Historial, repreguntas, confirmación de texto |
+| Fachada single-shot sobre el processor existente | Repreguntas interactivas, confirmación de texto |
 | Texto plano para listas, aviso para contenido no mostrable | SSE/webhook de respuesta, jobs, polling, cancelación |
 | Errores del parser JSON → `400`/`413` (todas las rutas) | Reintentos, idempotencia, exactly-once |
 
@@ -27,9 +27,9 @@ src/modules/conversations/
 src/shared/middleware/errors.ts                        # body-parser → 400/413
 ```
 
-- **Misma ejecución que un DM de Slack:** `processAssistantMessage(message, userId, undefined, false, undefined)`. Sin canal, sin contexto de canal, sin historial, sin `onProgress`. Mismo clasificador, mismos servicios y mismos permisos por usuario.
-- **No usa** `ConversationsServices.generateAssistantConversation` (wrapper web): ese camino lee/escribe historial en Redis y usa un canal sintético (`userId.padStart(8, '9')`) que termina guardado en las entidades.
-- La fachada depende sólo de `MessageProcessor`: no escribe en Redis ni emite al socket.
+- **Misma ejecución que un DM normal de Slack:** `PersonalAssistantService.processMessage(message, userId)`, que llama al processor sin canal y con el contexto personal compartido. Hasta 6 entradas de texto, sin expiración, separadas del historial visible de la web; ver [ASSISTANT_CONTEXT.md](ASSISTANT_CONTEXT.md). Sin `onProgress` en REST. Mismo clasificador, servicios y permisos por usuario.
+- **No usa** `ConversationsServices.generateAssistantConversation` (wrapper web): ese wrapper conserva por separado el historial visible de la web. Las tres entradas comparten únicamente el servicio de contexto personal; ninguna usa un canal sintético para crear entidades personales.
+- La fachada depende de `PersonalAssistantService`: no emite al socket. El servicio compartido lee y guarda el contexto en Redis; una falla de persistencia nunca repite acciones ni cambia el resultado REST.
 - `IConversation` suma dos campos opcionales que Slack y la web ignoran: `plainText` (versión texto) y `contentOmitted` (el texto deja afuera contenido no mostrable). Viajan también por el socket web y quedan en el historial del wrapper web, sin uso.
 
 ## 3. Contrato
@@ -126,7 +126,7 @@ Valores no enteros o ≤ 0 usan el default. Se leen en cada request.
 |------|-----------|
 | Errores globales | JSON roto → 400 sin eco del body; body grande → 413; `CustomError` y 500 sin cambios |
 | Texto plano | Listas (tope 10, `y N más`, vacío, URL de links), comando `alerts <scope>` con los mismos bloques, QR/imágenes omitidos; `content`/`contentBlock` idénticos; paridad Slack/texto de alertas sin cambios |
-| Fachada | Llamada única estilo DM; mapeo respuesta/`null`/`+`/excepción; sin mensaje interno; recorte y env; pedidos independientes; con processor real: alerta sin canal ni `requestId`, fallo del servicio → `unknown`, error de imagen sin detalle del proveedor |
+| Fachada | Llamada única al servicio personal compartido estilo DM; mapeo respuesta/`null`/`+`/excepción; sin mensaje interno; recorte y env; pedidos con contexto compartido y aislamiento entre usuarios; con processor real: alerta sin canal ni `requestId`, fallo del servicio → `unknown`, error de imagen sin detalle del proveedor |
 | Endpoint | Unitarios: 200/500, 10 bodies inválidos sin ejecutar, límite exacto y por env. Integración (supertest con `HttpAuth`/`Permission`/`errorHandler` reales): usuario del token, 401 sin token/inválido/deshabilitado, 403 por perfil, 400 sin eco, JSON roto |
 | Arranque | Resolución del controller con el contenedor DI real: servicio inyectado y ruta registrada |
 
@@ -141,7 +141,7 @@ Validación por commit: `npx tsc --noEmit`, `npm run lint`, `npx jest`, `npm run
 | A1 | Body y envelope en **snake_case** según el contrato compartido; excepción explícita a D1 de `BRIDGE_INTEGRATION.md` (camelCase en el REST del bot) |
 | A2 | `request_id` UUID estricto en minúsculas; mayúsculas → `400` |
 | A3 | Perfiles USER, USER_PREMIUM y ADMIN (como `/alerts`), usuario `enabled` |
-| A4 | Mismo flujo que Slack DM, sin cambiar la clasificación del processor |
+| A4 | Mismo flujo que Slack DM normal y contexto personal compartido por usuario; contrato REST y mapeo de resultados sin cambios. Ver ASSISTANT_CONTEXT.md |
 | A5 | `+` → `completed` con aviso; `null` y excepción → `unknown` (revisión del PR); errores como texto de los servicios → `completed`. El error de generación de imagen del comando `.img` responde un mensaje genérico (antes incluía `error.message`, también en Slack y web) |
 | A6 | Texto plano opcional en `IConversation` desde los mismos datos que los bloques; máximo 10 ítems |
 | A7 | Formato Slack → texto plano; links como `etiqueta: url`; sin emojis, con acentos |
@@ -165,7 +165,5 @@ Validación por commit: `npx tsc --noEmit`, `npm run lint`, `npx jest`, `npm run
 - **Contrato compartido:** sincronizar `contratos.md` con estas decisiones (snake_case, `null` → `unknown`, el bot no emite `failed`, límites de 2000, formatos de error previos al handler).
 - **Charset del ESP32:** se asume UTF-8 con acentos y sin emojis; confirmar con la fuente real.
 - **Observaciones fuera de alcance (sin cambios):**
-  - el socket `send_assistant_message` toma el `userId` del cliente sin autenticar;
   - la lista de imágenes no filtra por usuario (`Images` no tiene `userId`);
-  - el wrapper web guarda su canal sintético en las entidades que crea;
   - el parser de comandos deja un espacio final en el texto (`.a 10m llamar ` → `'llamar '`), también en Slack.

@@ -4,6 +4,8 @@ import { roleTypes } from '../../shared/constants/openai'
 
 const redisRepositoryMock = {
   getConversationMessages: jest.fn(),
+  getWebAssistantMessages: jest.fn(),
+  saveWebAssistantMessages: jest.fn(),
   saveConversationMessages: jest.fn(),
   getConversationFlow: jest.fn(),
   saveConversationFlow: jest.fn(),
@@ -59,10 +61,7 @@ const linksServicesMock = {
   updateLink: jest.fn(),
 }
 
-const messageProcessorMock = {
-  processAssistantMessage: jest.fn(),
-  cleanSkipFlag: jest.fn(),
-}
+const personalAssistantMock = { processMessage: jest.fn() }
 
 const remindersServicesMock = {
   getRemindersByScope: jest.fn(),
@@ -103,7 +102,7 @@ const buildService = (): ConversationsServices =>
     tasksServicesMock as any,
     notesServicesMock as any,
     linksServicesMock as any,
-    messageProcessorMock as any,
+    personalAssistantMock as any,
     remindersServicesMock as any
   )
 
@@ -113,6 +112,100 @@ describe('ConversationsServices', () => {
   beforeEach(() => {
     jest.resetAllMocks()
     service = buildService()
+  })
+
+  describe('web assistant display history', () => {
+    it('uses shared context once and stores only this web exchange', async () => {
+      const onProgress = jest.fn()
+      const response = {
+        role: roleTypes.assistant,
+        content: 'data:image/png;base64,abc',
+        contentBlock: { blocks: [] },
+        provider: ConversationProviders.ASSISTANT,
+      }
+      personalAssistantMock.processMessage.mockResolvedValue({ response, shouldSkipAI: false })
+      redisRepositoryMock.getWebAssistantMessages.mockResolvedValue([])
+      await expect(
+        service.generateAssistantConversation('web hello', 1, onProgress)
+      ).resolves.toEqual({ response, skipped: false })
+      expect(personalAssistantMock.processMessage).toHaveBeenCalledTimes(1)
+      expect(personalAssistantMock.processMessage).toHaveBeenCalledWith('web hello', 1, onProgress)
+      expect(redisRepositoryMock.saveWebAssistantMessages).toHaveBeenCalledWith(1, [
+        expect.objectContaining({ content: 'web hello', provider: ConversationProviders.WEB }),
+        response,
+      ])
+      expect(redisRepositoryMock.getConversationFlow).not.toHaveBeenCalled()
+      expect(redisRepositoryMock.saveConversationFlow).not.toHaveBeenCalled()
+    })
+
+    it('keeps exactly 20 visible entries and can display skipped user messages', async () => {
+      personalAssistantMock.processMessage.mockResolvedValue({ response: null, shouldSkipAI: true })
+      redisRepositoryMock.getWebAssistantMessages.mockResolvedValue(
+        Array.from({ length: 20 }, (_, index) => ({
+          role: roleTypes.user,
+          content: String(index),
+          provider: ConversationProviders.WEB,
+        }))
+      )
+      await service.generateAssistantConversation('+ saved', 91)
+      const saved = redisRepositoryMock.saveWebAssistantMessages.mock.calls[0][1]
+      expect(saved).toHaveLength(20)
+      expect(saved[0].content).toBe('1')
+      expect(saved[19].content).toBe('saved')
+    })
+
+    it('does not replace unavailable display history or lose a successful response', async () => {
+      const response = { content: 'done' }
+      personalAssistantMock.processMessage.mockResolvedValue({ response, shouldSkipAI: false })
+      redisRepositoryMock.getWebAssistantMessages.mockResolvedValue(null)
+      expect(await service.generateAssistantConversation('hello', 1)).toEqual({
+        response,
+        skipped: false,
+      })
+      expect(redisRepositoryMock.saveWebAssistantMessages).not.toHaveBeenCalled()
+      expect(await service.getWebAssistantHistory(1)).toEqual([])
+    })
+
+    it('serializes overlapping web requests without losing visible turns', async () => {
+      let history: any[] = []
+      redisRepositoryMock.getWebAssistantMessages.mockImplementation(async () => history)
+      redisRepositoryMock.saveWebAssistantMessages.mockImplementation(async (_id, entries) => {
+        history = entries
+        return true
+      })
+      personalAssistantMock.processMessage.mockImplementation(async (content: string) => ({
+        response: {
+          role: roleTypes.assistant,
+          content: `reply:${content}`,
+          provider: ConversationProviders.ASSISTANT,
+        },
+        shouldSkipAI: false,
+      }))
+      await Promise.all([
+        service.generateAssistantConversation('one', 1),
+        service.generateAssistantConversation('two', 1),
+      ])
+      expect(history.map((entry) => entry.content)).toEqual([
+        'one',
+        'reply:one',
+        'two',
+        'reply:two',
+      ])
+    })
+
+    it('never reveals internal source error details and releases the web queue', async () => {
+      personalAssistantMock.processMessage
+        .mockRejectedValueOnce(new Error('private database details'))
+        .mockResolvedValueOnce({ response: null, shouldSkipAI: true })
+      expect(JSON.stringify(await service.generateAssistantConversation('one', 1))).not.toContain(
+        'private database'
+      )
+      redisRepositoryMock.getWebAssistantMessages.mockResolvedValue([])
+      expect(await service.generateAssistantConversation('+ two', 1)).toEqual({
+        response: null,
+        skipped: true,
+      })
+    })
   })
 
   describe('generateConversation', () => {
