@@ -43,3 +43,9 @@ The user authorized automatic progression through these stages, commits, pushes 
 ## Resume protocol
 
 Read `docs/ASSISTANT_CONTEXT_PROGRESS.md` on the remote feature branch before resuming. Inspect actual commits and working-tree changes; never restart completed stages. Run only one implementing session. Checkpoint reviewed changes and remaining fixes remotely after each stage so recovery does not depend on a scratch directory. The same feature branch exists in `nico0695/slack_bot_web`; its coordinated change targets `dev` too.
+
+## Smoke guide after a coordinated release
+
+Use a test account and normal assistant mode (not Slack START). Create a personal note in Slack, then ask about it through REST and the web. Verify the follow-up uses shared context while the web-visible history contains only web turns. Check `.q` and a natural-language question about a note description. Sign out and sign into another test account; previous history, progress and late replies must not appear. Reconnect the web socket; it should rejoin without resending a mutation. Verify channel conversations still use their own data and history.
+
+The REST body/envelope and bridge/device protocol are unchanged. Release the backend and companion web PR together: old web clients without a Supabase token cannot use the protected assistant events. See `docs/ASSISTANT_CONTEXT_PROGRESS.md` for exact verification and deferred live checks.

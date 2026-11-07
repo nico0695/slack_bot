@@ -131,9 +131,39 @@ it('shares Slack DM → REST → web context while only web turns enter the web 
   expect(await redis.getPersonalAssistantMessages(91)).toEqual([])
   expect(await redis.getChannelsConversationFlow()).toEqual([])
   expect(emitMock).not.toHaveBeenCalled()
-  expect(processSpy.mock.calls.every((call) => call[2] === undefined && !call[3])).toBe(
-    true
-  )
+  expect(processSpy.mock.calls.every((call) => call[2] === undefined && !call[3])).toBe(true)
   expect(stored.has('cb_assistant_user_1')).toBe(true)
   expect(stored.has('cb_assistant_web_user_1')).toBe(true)
+})
+
+it('keeps provider-less OpenAI answers readable on reconnect and later web turns', async () => {
+  const redis = new RedisRepository()
+  const rawAnswer = { role: roleTypes.assistant, content: 'OpenAI answer' }
+  const personal = {
+    processMessage: jest.fn().mockResolvedValue({ response: rawAnswer, shouldSkipAI: false }),
+  }
+  const web = new ConversationsServices(
+    {} as any,
+    redis,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    personal as any,
+    {} as any
+  )
+  expect((await web.generateAssistantConversation('first', 1)).response).toBe(rawAnswer)
+  expect(await web.getWebAssistantHistory(1)).toEqual([
+    expect.objectContaining({ role: roleTypes.user, content: 'first' }),
+    { ...rawAnswer, provider: ConversationProviders.ASSISTANT },
+  ])
+  await web.generateAssistantConversation('second', 1)
+  expect((await web.getWebAssistantHistory(1)).map((entry) => entry.content)).toEqual([
+    'first',
+    'OpenAI answer',
+    'second',
+    'OpenAI answer',
+  ])
 })

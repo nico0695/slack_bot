@@ -197,7 +197,9 @@ export default class ConversationsServices {
             provider: ConversationProviders.WEB,
           }
           const updated = [...stored, userMessage]
-          if (result.response) updated.push(result.response)
+          if (result.response) {
+            updated.push({ ...result.response, provider: ConversationProviders.ASSISTANT })
+          }
           await this.redisRepository.saveWebAssistantMessages(
             userId,
             updated.slice(-this.maxContextMessages)
