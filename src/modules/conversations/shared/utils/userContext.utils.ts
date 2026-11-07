@@ -96,7 +96,8 @@ export const formatCompactLinks = (links: Links[], maxItems: number): string => 
 
 export const formatConversationHistory = (
   messages: IUserConversation[],
-  maxMessages = 3
+  maxMessages = 3,
+  maxCharacters = 60
 ): string => {
   if (!messages || messages.length === 0) return ''
 
@@ -104,8 +105,57 @@ export const formatConversationHistory = (
     .slice(-maxMessages)
     .map((msg) => {
       const prefix = msg.role === 'user' ? 'U' : 'A'
-      const content = truncateText(msg.content, 60)
+      const content =
+        maxCharacters === 60
+          ? truncateText(msg.content, maxCharacters)
+          : Array.from(msg.content).slice(0, maxCharacters).join('')
       return `${prefix}:${content}`
+    })
+    .join('\n')
+}
+
+// Each section has its own budget so one large description cannot hide another type.
+// Serialized records deliberately include only useful fields, never user/account metadata.
+export const buildQuestionDataContext = (
+  data: IUserContextData,
+  unavailable: Array<keyof IUserContextData> = []
+): string => {
+  // Leave space for the prompt label and separators inside the 16000-character data budget.
+  const sectionBudget = 3900
+  const omission = '\n[CONTEXTO_INCOMPLETO: texto truncado por límite de caracteres]'
+  const types: Array<keyof IUserContextData> = ['alerts', 'tasks', 'notes', 'links']
+  return types
+    .map((type) => {
+      if (unavailable.includes(type)) return `${type}: [DATOS_NO_DISPONIBLES]`
+      const records = data[type] ?? []
+      const selected = records.slice(0, 20).map((record) => {
+        const item = record as unknown as Record<string, unknown>
+        const fields = [
+          'id',
+          'message',
+          'title',
+          'description',
+          'tag',
+          'status',
+          'date',
+          'alertDate',
+          'sent',
+          'createdAt',
+          'updatedAt',
+          'url',
+        ]
+        return Object.fromEntries(
+          fields.filter((field) => item[field] != null).map((field) => [field, item[field]])
+        )
+      })
+      const header = `${type}: total=${records.length}, incluidos=${selected.length}`
+      const omitted =
+        records.length > 20 ? `\n[OMITIDOS: ${records.length - 20} registros por límite de 20]` : ''
+      const section = `${header}${omitted}\n${JSON.stringify(selected)}`
+      const chars = Array.from(section)
+      return chars.length > sectionBudget
+        ? chars.slice(0, sectionBudget - Array.from(omission).length).join('') + omission
+        : section
     })
     .join('\n')
 }

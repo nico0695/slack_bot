@@ -1,5 +1,6 @@
 import {
   buildUserDataContext,
+  buildQuestionDataContext,
   formatCompactAlerts,
   formatCompactTasks,
   formatCompactNotes,
@@ -201,5 +202,56 @@ describe('formatConversationHistory', () => {
     const result = formatConversationHistory(messages)
     expect(result.length).toBeLessThan(100)
     expect(result).toContain('..')
+  })
+})
+
+describe('question context', () => {
+  it('keeps useful fields and distinguishes empty from unavailable data', () => {
+    const result = buildQuestionDataContext(
+      {
+        tasks: [
+          createTask({ description: 'Required project details', status: 'pending', tag: 'work' }),
+        ],
+        notes: [],
+      },
+      ['links']
+    )
+    expect(result).toContain('Required project details')
+    expect(result).toContain('"status":"pending"')
+    expect(result).toContain('notes: total=0')
+    expect(result).toContain('links: [DATOS_NO_DISPONIBLES]')
+  })
+
+  it('caps each type at 20 and the total at 16000 Unicode characters including notices', () => {
+    const result = buildQuestionDataContext({
+      tasks: Array.from({ length: 21 }, (_, id) =>
+        createTask({ id, description: '😀'.repeat(16000) })
+      ),
+      notes: [createNote({ description: 'Other type survives' })],
+    })
+    expect(Array.from(result).length).toBeLessThanOrEqual(16000)
+    expect(result).toContain('OMITIDOS: 1 registros')
+    expect(result).toContain('CONTEXTO_INCOMPLETO')
+    expect(result).toContain('Other type survives')
+    const large = '😀'.repeat(16000)
+    const full = buildQuestionDataContext({
+      alerts: [createAlert({ message: large })],
+      tasks: [createTask({ description: large })],
+      notes: [createNote({ description: large })],
+      links: [{ id: 1, description: large, url: 'https://example.com' } as any],
+    })
+    expect(Array.from(full).length).toBeLessThanOrEqual(16000)
+    expect(full.match(/CONTEXTO_INCOMPLETO/g)).toHaveLength(4)
+  })
+
+  it('allows all six history entries at 2000 Unicode characters without changing compact defaults', () => {
+    const messages = Array.from({ length: 6 }, (_, index) =>
+      createMessage(roleTypes.user, `${index}:` + '😀'.repeat(2100))
+    )
+    const result = formatConversationHistory(messages, 6, 2000)
+    expect(result.split('\n')).toHaveLength(6)
+    expect(result).toContain('0:')
+    expect(result.split('\n').every((line) => Array.from(line).length === 2002)).toBe(true)
+    expect(result).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/)
   })
 })

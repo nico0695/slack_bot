@@ -1,4 +1,5 @@
 import MessageProcessor from '../messageProcessor.service'
+import { createModuleLogger } from '../../../../config/logger'
 import AlertInteractionsService from '../../../alerts/services/alertInteractions.services'
 import {
   ReminderRecurrenceType,
@@ -7,6 +8,14 @@ import {
   ReminderWeekDay,
 } from '../../../reminders/shared/constants/reminders.constants'
 import { resolveNextCalendarDayAt } from '../../../../shared/utils/dates.utils'
+
+jest.mock('../../../../config/logger', () => ({
+  createModuleLogger: jest
+    .fn()
+    .mockReturnValue({ warn: jest.fn(), error: jest.fn(), info: jest.fn() }),
+}))
+
+const processorLoggerMock = (createModuleLogger as jest.Mock).mock.results[0].value
 
 const redisRepositoryMock = {
   getAlertSnoozeConfig: jest.fn(),
@@ -1677,5 +1686,165 @@ describe('MessageProcessor - plain-text fallback', () => {
     expect(response?.content).toBe('Respuesta')
     expect(response?.plainText).toBeUndefined()
     expect(response?.contentOmitted).toBeUndefined()
+  })
+})
+
+describe('MessageProcessor question context', () => {
+  beforeEach(() => {
+    jest.resetAllMocks()
+    alertsServicesMock.getAlertsByUserId.mockImplementation(async (_userId, options) => ({
+      data: options?.sent ? [] : [{ id: 4, message: 'Review', date: '2026-11-09', sent: false }],
+    }))
+    tasksServicesMock.getTasksByUserId.mockResolvedValue({
+      data: [
+        {
+          id: 7,
+          title: 'Deploy',
+          description: 'Roll back if checks fail',
+          status: 'pending',
+          tag: 'ops',
+        },
+      ],
+    })
+    notesServicesMock.getNotesByUserId.mockResolvedValue({ data: [] })
+    linksServicesMock.getLinksByUserId.mockResolvedValue({
+      data: [
+        {
+          id: 8,
+          title: 'Runbook',
+          description: 'Recovery steps',
+          url: 'https://example.com',
+          status: 'unread',
+        },
+      ],
+    })
+    aiRepositoryMock.chatCompletion.mockImplementation(async (_messages, options) => ({
+      role: 'assistant',
+      content: options?.mode === 'classification' ? '{"intent":"question"}' : 'Answer',
+    }))
+  })
+
+  const history = Array.from({ length: 6 }, (_, index) => ({
+    role: index % 2 ? 'assistant' : 'user',
+    content: `Entry ${index} ` + 'detail '.repeat(25),
+    provider: 'assistant',
+  })) as any
+
+  it('gives .q and inferred questions the same rich data and six role-based history entries', async () => {
+    const processor = buildProcessor()
+    await processor.processAssistantMessage('.q What should I do?', 91, undefined, false, history)
+    const explicit = aiRepositoryMock.chatCompletion.mock.calls[0][0]
+    aiRepositoryMock.chatCompletion.mockClear()
+    await processor.processAssistantMessage('What should I do?', 91, undefined, false, history)
+    const classifier = aiRepositoryMock.chatCompletion.mock.calls[0][0]
+    const inferred = aiRepositoryMock.chatCompletion.mock.calls[1][0]
+    expect(inferred).toEqual(explicit)
+    expect(inferred.slice(1, 7)).toEqual(history.map(({ role, content }) => ({ role, content })))
+    expect(JSON.stringify(inferred)).toContain('Roll back if checks fail')
+    expect(JSON.stringify(inferred)).toContain('Recovery steps')
+    expect(JSON.stringify(inferred)).toContain('https://example.com')
+    expect(classifier[0].content).not.toContain('Entry 0')
+    expect(classifier[1].content).toContain('Entry 0')
+    expect(classifier[1].content).toContain('Entry 5')
+    expect(classifier[1].content).toContain(history[0].content)
+    expect(classifier[0].content.indexOf('**HOY_ES**:')).toBeGreaterThan(
+      classifier[0].content.indexOf('#IMPORTANT')
+    )
+    expect(tasksServicesMock.getTasksByUserId).toHaveBeenCalledWith(91, { channelId: null })
+  })
+
+  it.each(['.q Explain my saved alerts', 'Explain my saved alerts'])(
+    'includes sent-only alerts and requests explicit statuses for %s',
+    async (message) => {
+      alertsServicesMock.getAlertsByUserId.mockImplementation(async (_userId, options) => ({
+        data: options.sent ? [{ id: 9, message: 'Already delivered', sent: true }] : [],
+      }))
+      await buildProcessor().processAssistantMessage(message, 91)
+      const calls = aiRepositoryMock.chatCompletion.mock.calls
+      const questionPrompt = calls[calls.length - 1][0]
+      expect(JSON.stringify(questionPrompt)).toContain('Already delivered')
+      expect(JSON.stringify(questionPrompt)).toContain('alerts: total=1, incluidos=1')
+      expect(alertsServicesMock.getAlertsByUserId).toHaveBeenCalledWith(91, {
+        sent: false,
+        channelId: null,
+      })
+      expect(alertsServicesMock.getAlertsByUserId).toHaveBeenCalledWith(91, {
+        sent: true,
+        channelId: null,
+      })
+      expect(alertsServicesMock.getAlertsByUserId.mock.calls.map((call) => call[1].sent)).toEqual(
+        message.startsWith('.q') ? [false, true] : [false, false, true]
+      )
+    }
+  )
+
+  it.each(['rejected', 'error', 'malformed'])(
+    'marks alerts unavailable if the sent-status response is %s',
+    async (failure) => {
+      alertsServicesMock.getAlertsByUserId.mockImplementation(async (_userId, options) => {
+        if (!options.sent) return { data: [] }
+        if (failure === 'rejected') throw new Error('private failure')
+        if (failure === 'error') return { error: 'private failure' }
+        return { data: [null] }
+      })
+      await buildProcessor().processAssistantMessage('.q Explain', 91)
+      const prompt = JSON.stringify(aiRepositoryMock.chatCompletion.mock.calls[0][0])
+      expect(prompt).toContain('alerts: [DATOS_NO_DISPONIBLES]')
+      expect(prompt).not.toContain('alerts: total=0')
+      expect(prompt).not.toContain('private failure')
+    }
+  )
+
+  it.each(['.q Explain', 'Explain'])(
+    'isolates channel scope and discards personal history for %s',
+    async (message) => {
+      await buildProcessor().processAssistantMessage(message, 91, 'C123', true, history)
+      expect(tasksServicesMock.getTasksByUserId).toHaveBeenCalledWith(91, { channelId: 'C123' })
+      expect(alertsServicesMock.getAlertsByUserId).toHaveBeenCalledWith(
+        91,
+        expect.objectContaining({ channelId: 'C123' })
+      )
+      expect(JSON.stringify(aiRepositoryMock.chatCompletion.mock.calls)).not.toContain('Entry 0')
+    }
+  )
+
+  it('marks rejected and error responses unavailable while retaining successful data', async () => {
+    notesServicesMock.getNotesByUserId.mockRejectedValue(new Error('private error'))
+    linksServicesMock.getLinksByUserId.mockResolvedValue({ error: 'private error' })
+    await buildProcessor().processAssistantMessage('.q Explain', 1)
+    const payload = JSON.stringify(aiRepositoryMock.chatCompletion.mock.calls[0][0])
+    expect(payload).toContain('notes: [DATOS_NO_DISPONIBLES]')
+    expect(payload).toContain('links: [DATOS_NO_DISPONIBLES]')
+    expect(payload).toContain('Roll back if checks fail')
+    expect(payload).not.toContain('private error')
+  })
+
+  it('keeps null fallback for malformed classification without logging its private content', async () => {
+    aiRepositoryMock.chatCompletion.mockResolvedValue({ content: '{private response' })
+    const result = await buildProcessor().processAssistantMessage('private user message', 1)
+    expect(result.response).toBeNull()
+    const logger = processorLoggerMock
+    expect(logger.warn).toHaveBeenCalledWith(
+      { reason: 'invalid_classification', length: 17, provider: 'openai' },
+      'Classification parse failed'
+    )
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('private response')
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain('private user message')
+  })
+
+  it('never fetches personal data for a channel request missing its channel ID', async () => {
+    await buildProcessor().processAssistantMessage('.q Explain', 91, undefined, true, history)
+    expect(tasksServicesMock.getTasksByUserId).not.toHaveBeenCalled()
+    expect(JSON.stringify(aiRepositoryMock.chatCompletion.mock.calls)).toContain(
+      'DATOS_NO_DISPONIBLES'
+    )
+  })
+
+  it('marks malformed service data unavailable', async () => {
+    tasksServicesMock.getTasksByUserId.mockResolvedValue({ data: [null] })
+    await buildProcessor().processAssistantMessage('.q Explain', 1)
+    expect(JSON.stringify(aiRepositoryMock.chatCompletion.mock.calls)).toContain(
+      'tasks: [DATOS_NO_DISPONIBLES]'
+    )
   })
 })

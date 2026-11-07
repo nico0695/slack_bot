@@ -54,3 +54,18 @@ describe('OpenaiRepository', () => {
     expect(result).toBeNull()
   })
 })
+
+describe('classification payload', () => {
+  it('retains the current model and allows 400 output tokens', async () => {
+    const repository = new OpenaiRepository()
+    getChatCompletionMock().mockResolvedValue({
+      data: { choices: [{ message: { role: 'assistant', content: '{"intent":"question"}' } }] },
+    })
+    await repository.chatCompletion([{ role: 'user', content: 'question' }], {
+      mode: 'classification',
+    })
+    expect(getChatCompletionMock()).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gpt-4o-mini', max_tokens: 400, temperature: 0 })
+    )
+  })
+})
