@@ -1,7 +1,7 @@
 # Assistant context implementation progress
 
-- Status: ready for PR
-- Checkpoint UTC: 2026-11-07T04:07:34Z
+- Status: complete
+- Checkpoint UTC: 2026-11-07T04:09:16Z
 - Backend branch: `feature/assistant-shared-context` from `dev`
 - Web branch: `feature/assistant-shared-context` from `dev`
 - Specification: `docs/ASSISTANT_CONTEXT.md`
@@ -26,6 +26,12 @@
 - Runtime used Node 24; existing backend deploy workflow declares Node 18. Changes use APIs already supported by Node 18; no Node 18 run is claimed.
 - Live OpenAI/Supabase/Redis/hardware smoke tests and model quality evaluation were not run. `gpt-4o-mini` remains unchanged.
 
-## Remaining delivery
+## Delivery
 
-Open backend and web PRs to `dev`, cross-link them, verify remote SHAs/messages and mark this document complete. Then pause recovery automation. No merge/deploy or data migration is authorized by completion.
+- Backend PR: https://github.com/nico0695/slack_bot/pull/107 (base `dev`).
+- Web PR: https://github.com/nico0695/slack_bot_web/pull/9 (base `dev`).
+- PR descriptions cross-link the coordinated change and disclose live-check/runtime limitations.
+- Reviewed backend code checkpoint: `a2b054aa22461655749017e58b80f1178617eb6c`; final documentation checkpoint follows it.
+- Reviewed web checkpoint: `2ff3e9d0474674f0b22c4a7714a0c069caffc635`.
+- Implementation is complete; do not resume or redo stages. Recovery automation is being paused because both PRs exist.
+- No merge, deploy or data migration performed.
