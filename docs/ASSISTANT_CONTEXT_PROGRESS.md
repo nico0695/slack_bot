@@ -34,4 +34,6 @@
 - Reviewed backend code checkpoint: `a2b054aa22461655749017e58b80f1178617eb6c`; final documentation checkpoint follows it.
 - Reviewed web checkpoint: `2ff3e9d0474674f0b22c4a7714a0c069caffc635`.
 - Implementation is complete; do not resume or redo stages. Recovery automation is being paused because both PRs exist.
-- No merge, deploy or data migration performed.
+- No merge, manual deploy or data migration performed.
+- Remote web PR check: Vercel preview failed for `2ff3e9d0474674f0b22c4a7714a0c069caffc635`. The GitHub status contains no cause, and deployment logs are not available through the current connection. Local configured production build passed. This external preview check remains unresolved; implementation and PR delivery are complete.
+- No GitHub Actions runs were triggered on either feature branch by the existing workflows.
