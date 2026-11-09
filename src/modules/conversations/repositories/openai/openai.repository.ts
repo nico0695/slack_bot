@@ -37,12 +37,28 @@ export default class OpenaiRepository {
           content: message.content,
         })),
         temperature: isClassification ? 0 : 0.4,
-        max_tokens: isClassification ? 200 : undefined,
+        max_tokens: isClassification ? 400 : undefined,
       }
 
       const completion = await this.openai.createChatCompletion(apiRequestBot)
 
-      return completion.data.choices[0].message as IConversation
+      const choice = completion.data.choices[0]
+
+      // Metadata only: a cut-off classification yields invalid JSON downstream
+      if (isClassification && choice.finish_reason !== 'stop') {
+        log.warn(
+          {
+            finishReason: choice.finish_reason,
+            model: apiRequestBot.model,
+            promptTokens: completion.data.usage?.prompt_tokens,
+            completionTokens: completion.data.usage?.completion_tokens,
+            totalTokens: completion.data.usage?.total_tokens,
+          },
+          'OpenAI classification did not finish normally'
+        )
+      }
+
+      return choice.message as IConversation
     } catch (error) {
       if (error.message.includes('429')) {
         log.warn('OpenAI API rate limit exceeded')
