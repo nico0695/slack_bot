@@ -11,3 +11,6 @@ export const rPersonalConversationFlow = (userId: string): string =>
   `${personalFlowPrefix}${userId}`
 
 export const rAlertSnoozeConfig = (userId: number): string => `cb_alert_snooze_${userId}`
+
+// Keyed by internal user id. Cannot collide with cb_{channel}_{user}: Slack channel ids are uppercase
+export const rAssistantContext = (userId: number): string => `cb_actx_${userId}`
