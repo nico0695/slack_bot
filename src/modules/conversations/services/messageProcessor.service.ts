@@ -184,7 +184,8 @@ export default class MessageProcessor {
     }
 
     // Personal requests (Slack DM, REST, web) share one context per user; channels keep their own
-    const isPersonal = this.getScopeChannelId(channelId, isChannelContext) === null
+    // Decided by the request kind alone: a channel request with a blank id is still not personal
+    const isPersonal = !isChannelContext
 
     const getHistoryContext: HistoryContextLoader = isPersonal
       ? async () => formatContextForClassifier(await this.loadPersonalContext(userId))

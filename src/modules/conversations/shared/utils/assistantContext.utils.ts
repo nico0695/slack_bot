@@ -14,14 +14,19 @@ import { IAssistantContextEntry, IConversation } from '../interfaces/converstion
 export const OMITTED_CONTENT_MARKER = '[contenido omitido]'
 
 export const DATA_CONTEXT_OMITTED_NOTICE =
-  'AVISO: hay registros omitidos por límite o datos no disponibles; la ausencia de un registro aquí no significa que no exista.'
+  'AVISO: hay registros omitidos por límite, campos recortados u omitidos por su longitud, o datos no disponibles; la ausencia de un registro o dato aquí no significa que no exista.'
 
 const DATA_FIELD_MAX_CHARS = 500
 
-const DATA_URI_REGEX = /data:[^\s;,]+(?:;[^\s;,]+)*;base64,[A-Za-z0-9+/=]*/gi
+// Splits out http(s) URLs and data: URIs (";base64" optional, payload up to the next whitespace
+// or closing delimiter); whichever starts first wins, so a URL inside a data payload goes with it
+const URL_OR_DATA_URI_REGEX =
+  /(https?:\/\/\S+|\bdata:(?:[\w.+-]+\/[\w.+-]+)?(?:;[^\s;,]+)*,[^\s"'<>)\]]*)/gi
 
-// Prose has spaces and URLs have ".", ":", "-", "?" or "&", so neither reaches a run this long
-const BASE64_RUN_REGEX = /[A-Za-z0-9+/=]{200,}/g
+// Standard and URL-safe base64: either line-wrapped (MIME/PEM style, 2+ full lines) or a single
+// long run. Prose has spaces and URLs are split out before, so neither reaches these lengths.
+const BASE64_REGEX =
+  /(?:[A-Za-z0-9+/_-]{60,}={0,2}\r?\n){2,}[A-Za-z0-9+/_-]*={0,2}|[A-Za-z0-9+/=_-]{200,}/g
 
 export interface IDataContextInput {
   alerts: Alerts[] | null
@@ -35,11 +40,18 @@ export interface IDataContextOptions {
   maxChars?: number
 }
 
+interface IRecordLine {
+  text: string
+  truncated: boolean // a field value was cut or left out
+}
+
 interface IDataSection {
   title: string
   total: number | null // null = could not be fetched
-  lines: string[]
+  lines: IRecordLine[]
 }
+
+type RecordField = [label: string, value: string | null | undefined, whole?: boolean]
 
 const countChars = (text: string): number => Array.from(text).length
 
@@ -63,8 +75,14 @@ const collapseWhitespace = (text: string): string => text.replace(/\s+/g, ' ').t
  */
 export const toContextText = (text: string): string => {
   const withoutBinary = (text ?? '')
-    .replace(DATA_URI_REGEX, OMITTED_CONTENT_MARKER)
-    .replace(BASE64_RUN_REGEX, OMITTED_CONTENT_MARKER)
+    .split(URL_OR_DATA_URI_REGEX)
+    .map((part, index) => {
+      // Even indexes are plain text, odd ones the captured URL or data URI
+      if (index % 2 === 0) return part.replace(BASE64_REGEX, OMITTED_CONTENT_MARKER)
+      // http(s) URLs are kept verbatim: long path-style URLs look like base64 runs
+      return /^https?:/i.test(part) ? part : OMITTED_CONTENT_MARKER
+    })
+    .join('')
     .trim()
 
   return truncateChars(withoutBinary, ASSISTANT_CONTEXT_MAX_ENTRY_CHARS)
@@ -119,18 +137,24 @@ const formatDataDate = (value: Date | string | null | undefined): string => {
   return `${year}-${pad(month)}-${pad(day)} ${pad(hour)}:${pad(minute)}`
 }
 
-const buildRecordLine = (
-  id: number,
-  fields: Array<[label: string, value: string | null | undefined]>
-): string => {
+// `whole` fields (urls) are never cut: a partial url is worse than none, so past the limit they
+// are left out
+const buildRecordLine = (id: number, fields: RecordField[]): IRecordLine => {
   const parts = [`- #${id}`]
+  let truncated = false
 
-  fields.forEach(([label, value]) => {
-    const clean = truncateChars(collapseWhitespace(String(value ?? '')), DATA_FIELD_MAX_CHARS)
+  fields.forEach(([label, value, whole]) => {
+    const full = collapseWhitespace(String(value ?? ''))
+    const tooLong = countChars(full) > DATA_FIELD_MAX_CHARS
+
+    if (tooLong) truncated = true
+    if (tooLong && whole) return
+
+    const clean = truncateChars(full, DATA_FIELD_MAX_CHARS)
     if (clean) parts.push(`${label}: ${clean}`)
   })
 
-  return parts.join(' | ')
+  return { text: parts.join(' | '), truncated }
 }
 
 const byDateAsc =
@@ -152,7 +176,7 @@ const buildSection = <T>(
   items: T[] | null,
   maxItems: number,
   compare: (a: T, b: T) => number,
-  toLine: (item: T) => string
+  toLine: (item: T) => IRecordLine
 ): IDataSection => {
   if (items === null) return { title, total: null, lines: [] }
 
@@ -171,11 +195,17 @@ const buildSectionHeader = (section: IDataSection, shown: number): string => {
 
 const renderDataContext = (sections: IDataSection[], shown: number[]): string => {
   const incomplete = sections.some(
-    (section, index) => section.total === null || shown[index] < section.total
+    (section, index) =>
+      section.total === null ||
+      shown[index] < section.total ||
+      section.lines.slice(0, shown[index]).some((line) => line.truncated)
   )
 
   const blocks = sections.map((section, index) =>
-    [buildSectionHeader(section, shown[index]), ...section.lines.slice(0, shown[index])].join('\n')
+    [
+      buildSectionHeader(section, shown[index]),
+      ...section.lines.slice(0, shown[index]).map((line) => line.text),
+    ].join('\n')
   )
 
   if (incomplete) blocks.push(DATA_CONTEXT_OMITTED_NOTICE)
@@ -186,6 +216,9 @@ const renderDataContext = (sections: IDataSection[], shown: number[]): string =>
 /**
  * Saved-data block for question answering. `null` means the type could not be fetched.
  * Output never exceeds `maxChars` code points; records are dropped whole, never cut.
+ * Field values over 500 chars are cut with "…" (urls are left out instead of cut). Whenever a
+ * record is dropped, a field is cut or left out, or a type is unavailable, the block ends with
+ * DATA_CONTEXT_OMITTED_NOTICE.
  */
 export const buildDataContext = (
   data: IDataContextInput,
@@ -231,7 +264,7 @@ export const buildDataContext = (
         ['etiqueta', link.tag],
         ['estado', link.status],
         ['fecha', formatDataDate(link.createdAt)],
-        ['url', link.url],
+        ['url', link.url, true],
       ])
     ),
   ]

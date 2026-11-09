@@ -357,6 +357,40 @@ describe('MessageProcessor - shared personal context across entry points', () =>
     expect(repository.entries(7)).toHaveLength(2)
   })
 
+  it.each([
+    ['blank', '   '],
+    ['empty', ''],
+    ['missing', undefined],
+  ])(
+    'keeps a channel request with a %s channel id out of the personal context',
+    async (_name, channelId) => {
+      mockQuestionFlow()
+      const repository = new FakeContextRepository()
+      const processor = buildProcessor(repository)
+
+      await processor.processAssistantMessage('mensaje personal', 7)
+      repository.getAssistantContext.mockClear()
+      repository.appendAssistantContext.mockClear()
+
+      const result = await processor.processAssistantMessage(
+        'mensaje en canal',
+        7,
+        channelId,
+        true,
+        [{ role: roleTypes.user, content: 'historial del canal', userSlackId: 'U1' } as any]
+      )
+
+      expect(result.response?.content).toBe('respuesta a mensaje en canal')
+      expect(repository.getAssistantContext).not.toHaveBeenCalled()
+      expect(repository.appendAssistantContext).not.toHaveBeenCalled()
+
+      const channelPrompt = classifierPrompts()[1]
+      expect(channelPrompt).toContain('HISTORIAL:\nU:historial del canal')
+      expect(channelPrompt).not.toContain('mensaje personal')
+      expect(repository.entries(7)).toHaveLength(2)
+    }
+  )
+
   it('stores both exchanges of two simultaneous requests without interleaving them', async () => {
     const repository = new FakeContextRepository()
     const processor = buildProcessor(repository)

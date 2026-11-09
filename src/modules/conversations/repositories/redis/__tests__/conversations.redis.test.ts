@@ -11,6 +11,7 @@ const lTrimMock = jest.fn()
 const execMock = jest.fn()
 const multiChain = { rPush: rPushMock, lTrim: lTrimMock, exec: execMock }
 const multiMock = jest.fn()
+const clientState = { isReady: true as boolean | undefined }
 
 const mockLogFns = {
   info: jest.fn(),
@@ -33,6 +34,9 @@ jest.mock('../../../../../config/logger', () => ({
 jest.mock('../../../../../config/redisConfig', () => ({
   RedisConfig: {
     getClient: () => ({
+      get isReady() {
+        return clientState.isReady
+      },
       set: setMock,
       get: getMock,
       del: delMock,
@@ -53,6 +57,7 @@ describe('RedisRepository', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    clientState.isReady = true
     multiMock.mockReturnValue(multiChain)
     rPushMock.mockReturnValue(multiChain)
     lTrimMock.mockReturnValue(multiChain)
@@ -313,6 +318,118 @@ describe('RedisRepository', () => {
       expect(multiMock).not.toHaveBeenCalled()
       expect(execMock).not.toHaveBeenCalled()
       expect(lRangeMock).not.toHaveBeenCalled()
+    })
+    describe('when redis is unavailable', () => {
+      const expectUserIdOnlyLogs = (): void => {
+        const logged = [...mockLogFns.warn.mock.calls, ...mockLogFns.error.mock.calls]
+        expect(logged).toHaveLength(1)
+        expect(logged[0][0]).toEqual({ userId: 7 })
+      }
+
+      afterEach(() => {
+        jest.useRealTimers()
+      })
+
+      it.each([
+        ['false', false],
+        ['undefined', undefined],
+      ])('reads [] without issuing a command when isReady is %s', async (_name, isReady) => {
+        clientState.isReady = isReady
+        lRangeMock.mockReturnValue(new Promise(() => undefined))
+
+        await expect(repository.getAssistantContext(7)).resolves.toEqual([])
+
+        expect(lRangeMock).not.toHaveBeenCalled()
+        expectUserIdOnlyLogs()
+      })
+
+      it('does not append nor issue a command when the client is not ready', async () => {
+        clientState.isReady = false
+        execMock.mockReturnValue(new Promise(() => undefined))
+
+        await expect(repository.appendAssistantContext(7, entries)).resolves.toBe(false)
+
+        expect(multiMock).not.toHaveBeenCalled()
+        expect(execMock).not.toHaveBeenCalled()
+        expectUserIdOnlyLogs()
+      })
+
+      it('reads [] after the timeout when the command never settles', async () => {
+        jest.useFakeTimers()
+        lRangeMock.mockReturnValue(new Promise(() => undefined))
+        const settled = jest.fn()
+
+        const pending = repository.getAssistantContext(7).then((result) => {
+          settled(result)
+          return result
+        })
+
+        await jest.advanceTimersByTimeAsync(499)
+        expect(settled).not.toHaveBeenCalled()
+
+        await jest.advanceTimersByTimeAsync(1)
+        await expect(pending).resolves.toEqual([])
+        expect(lRangeMock).toHaveBeenCalledTimes(1)
+        expectUserIdOnlyLogs()
+      })
+
+      it('returns false after the timeout when the transaction never settles', async () => {
+        jest.useFakeTimers()
+        execMock.mockReturnValue(new Promise(() => undefined))
+        const settled = jest.fn()
+
+        const pending = repository.appendAssistantContext(7, entries).then((result) => {
+          settled(result)
+          return result
+        })
+
+        await jest.advanceTimersByTimeAsync(499)
+        expect(settled).not.toHaveBeenCalled()
+
+        await jest.advanceTimersByTimeAsync(1)
+        await expect(pending).resolves.toBe(false)
+        expect(execMock).toHaveBeenCalledTimes(1)
+        expectUserIdOnlyLogs()
+      })
+
+      it('swallows a late rejection of a command abandoned by the timeout', async () => {
+        jest.useFakeTimers()
+        let rejectCommand: (error: Error) => void = () => undefined
+        lRangeMock.mockReturnValue(
+          new Promise((_resolve, reject) => {
+            rejectCommand = reject
+          })
+        )
+        const onUnhandled = jest.fn()
+        process.on('unhandledRejection', onUnhandled)
+
+        try {
+          const pending = repository.getAssistantContext(7)
+          await jest.advanceTimersByTimeAsync(500)
+          await expect(pending).resolves.toEqual([])
+
+          rejectCommand(new Error('The client is closed'))
+          jest.useRealTimers()
+          await new Promise((resolve) => setImmediate(resolve))
+          await new Promise((resolve) => setImmediate(resolve))
+
+          expect(onUnhandled).not.toHaveBeenCalled()
+          expect(mockLogFns.warn).toHaveBeenCalledTimes(1)
+        } finally {
+          process.off('unhandledRejection', onUnhandled)
+        }
+      })
+
+      it('clears the timer when the command settles in time', async () => {
+        jest.useFakeTimers()
+        lRangeMock.mockResolvedValue([])
+        execMock.mockResolvedValue([2, 'OK'])
+
+        await repository.getAssistantContext(7)
+        await repository.appendAssistantContext(7, entries)
+
+        expect(jest.getTimerCount()).toBe(0)
+      })
     })
   })
 })

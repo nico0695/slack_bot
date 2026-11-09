@@ -121,6 +121,80 @@ describe('toContextText', () => {
     expect(url.length).toBeGreaterThan(300)
     expect(toContextText(`ver ${url}`)).toBe(`ver ${url}`)
   })
+
+  it('leaves a long path-style URL made only of base64 characters untouched', () => {
+    const url = `https://cdn.example.com/${'a1b2c3d4/'.repeat(30)}file.png`
+
+    expect(toContextText(`mirá ${url} y decime`)).toBe(`mirá ${url} y decime`)
+    expect(toContextText(url)).toBe(url)
+  })
+
+  it('keeps every URL while removing a blob next to them', () => {
+    const first = `http://a.example.com/${'AbCd1234/'.repeat(40)}`
+    const second = `https://b.example.com/${'x'.repeat(250)}`
+    const blob = 'QUJDRA+/'.repeat(40)
+
+    expect(toContextText(`${first} ${blob} ${second}`)).toBe(
+      `${first} ${OMITTED_CONTENT_MARKER} ${second}`
+    )
+  })
+
+  it('removes a 5000-char raw base64 blob with "/" and "+"', () => {
+    const blob = 'aB3/xY9+Zk'.repeat(500)
+
+    expect(blob).toHaveLength(5000)
+    expect(toContextText(`antes ${blob} después`)).toBe(`antes ${OMITTED_CONTENT_MARKER} después`)
+  })
+
+  it('removes base64url runs', () => {
+    const blob = 'aB3-xY9_Zk'.repeat(30)
+
+    expect(toContextText(`token ${blob} fin`)).toBe(`token ${OMITTED_CONTENT_MARKER} fin`)
+  })
+
+  it.each([
+    ['LF', '\n'],
+    ['CRLF', '\r\n'],
+  ])('removes MIME-wrapped base64 (76-char lines, %s)', (_name, eol) => {
+    const line = 'QUJDRA+/'.repeat(10).slice(0, 76)
+    const blob = [line, line, line, 'QUJDRA=='].join(eol)
+
+    expect(line).toHaveLength(76)
+    expect(toContextText(`adjunto:\n${blob}\nsaludos`)).toBe(
+      `adjunto:\n${OMITTED_CONTENT_MARKER}\nsaludos`
+    )
+  })
+
+  it('keeps consecutive lines of normal prose', () => {
+    const prose = [
+      'Primera línea con bastante texto para superar los sesenta caracteres de largo sin problema.',
+      'Segunda línea con bastante texto para superar los sesenta caracteres de largo sin problema.',
+      'Tercera línea con bastante texto para superar los sesenta caracteres de largo sin problema.',
+    ].join('\n')
+
+    expect(toContextText(prose)).toBe(prose)
+  })
+
+  it.each([
+    ['base64 with url-safe alphabet', `data:image/png;base64,${'iVBOR-_0KGgo'.repeat(5)}`],
+    ['percent-encoded without base64', 'data:text/plain;charset=utf-8,hola%20mundo%20secreto'],
+    ['plain svg', 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22/%3E'],
+    ['no media type', 'data:,contenido%20secreto'],
+  ])('replaces the payload of any data: URI (%s)', (_name, uri) => {
+    expect(toContextText(`mirá ${uri} listo`)).toBe(`mirá ${OMITTED_CONTENT_MARKER} listo`)
+  })
+
+  it('keeps a URL that carries a data URI in its query', () => {
+    const url = 'https://example.com/preview?src=data:text/plain,hola'
+
+    expect(toContextText(`ver ${url}`)).toBe(`ver ${url}`)
+  })
+
+  it('does not treat the word "data:" in prose as a data URI', () => {
+    const prose = 'la data: nombre, apellido y metadata:, nada más'
+
+    expect(toContextText(prose)).toBe(prose)
+  })
 })
 
 describe('buildContextEntries', () => {
@@ -339,7 +413,64 @@ describe('buildDataContext', () => {
     })
 
     expect(output).toContain(`descripción: ${'😀'.repeat(499)}… |`)
+  })
+
+  it('adds the notice when a field value is cut', () => {
+    const output = buildDataContext({
+      ...empty,
+      notes: [note(1, { description: 'x'.repeat(501) })],
+    })
+
+    expect(output).toContain('NOTAS (1)')
+    expect(output).toContain(`descripción: ${'x'.repeat(499)}…`)
+    expect(output.endsWith(DATA_CONTEXT_OMITTED_NOTICE)).toBe(true)
+    expect(DATA_CONTEXT_OMITTED_NOTICE).toContain('campos recortados')
+  })
+
+  it('has no notice for a field of exactly the limit', () => {
+    const output = buildDataContext({
+      ...empty,
+      tasks: [task(1, { description: 'x'.repeat(500) })],
+    })
+
+    expect(output).toContain(`descripción: ${'x'.repeat(500)} |`)
     expect(output).not.toContain('AVISO')
+  })
+
+  it('shows a long url whole', () => {
+    const url = `https://example.com/${'segmento/'.repeat(50)}fin`
+    const output = buildDataContext({ ...empty, links: [link(1, { url })] })
+
+    expect(url.length).toBeGreaterThan(400)
+    expect(output).toContain(`url: ${url}`)
+    expect(output).not.toContain('AVISO')
+  })
+
+  it('leaves out an absurdly long url instead of cutting it and adds the notice', () => {
+    const url = `https://example.com/${'a'.repeat(600)}`
+    const output = buildDataContext({
+      ...empty,
+      links: [link(1, { url, title: 'link gigante' })],
+    })
+
+    expect(output).toContain('- #1 | título: link gigante')
+    expect(output).not.toContain('url:')
+    expect(output).not.toContain('https://example.com/a')
+    expect(output.endsWith(DATA_CONTEXT_OMITTED_NOTICE)).toBe(true)
+  })
+
+  it('has no truncation notice when the cut record is not shown', () => {
+    const output = buildDataContext(
+      {
+        ...empty,
+        notes: [note(2, { title: 'reciente' }), note(1, { description: 'x'.repeat(900) })],
+      },
+      { maxItemsPerType: 1 }
+    )
+
+    // The notice is there because of the omitted record, the cut one is not rendered
+    expect(output).toContain('NOTAS (mostrando 1 de 2)')
+    expect(output).not.toContain('…')
   })
 
   it('stays within a small custom budget dropping whole records', () => {
