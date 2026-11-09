@@ -11,6 +11,8 @@ import { resolveNextCalendarDayAt } from '../../../../shared/utils/dates.utils'
 const redisRepositoryMock = {
   getAlertSnoozeConfig: jest.fn(),
   saveAlertSnoozeConfig: jest.fn(),
+  getAssistantContext: jest.fn().mockResolvedValue([]),
+  appendAssistantContext: jest.fn().mockResolvedValue(true),
 }
 
 const aiRepositoryMock = {
@@ -130,7 +132,8 @@ const buildProcessor = (
     imagesServicesMock as any,
     searchRepositoryMock as any,
     translateServicesMock as any,
-    qrServicesMock as any
+    qrServicesMock as any,
+    redisRepositoryMock as any
   )
 
 describe('MessageProcessor - channel scoped lookups', () => {

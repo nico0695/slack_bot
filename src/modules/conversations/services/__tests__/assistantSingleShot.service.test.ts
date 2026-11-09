@@ -202,7 +202,11 @@ describe('AssistantSingleShotService', () => {
         { generateImageForAssistant: generateImageForAssistantMock } as any,
         {} as any,
         {} as any,
-        {} as any
+        {} as any,
+        {
+          getAssistantContext: jest.fn().mockResolvedValue([]),
+          appendAssistantContext: jest.fn().mockResolvedValue(true),
+        } as any
       )
       return new AssistantSingleShotService(processor)
     }

@@ -2,6 +2,7 @@ import { injectable, inject } from 'tsyringe'
 
 import { createModuleLogger } from '../../../config/logger'
 import {
+  IAssistantContextEntry,
   IConversation,
   IUserConversation,
   ProgressCallback,
@@ -37,6 +38,7 @@ import { qrSchema } from '../../qr/shared/schemas/qr.schemas'
 import SearchRepository from '../repositories/search/search.repository'
 import OpenaiRepository from '../repositories/openai/openai.repository'
 import GeminiRepository from '../repositories/gemini/gemini.repository'
+import { RedisRepository } from '../repositories/redis/conversations.redis'
 import { IGeneratedImage, ImageProvider } from '../../images/shared/interfaces/images.interfaces'
 import {
   VALID_IMAGE_SIZES,
@@ -44,6 +46,10 @@ import {
 } from '../../images/shared/constants/imageOptions.constants'
 
 import { buildUserDataContext, formatConversationHistory } from '../shared/utils/userContext.utils'
+import {
+  buildContextEntries,
+  formatContextForClassifier,
+} from '../shared/utils/assistantContext.utils'
 import {
   alertPlainTextLine,
   formatPlainTextList,
@@ -141,6 +147,9 @@ const parseReminderMonthDays = (rawValue: string): number[] => {
     })
 }
 
+// Resolved lazily so only requests that reach the classifier pay for the history
+type HistoryContextLoader = () => Promise<string>
+
 type ReminderCommandAction = 'create' | 'list' | 'check' | 'pause' | 'resume' | 'delete'
 
 @injectable()
@@ -156,7 +165,8 @@ export default class MessageProcessor {
     private imagesServices: ImagesServices,
     private searchRepository: SearchRepository,
     private translateServices: TranslateServices,
-    private qrServices: QrServices
+    private qrServices: QrServices,
+    private redisRepository: RedisRepository
   ) {}
 
   processAssistantMessage = async (
@@ -173,29 +183,58 @@ export default class MessageProcessor {
       return { response: null, shouldSkipAI: true }
     }
 
-    const commandResponse = await this.handleAssistantCommand(
-      userId,
-      message,
-      channelId,
-      isChannelContext
-    )
-    if (commandResponse) {
-      return { response: commandResponse, shouldSkipAI: false }
+    // Personal requests (Slack DM, REST, web) share one context per user; channels keep their own
+    const isPersonal = this.getScopeChannelId(channelId, isChannelContext) === null
+
+    const getHistoryContext: HistoryContextLoader = isPersonal
+      ? async () => formatContextForClassifier(await this.loadPersonalContext(userId))
+      : async () => formatConversationHistory(conversationHistory ?? [], 3)
+
+    const response =
+      (await this.handleAssistantCommand(userId, message, channelId, isChannelContext)) ??
+      (await this.manageAssistantVariables(
+        userId,
+        message,
+        channelId,
+        isChannelContext,
+        getHistoryContext,
+        onProgress
+      ))
+
+    if (isPersonal && response) {
+      await this.recordPersonalExchange(userId, message, response)
     }
 
-    const variableResponse = await this.manageAssistantVariables(
-      userId,
-      message,
-      channelId,
-      isChannelContext,
-      conversationHistory,
-      onProgress
-    )
-    if (variableResponse) {
-      return { response: variableResponse, shouldSkipAI: false }
-    }
+    return { response: response ?? null, shouldSkipAI: false }
+  }
 
-    return { response: null, shouldSkipAI: false }
+  private loadPersonalContext = async (userId: number): Promise<IAssistantContextEntry[]> => {
+    try {
+      return await this.redisRepository.getAssistantContext(userId)
+    } catch (error) {
+      log.warn({ err: error, userId }, 'loadPersonalContext failed')
+      return []
+    }
+  }
+
+  // Best effort: the exchange already happened, so a failed save must never fail the request
+  private recordPersonalExchange = async (
+    userId: number,
+    message: string,
+    response: IConversation
+  ): Promise<void> => {
+    try {
+      const saved = await this.redisRepository.appendAssistantContext(
+        userId,
+        buildContextEntries(message, response)
+      )
+
+      if (!saved) {
+        log.warn({ userId }, 'recordPersonalExchange could not save the exchange')
+      }
+    } catch (error) {
+      log.warn({ err: error, userId }, 'recordPersonalExchange failed')
+    }
   }
 
   private getScopeChannelId = (channelId?: string, isChannelContext = false): string | null => {
@@ -878,7 +917,7 @@ export default class MessageProcessor {
         userId,
         timeText,
         noteText,
-        channelId
+        scopeChannelId ?? undefined
       )
 
       if (alertRes.error || !alertRes.data) {
@@ -900,7 +939,7 @@ export default class MessageProcessor {
     message: string,
     channelId: string | undefined,
     isChannelContext: boolean,
-    conversationHistory?: IUserConversation[],
+    getHistoryContext: HistoryContextLoader,
     onProgress?: ProgressCallback
   ): Promise<IConversation | null> => {
     const assistantMessage = new AssistantMessage(message)
@@ -912,7 +951,7 @@ export default class MessageProcessor {
         assistantMessage.cleanMessage,
         channelId,
         isChannelContext,
-        conversationHistory,
+        getHistoryContext,
         onProgress
       )
     }
@@ -961,7 +1000,7 @@ export default class MessageProcessor {
           userId,
           assistantMessage.value as string,
           assistantMessage.cleanMessage,
-          channelId
+          scopeChannelId ?? undefined
         )
 
         if (alert.error) {
@@ -1060,7 +1099,7 @@ export default class MessageProcessor {
           (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
           {
             tag: normalizedTaskTag || undefined,
-            channelId,
+            channelId: scopeChannelId ?? undefined,
           }
         )
 
@@ -1148,7 +1187,7 @@ export default class MessageProcessor {
           assistantMessage.value as string,
           (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
           normalizedNoteTag || undefined,
-          channelId
+          scopeChannelId ?? undefined
         )
 
         if (note.error) {
@@ -1247,7 +1286,7 @@ export default class MessageProcessor {
             title: (assistantMessage?.flags?.[AssistantsFlags.TITLE] as string) ?? '',
             description: (assistantMessage?.flags?.[AssistantsFlags.DESCRIPTION] as string) ?? '',
             tag: normalizedLinkTag || undefined,
-            channelId,
+            channelId: scopeChannelId ?? undefined,
           }
         )
 
@@ -1475,7 +1514,7 @@ export default class MessageProcessor {
     cleanMessage: string,
     channelId: string | undefined,
     isChannelContext: boolean,
-    conversationHistory?: IUserConversation[],
+    getHistoryContext: HistoryContextLoader,
     onProgress?: ProgressCallback
   ): Promise<IConversation | null> => {
     try {
@@ -1484,7 +1523,7 @@ export default class MessageProcessor {
 
       const [userDataContext, historyContext] = await Promise.all([
         this.fetchUserDataContext(userId, scopeChannelId),
-        Promise.resolve(formatConversationHistory(conversationHistory ?? [], 3)),
+        getHistoryContext(),
       ])
 
       const contextBlock = this.buildContextBlock(userDataContext, historyContext)
@@ -1551,7 +1590,7 @@ export default class MessageProcessor {
             userId,
             parsed.time,
             parsed.title,
-            channelId
+            scopeChannelId ?? undefined
           )
           if (alert.error) return null
           const contentBlock = slackMsgUtils.msgAlertCreated(alert.data)
@@ -1596,7 +1635,7 @@ export default class MessageProcessor {
             parsed.description || '',
             {
               tag: normalizedTag,
-              channelId,
+              channelId: scopeChannelId ?? undefined,
             }
           )
           if (task.error) return null
@@ -1653,7 +1692,7 @@ export default class MessageProcessor {
             parsed.title,
             parsed.description || '',
             normalizedTag,
-            channelId
+            scopeChannelId ?? undefined
           )
           if (note.error) return null
           const contentBlock = slackMsgUtils.msgNoteCreated(note.data)
@@ -1705,7 +1744,7 @@ export default class MessageProcessor {
             title: parsed.title || '',
             description: parsed.description || '',
             tag: normalizedTag,
-            channelId,
+            channelId: scopeChannelId ?? undefined,
           })
           if (link.error) return null
           const contentBlock = slackMsgUtils.msgLinkCreated(link.data)

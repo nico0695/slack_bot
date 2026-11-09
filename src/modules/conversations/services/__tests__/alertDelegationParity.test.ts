@@ -49,6 +49,8 @@ jest.mock('../../../../config/slackConfig', () => ({
 const redisRepositoryMock = {
   getAlertSnoozeConfig: jest.fn(),
   saveAlertSnoozeConfig: jest.fn(),
+  getAssistantContext: jest.fn().mockResolvedValue([]),
+  appendAssistantContext: jest.fn().mockResolvedValue(true),
 }
 
 const alertsServicesMock = {
@@ -134,7 +136,8 @@ describe('Alert delegation parity between the two entry points (AC-5)', () => {
       {} as any, // imagesServices
       {} as any, // searchRepository
       {} as any, // translateServices
-      {} as any // qrServices
+      {} as any, // qrServices
+      redisRepositoryMock as any
     )
   })
 
