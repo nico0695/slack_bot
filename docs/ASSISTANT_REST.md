@@ -9,7 +9,7 @@ Entrada REST al mismo assistant que usan Slack y la web: el bridge envía el tex
 | Incluye | Fuera de alcance |
 |---------|------------------|
 | `POST /conversations/assistant` autenticado | Audio, STT, firmware, bridge |
-| Fachada single-shot sobre el processor existente | Historial, repreguntas, confirmación de texto |
+| Fachada single-shot sobre el processor existente | Historial visible o enviado por el cliente (el server guarda un contexto personal corto, §11), repreguntas, confirmación de texto |
 | Texto plano para listas, aviso para contenido no mostrable | SSE/webhook de respuesta, jobs, polling, cancelación |
 | Errores del parser JSON → `400`/`413` (todas las rutas) | Reintentos, idempotencia, exactly-once |
 
@@ -27,9 +27,9 @@ src/modules/conversations/
 src/shared/middleware/errors.ts                        # body-parser → 400/413
 ```
 
-- **Misma ejecución que un DM de Slack:** `processAssistantMessage(message, userId, undefined, false, undefined)`. Sin canal, sin contexto de canal, sin historial, sin `onProgress`. Mismo clasificador, mismos servicios y mismos permisos por usuario.
+- **Misma ejecución que un DM de Slack:** `processAssistantMessage(message, userId, undefined, false, undefined)`. Sin canal, sin contexto de canal, sin historial como parámetro (el processor usa el contexto personal compartido del usuario, §11), sin `onProgress`. Mismo clasificador, mismos servicios y mismos permisos por usuario.
 - **No usa** `ConversationsServices.generateAssistantConversation` (wrapper web): ese camino lee/escribe historial en Redis y usa un canal sintético (`userId.padStart(8, '9')`) que termina guardado en las entidades.
-- La fachada depende sólo de `MessageProcessor`: no escribe en Redis ni emite al socket.
+- La fachada depende sólo de `MessageProcessor`: por sí misma no escribe en Redis ni emite al socket (el processor lee y escribe el contexto personal, §11).
 - `IConversation` suma dos campos opcionales que Slack y la web ignoran: `plainText` (versión texto) y `contentOmitted` (el texto deja afuera contenido no mostrable). Viajan también por el socket web y quedan en el historial del wrapper web, sin uso.
 
 ## 3. Contrato
@@ -169,3 +169,34 @@ Validación por commit: `npx tsc --noEmit`, `npm run lint`, `npx jest`, `npm run
   - la lista de imágenes no filtra por usuario (`Images` no tiene `userId`);
   - el wrapper web guarda su canal sintético en las entidades que crea;
   - el parser de comandos deja un espacio final en el texto (`.a 10m llamar ` → `'llamar '`), también en Slack.
+
+## 11. Contexto personal compartido y evaluación del clasificador
+
+> Rama `feat/assistant-shared-context`. Complementa §1 y §2: el pedido REST no guarda una conversación visible y sigue sin recibir historial como parámetro, pero el processor ahora lee y escribe el contexto personal del usuario.
+
+### Contexto personal
+
+- **Qué es:** los últimos intercambios (mensaje del usuario + respuesta del assistant) de cada usuario, en la lista de Redis `cb_actx_{userId}`. Máximo **6 entradas** (3 intercambios), **2000 caracteres** por entrada, **sin TTL**.
+- **Quién lo comparte:** todos los pedidos personales (`isChannelContext = false`) que pasan por `processAssistantMessage`: DM de Slack, `POST /conversations/assistant` y el assistant web personal. Los pedidos de canal no lo leen ni lo escriben; siguen usando el historial del canal.
+- **Para qué se usa:** el clasificador lo recibe como bloque `HISTORIAL` (líneas `U:`/`A:`, 200 caracteres por entrada) para resolver referencias como "esa" o "hacela para 2h"; las preguntas lo reciben como turnos previos.
+- **Qué no se registra:** mensajes con `+` (sin IA), pedidos sin respuesta (`null` o excepción), pedidos de canal e intercambios donde alguno de los dos textos queda vacío. Del assistant se guarda `plainText` si existe (no los bloques de Slack); base64 y `data:` URIs se reemplazan por `[contenido omitido]`.
+- **Fallas:** lectura y escritura tienen un tope de 500 ms y son best effort; si Redis falla, el pedido sigue sin contexto y no se registra.
+
+### Preguntas con datos guardados
+
+El intent `question` responde con las alertas pendientes, tareas, notas y links del usuario como bloque `DATOS_GUARDADOS` (mensaje de usuario, nunca instrucciones). Límites: **20 registros por tipo** y **16000 caracteres** en total; los registros se omiten enteros y, si algo quedó afuera, recortado o no disponible, el bloque termina con una línea `AVISO`. El assistant no edita ni elimina registros por esta vía.
+
+### Evaluación del clasificador
+
+Compara modelos sobre el prompt de clasificación de producción **sin ejecutar acciones** (sólo llama a chat completions con `temperature: 0` y `max_tokens: 400`; no toca base de datos, Redis ni Slack).
+
+```bash
+OPENAI_API_KEY=... npm run eval:classifier                       # gpt-4o-mini vs gpt-4.1-mini, 40 casos
+npm run eval:classifier -- --models gpt-4o-mini --filter alert    # un modelo, casos filtrados
+npm run eval:classifier -- --help
+```
+
+- **Dataset:** `src/modules/conversations/evals/classifier.dataset.json`, 40 frases **sintéticas** (escritas para la evaluación, no son mensajes reales) con fecha de referencia fija. Se pueden sumar frases reales con `"source": "real"`.
+- **Salida:** tabla por modelo y reporte JSON en `./classifier-eval-temp.json` (ignorado por git; no versionar). Sin `OPENAI_API_KEY` termina con código 1 sin llamar a nada.
+- **Cómo leerla:** `intent ok` = el intent coincide con el esperado (o con una alternativa aceptada); `intent+campos ok` = además pasan los chequeos de campos (hora, etiqueta, URL, id); `json inválido` = respuestas que el router descartaría; `errores req` = fallas de red/HTTP, que no hablan del modelo. Revisar los fallos caso por caso: con 40 casos cada uno pesa 2,5 puntos, y las etiquetas esperadas son criterio de quien armó el dataset.
+- **Estado:** la evaluación real **no se ejecutó** (no había API key en el entorno de desarrollo); sólo están probadas las partes offline con salidas simuladas. El modelo de producción sigue siendo `gpt-4o-mini` y un cambio a `gpt-4.1-mini` requiere correr esta evaluación antes.

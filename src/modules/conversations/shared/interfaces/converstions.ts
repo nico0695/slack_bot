@@ -10,6 +10,12 @@ export interface IConversation {
   provider: ConversationProviders
 }
 
+// Text-only entry of the personal assistant context (no blocks, no binary content)
+export interface IAssistantContextEntry {
+  role: roleTypes.user | roleTypes.assistant
+  content: string
+}
+
 export interface IUserConversation extends IConversation {
   userSlackId?: string
   userId?: number

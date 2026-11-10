@@ -1,0 +1,474 @@
+{
+  "metadata": {
+    "name": "classifier-intents-mini",
+    "version": 1,
+    "language": "es-AR",
+    "now": "2026-11-10T13:30:00.000Z",
+    "nowLocal": "martes 2026-11-10 10:30 (America/Argentina/Buenos_Aires)",
+    "description": "Mini evaluación del clasificador de intents del asistente. TODAS las frases de este archivo son SINTÉTICAS: fueron escritas a mano para esta evaluación imitando el registro de un usuario de chat o voz. NO son mensajes reales de usuarios ni provienen de logs, Redis o la base de datos.",
+    "sources": {
+      "synthetic": "Frase inventada para esta evaluación. No es un mensaje real de ningún usuario.",
+      "real": "Frase real de un usuario, agregada más adelante con su consentimiento y sin datos personales. Hoy no hay ninguna."
+    },
+    "labeling": "Las etiquetas esperadas reflejan el criterio de quien escribió el dataset a partir del prompt de clasificación y del router de intents; no fueron validadas contra uso real. El intent \"unknown\" representa la rama por defecto del router (intent que el router no maneja -> respuesta genérica). \"alsoAccept\" lista intents alternativos igualmente aceptables; en ese caso no se evalúan los campos.",
+    "fieldChecks": "nonEmpty | equals | includes (sin distinguir mayúsculas ni acentos) | time (minutos desde now, con tolerancia; acepta duración relativa o fecha absoluta en hora de Argentina) | timeOfDay (HH:mm) | sameElements"
+  },
+  "cases": [
+    {
+      "id": "alert-create-relative",
+      "source": "synthetic",
+      "message": "avisame en 20 minutos que saque la pizza del horno",
+      "expected": {
+        "intent": "alert.create",
+        "fields": [
+          { "field": "time", "check": "time", "minutesFromNow": 20, "toleranceMinutes": 2 },
+          { "field": "title", "check": "includes", "value": "pizza" }
+        ]
+      },
+      "note": "Alerta con duración relativa simple."
+    },
+    {
+      "id": "alert-create-tomorrow",
+      "source": "synthetic",
+      "message": "poneme una alerta mañana a las 9 que diga llamar al contador",
+      "expected": {
+        "intent": "alert.create",
+        "fields": [
+          { "field": "time", "check": "time", "at": "2026-11-11 09:00", "toleranceMinutes": 1 },
+          { "field": "title", "check": "includes", "value": "contador" }
+        ]
+      },
+      "note": "Fecha relativa a HOY_ES y regla del 'que diga'."
+    },
+    {
+      "id": "alert-create-voice",
+      "source": "synthetic",
+      "message": "eh poneme una alarma para dentro de una hora y media que tengo que ir a buscar a los chicos al colegio",
+      "expected": {
+        "intent": "alert.create",
+        "fields": [
+          { "field": "time", "check": "time", "minutesFromNow": 90, "toleranceMinutes": 2 },
+          { "field": "title", "check": "nonEmpty" }
+        ]
+      },
+      "note": "Estilo dictado por voz: muletilla, sin puntuación, duración en palabras."
+    },
+    {
+      "id": "alert-vs-reminder-oneshot",
+      "source": "synthetic",
+      "message": "recordame el jueves a las 10 pagar las expensas",
+      "expected": {
+        "intent": "alert.create",
+        "fields": [
+          { "field": "time", "check": "time", "at": "2026-11-12 10:00", "toleranceMinutes": 1 },
+          { "field": "title", "check": "includes", "value": "expensas" }
+        ]
+      },
+      "note": "Ambiguo alerta vs reminder: 'recordame' sin recurrencia es una alerta única."
+    },
+    {
+      "id": "alert-context-hacela-2h",
+      "source": "synthetic",
+      "message": "hacela para 2h",
+      "history": [
+        { "role": "user", "content": "avisame en 30 minutos que llame a mamá" },
+        {
+          "role": "assistant",
+          "content": "Alerta creada (fallback) para el martes 10 de noviembre 11:00 con id: #41"
+        }
+      ],
+      "expected": {
+        "intent": "alert.create",
+        "alsoAccept": ["alert.snooze"],
+        "fields": [
+          { "field": "time", "check": "time", "minutesFromNow": 120, "toleranceMinutes": 2 },
+          { "field": "title", "check": "includes", "value": "mama" }
+        ]
+      },
+      "note": "Referencia contextual: 'hacela' apunta a la última alerta del historial. Posponerla (#41) también es razonable."
+    },
+    {
+      "id": "alert-context-recordamelo",
+      "source": "synthetic",
+      "message": "recordamelo mañana a las 8",
+      "history": [
+        { "role": "user", "content": "anotá una tarea: comprar los pasajes a Bariloche" },
+        { "role": "assistant", "content": "Tarea creada con id: #58" }
+      ],
+      "expected": {
+        "intent": "alert.create",
+        "fields": [
+          { "field": "time", "check": "time", "at": "2026-11-11 08:00", "toleranceMinutes": 1 },
+          { "field": "title", "check": "includes", "value": "pasajes" }
+        ]
+      },
+      "note": "Referencia contextual: el contenido de la alerta está en el turno anterior."
+    },
+    {
+      "id": "alert-list-typo",
+      "source": "synthetic",
+      "message": "mostrame las alrtas q tengo",
+      "expected": { "intent": "alert.list" },
+      "note": "Listado con errores de tipeo."
+    },
+    {
+      "id": "alert-snooze-id",
+      "source": "synthetic",
+      "message": "posponé la alerta 15 por 30 minutos",
+      "expected": {
+        "intent": "alert.snooze",
+        "fields": [
+          { "field": "targetId", "check": "equals", "value": 15 },
+          { "field": "duration", "check": "time", "minutesFromNow": 30, "toleranceMinutes": 0 }
+        ]
+      },
+      "note": "Posponer con id explícito."
+    },
+    {
+      "id": "alert-snooze-context-data",
+      "source": "synthetic",
+      "message": "posponé la de Marta una hora",
+      "dataContext": "[A:2] #12\"Reunión con Marta\"45m #15\"Pagar monotributo\"23h",
+      "expected": {
+        "intent": "alert.snooze",
+        "fields": [
+          { "field": "targetId", "check": "equals", "value": 12 },
+          { "field": "duration", "check": "time", "minutesFromNow": 60, "toleranceMinutes": 0 }
+        ]
+      },
+      "note": "Referencia contextual: el id sale de DATOS_USUARIO."
+    },
+    {
+      "id": "task-create-simple",
+      "source": "synthetic",
+      "message": "agregá una tarea: renovar el registro de conducir",
+      "expected": {
+        "intent": "task.create",
+        "fields": [{ "field": "title", "check": "includes", "value": "registro" }]
+      },
+      "note": "Tarea explícita."
+    },
+    {
+      "id": "task-create-tag",
+      "source": "synthetic",
+      "message": "tengo que mandarle el presupuesto a Gómez, anotalo como tarea con etiqueta ventas",
+      "expected": {
+        "intent": "task.create",
+        "fields": [
+          { "field": "title", "check": "includes", "value": "presupuesto" },
+          { "field": "tag", "check": "equals", "value": "ventas" }
+        ]
+      },
+      "note": "Tarea con etiqueta al final de la frase."
+    },
+    {
+      "id": "task-vs-alert-no-time",
+      "source": "synthetic",
+      "message": "mañana tengo que llamar al plomero",
+      "expected": {
+        "intent": "task.create",
+        "fields": [{ "field": "title", "check": "includes", "value": "plomero" }]
+      },
+      "note": "Ambiguo alerta vs tarea vs nota: acción pendiente con día pero sin hora ni pedido de aviso -> tarea."
+    },
+    {
+      "id": "task-list-typo",
+      "source": "synthetic",
+      "message": "pasame mis taeras",
+      "expected": { "intent": "task.list" },
+      "note": "Listado con error de tipeo y verbo coloquial."
+    },
+    {
+      "id": "task-list-context-tag",
+      "source": "synthetic",
+      "message": "y las de soporte?",
+      "history": [
+        { "role": "user", "content": "listame las tareas de ventas" },
+        { "role": "assistant", "content": "Mostrando 3 tareas" }
+      ],
+      "expected": {
+        "intent": "task.list",
+        "fields": [{ "field": "tag", "check": "equals", "value": "soporte" }]
+      },
+      "note": "Referencia contextual: continúa el listado anterior cambiando la etiqueta."
+    },
+    {
+      "id": "note-create-data",
+      "source": "synthetic",
+      "message": "anotá que la clave del wifi de la oficina es Tucan2024",
+      "expected": {
+        "intent": "note.create",
+        "fields": [{ "field": "title", "check": "nonEmpty" }]
+      },
+      "note": "Dato a guardar sin acción pendiente -> nota (no tarea, pese al 'anotá')."
+    },
+    {
+      "id": "note-vs-task-idea",
+      "source": "synthetic",
+      "message": "idea para el cumple de Sofi: alquilar un inflable",
+      "expected": {
+        "intent": "note.create",
+        "fields": [{ "field": "title", "check": "nonEmpty" }]
+      },
+      "note": "Ambiguo nota vs tarea: se presenta como idea, no como pendiente."
+    },
+    {
+      "id": "note-list",
+      "source": "synthetic",
+      "message": "a ver mis notas",
+      "expected": { "intent": "note.list" },
+      "note": "Listado coloquial."
+    },
+    {
+      "id": "link-create-plain",
+      "source": "synthetic",
+      "message": "guardame este link https://nodejs.org/en/blog/release/v22.0.0",
+      "expected": {
+        "intent": "link.create",
+        "fields": [
+          {
+            "field": "url",
+            "check": "equals",
+            "value": "https://nodejs.org/en/blog/release/v22.0.0",
+            "caseSensitive": true
+          }
+        ]
+      },
+      "note": "Link simple; la URL debe conservarse exacta."
+    },
+    {
+      "id": "link-create-tag",
+      "source": "synthetic",
+      "message": "che guardá https://www.youtube.com/watch?v=dQw4w9WgXcQ para ver después, etiqueta musica",
+      "expected": {
+        "intent": "link.create",
+        "fields": [
+          {
+            "field": "url",
+            "check": "equals",
+            "value": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "caseSensitive": true
+          },
+          { "field": "tag", "check": "equals", "value": "musica" }
+        ]
+      },
+      "note": "Link con query string y etiqueta, registro informal."
+    },
+    {
+      "id": "link-list",
+      "source": "synthetic",
+      "message": "qué links tengo guardados",
+      "expected": { "intent": "link.list" },
+      "note": "Listado de links."
+    },
+    {
+      "id": "reminder-create-daily",
+      "source": "synthetic",
+      "message": "recordame todos los días a las 8 tomar la pastilla",
+      "expected": {
+        "intent": "reminder.create",
+        "fields": [
+          { "field": "recurrenceType", "check": "equals", "value": "daily" },
+          { "field": "timeOfDay", "check": "timeOfDay", "value": "08:00" },
+          { "field": "message", "check": "includes", "value": "pastilla" }
+        ]
+      },
+      "note": "Recurrencia explícita ('todos los días') -> reminder, no alerta."
+    },
+    {
+      "id": "reminder-list",
+      "source": "synthetic",
+      "message": "listá mis reminders",
+      "expected": { "intent": "reminder.list" },
+      "note": "Listado de reminders."
+    },
+    {
+      "id": "reminder-detail",
+      "source": "synthetic",
+      "message": "mostrame el reminder 7",
+      "expected": {
+        "intent": "reminder.detail",
+        "fields": [{ "field": "targetId", "check": "equals", "value": 7 }]
+      },
+      "note": "Detalle por id."
+    },
+    {
+      "id": "reminder-check",
+      "source": "synthetic",
+      "message": "marcá como hecho el reminder 7",
+      "expected": {
+        "intent": "reminder.check",
+        "fields": [{ "field": "targetId", "check": "equals", "value": 7 }]
+      },
+      "note": "Marcar hecho por id."
+    },
+    {
+      "id": "reminder-pause-context",
+      "source": "synthetic",
+      "message": "pausalo",
+      "history": [
+        { "role": "user", "content": "mostrame el reminder 6" },
+        { "role": "assistant", "content": "#6 tomar agua - diario 09:00 (activo)" }
+      ],
+      "expected": {
+        "intent": "reminder.pause",
+        "fields": [{ "field": "targetId", "check": "equals", "value": 6 }]
+      },
+      "note": "Referencia contextual: el id del reminder está en el historial."
+    },
+    {
+      "id": "reminder-resume",
+      "source": "synthetic",
+      "message": "reanudá el reminder 4",
+      "expected": {
+        "intent": "reminder.resume",
+        "fields": [{ "field": "targetId", "check": "equals", "value": 4 }]
+      },
+      "note": "Reanudar por id."
+    },
+    {
+      "id": "reminder-delete",
+      "source": "synthetic",
+      "message": "eliminá el reminder 9",
+      "expected": {
+        "intent": "reminder.delete",
+        "fields": [{ "field": "targetId", "check": "equals", "value": 9 }]
+      },
+      "note": "Eliminar por id."
+    },
+    {
+      "id": "image-create",
+      "source": "synthetic",
+      "message": "haceme una imagen de un carpincho tomando mate en la playa",
+      "expected": {
+        "intent": "image.create",
+        "fields": [{ "field": "prompt", "check": "nonEmpty" }]
+      },
+      "note": "Generación de imagen."
+    },
+    {
+      "id": "image-create-context-vertical",
+      "source": "synthetic",
+      "message": "otra igual pero vertical",
+      "history": [
+        { "role": "user", "content": "haceme una imagen de un faro al atardecer" },
+        { "role": "assistant", "content": "Imagen generada: faro al atardecer (1024x1024)" }
+      ],
+      "expected": {
+        "intent": "image.create",
+        "fields": [
+          { "field": "prompt", "check": "nonEmpty" },
+          { "field": "size", "check": "equals", "value": "1024x1536" }
+        ]
+      },
+      "note": "Referencia contextual: el prompt sale del historial; 'vertical' -> 1024x1536."
+    },
+    {
+      "id": "image-list",
+      "source": "synthetic",
+      "message": "mostrame las imágenes que generé",
+      "expected": { "intent": "image.list" },
+      "note": "Listado de imágenes."
+    },
+    {
+      "id": "search-realtime-price",
+      "source": "synthetic",
+      "message": "a cuánto cerró el dólar blue hoy?",
+      "expected": {
+        "intent": "search",
+        "fields": [{ "field": "query", "check": "nonEmpty" }]
+      },
+      "note": "Dato del día -> búsqueda externa. El router descarta 'search' sin query."
+    },
+    {
+      "id": "search-vs-question-sports",
+      "source": "synthetic",
+      "message": "quién ganó el partido de Boca anoche?",
+      "expected": {
+        "intent": "search",
+        "fields": [{ "field": "query", "check": "nonEmpty" }]
+      },
+      "note": "Ambiguo pregunta vs búsqueda: depende de información reciente."
+    },
+    {
+      "id": "question-general",
+      "source": "synthetic",
+      "message": "cuál es la diferencia entre un proceso y un hilo?",
+      "expected": { "intent": "question" },
+      "note": "Conocimiento general atemporal -> pregunta, no búsqueda."
+    },
+    {
+      "id": "question-greeting",
+      "source": "synthetic",
+      "message": "buenas, cómo va?",
+      "expected": { "intent": "question", "alsoAccept": ["unknown"] },
+      "note": "Saludo sin pedido: resultado genérico (respuesta conversacional o rama por defecto)."
+    },
+    {
+      "id": "question-own-data-alert",
+      "source": "synthetic",
+      "message": "cuándo era la alerta del dentista?",
+      "dataContext": "[A:2] #23\"Turno dentista\"3h #24\"Pagar la luz\"24h",
+      "expected": { "intent": "question" },
+      "note": "Pregunta sobre datos guardados del usuario: se responde con los datos, no es alert.list ni búsqueda."
+    },
+    {
+      "id": "question-own-data-note",
+      "source": "synthetic",
+      "message": "tengo alguna nota donde haya guardado la patente del auto?",
+      "dataContext": "[N:3] #31\"Patente auto\"[auto] #30\"Receta chimichurri\"[recetas] #28\"Ideas regalo Sofi\"",
+      "expected": { "intent": "question" },
+      "note": "Pregunta sobre datos guardados: ni note.create ni búsqueda externa."
+    },
+    {
+      "id": "translate",
+      "source": "synthetic",
+      "message": "traducime al inglés: mañana no voy a poder ir a la reunión",
+      "expected": {
+        "intent": "translate",
+        "fields": [
+          { "field": "targetLang", "check": "nonEmpty" },
+          { "field": "text", "check": "includes", "value": "reunion" }
+        ]
+      },
+      "note": "Traducción; el texto a traducir debe conservarse en el idioma original."
+    },
+    {
+      "id": "qr-context-link",
+      "source": "synthetic",
+      "message": "generame un qr de ese link",
+      "history": [
+        { "role": "user", "content": "guardá https://react.dev/learn" },
+        { "role": "assistant", "content": "Link guardado con id: #77" }
+      ],
+      "expected": {
+        "intent": "qr.generate",
+        "fields": [
+          {
+            "field": "text",
+            "check": "equals",
+            "value": "https://react.dev/learn",
+            "caseSensitive": true
+          }
+        ]
+      },
+      "note": "Referencia contextual: 'ese link' está en el historial."
+    },
+    {
+      "id": "unknown-task-delete",
+      "source": "synthetic",
+      "message": "borrá la tarea 58",
+      "dataContext": "[T:2] #58\"Comprar los pasaje..\" #57\"Renovar el registr..\"",
+      "expected": { "intent": "unknown", "alsoAccept": ["question"] },
+      "note": "El router no tiene borrado de tareas: debe caer en la rama genérica (o responder como pregunta que no puede), nunca crear o listar."
+    },
+    {
+      "id": "unknown-note-edit",
+      "source": "synthetic",
+      "message": "cambiale el título a la nota 31 por Patente del Corsa",
+      "dataContext": "[N:3] #31\"Patente auto\"[auto] #30\"Receta chimichurri\"[recetas] #28\"Ideas regalo Sofi\"",
+      "expected": { "intent": "unknown", "alsoAccept": ["question"] },
+      "note": "El router no tiene edición de notas: resultado genérico esperado, nunca note.create."
+    }
+  ]
+}
