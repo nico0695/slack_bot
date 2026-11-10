@@ -9,7 +9,7 @@ Entrada REST al mismo assistant que usan Slack y la web: el bridge envía el tex
 | Incluye | Fuera de alcance |
 |---------|------------------|
 | `POST /conversations/assistant` autenticado | Audio, STT, firmware, bridge |
-| Fachada single-shot sobre el processor existente | Historial, repreguntas, confirmación de texto |
+| Fachada single-shot sobre el processor existente | Historial visible o enviado por el cliente (el server guarda un contexto personal corto, §11), repreguntas, confirmación de texto |
 | Texto plano para listas, aviso para contenido no mostrable | SSE/webhook de respuesta, jobs, polling, cancelación |
 | Errores del parser JSON → `400`/`413` (todas las rutas) | Reintentos, idempotencia, exactly-once |
 
@@ -27,9 +27,9 @@ src/modules/conversations/
 src/shared/middleware/errors.ts                        # body-parser → 400/413
 ```
 
-- **Misma ejecución que un DM de Slack:** `processAssistantMessage(message, userId, undefined, false, undefined)`. Sin canal, sin contexto de canal, sin historial, sin `onProgress`. Mismo clasificador, mismos servicios y mismos permisos por usuario.
+- **Misma ejecución que un DM de Slack:** `processAssistantMessage(message, userId, undefined, false, undefined)`. Sin canal, sin contexto de canal, sin historial como parámetro (el processor usa el contexto personal compartido del usuario, §11), sin `onProgress`. Mismo clasificador, mismos servicios y mismos permisos por usuario.
 - **No usa** `ConversationsServices.generateAssistantConversation` (wrapper web): ese camino lee/escribe historial en Redis y usa un canal sintético (`userId.padStart(8, '9')`) que termina guardado en las entidades.
-- La fachada depende sólo de `MessageProcessor`: no escribe en Redis ni emite al socket.
+- La fachada depende sólo de `MessageProcessor`: por sí misma no escribe en Redis ni emite al socket (el processor lee y escribe el contexto personal, §11).
 - `IConversation` suma dos campos opcionales que Slack y la web ignoran: `plainText` (versión texto) y `contentOmitted` (el texto deja afuera contenido no mostrable). Viajan también por el socket web y quedan en el historial del wrapper web, sin uso.
 
 ## 3. Contrato
@@ -172,7 +172,7 @@ Validación por commit: `npx tsc --noEmit`, `npm run lint`, `npx jest`, `npm run
 
 ## 11. Contexto personal compartido y evaluación del clasificador
 
-> Rama `feat/assistant-shared-context`. Reemplaza lo que §1 y §2 dicen sobre "sin historial": el pedido REST sigue sin recibir historial como parámetro, pero el processor ahora lee y escribe el contexto personal del usuario.
+> Rama `feat/assistant-shared-context`. Complementa §1 y §2: el pedido REST no guarda una conversación visible y sigue sin recibir historial como parámetro, pero el processor ahora lee y escribe el contexto personal del usuario.
 
 ### Contexto personal
 

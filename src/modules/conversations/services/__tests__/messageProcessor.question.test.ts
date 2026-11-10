@@ -347,6 +347,38 @@ describe.each([
     expect(JSON.stringify(messages)).not.toContain('anotá que el wifi cambió')
   })
 
+  it.each([
+    ['blank', '   '],
+    ['missing', undefined],
+  ])(
+    'does not load personal records for a channel request with a %s channel id',
+    async (_name, channelId) => {
+      mockAi()
+      mockSavedData()
+
+      const result = await buildProcessor().processAssistantMessage(message, 7, channelId, true, [])
+
+      expect(result.response?.content).toBe(ANSWER)
+      // The classifier may read its own context; only the question fetches are checked
+      ;[
+        alertsServicesMock.getAlertsByUserId,
+        tasksServicesMock.getTasksByUserId,
+        notesServicesMock.getNotesByUserId,
+        linksServicesMock.getLinksByUserId,
+      ].forEach((fetch) => {
+        expect(fetch).toHaveBeenCalledTimes(usesClassifier ? 1 : 0)
+      })
+
+      const data: string = lastAnswerMessages().slice(-2)[0].content
+      ;['ALERTAS', 'TAREAS', 'NOTAS', 'LINKS'].forEach((section) => {
+        expect(data).toContain(`${section} (no disponible)`)
+      })
+      expect(data).not.toContain('pagar la luz')
+      expect(data).not.toContain('clave del wifi')
+      expect(redisRepositoryMock.getAssistantContext).not.toHaveBeenCalled()
+    }
+  )
+
   it('sends at most the last 6 channel turns', async () => {
     mockAi()
     const channelHistory: any[] = Array.from({ length: 9 }, (_item, index) => ({

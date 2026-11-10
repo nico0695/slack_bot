@@ -23,10 +23,36 @@ const DATA_FIELD_MAX_CHARS = 500
 const URL_OR_DATA_URI_REGEX =
   /(https?:\/\/\S+|\bdata:(?:[\w.+-]+\/[\w.+-]+)?(?:;[^\s;,]+)*,[^\s"'<>)\]]*)/gi
 
-// Standard and URL-safe base64: either line-wrapped (MIME/PEM style, 2+ full lines) or a single
-// long run. Prose has spaces and URLs are split out before, so neither reaches these lengths.
-const BASE64_REGEX =
-  /(?:[A-Za-z0-9+/_-]{60,}={0,2}\r?\n){2,}[A-Za-z0-9+/_-]*={0,2}|[A-Za-z0-9+/=_-]{200,}/g
+const HTTP_URL_REGEX = /https?:\/\/\S+/gi
+
+// Base64 candidates (standard and URL-safe): 2+ full lines (MIME/PEM style) plus an optional
+// short last line, or a single long run. The last line is only taken when it fills its line and
+// has a non-letter, so the first word of a following prose line is never eaten.
+const BASE64_CANDIDATE_REGEX =
+  /[A-Za-z0-9+/_-]{60,}={0,2}(?:\r?\n[A-Za-z0-9+/_-]{60,}={0,2})+(?:\r?\n(?=[A-Za-z]*[0-9+/_=-])[A-Za-z0-9+/_-]+={0,2}(?=[ \t]*(?:\r?\n|$)))?|[A-Za-z0-9+/=_-]{200,}/g
+
+const BASE64_DOMINANT_CLASS_RATIO = 0.8
+
+// Tells base64 from other long runs of the same alphabet: separators, words, hex checksums and
+// paths or slugs (mostly one character class). "+" does not show up in those, so it settles it.
+const isBase64Like = (candidate: string): boolean => {
+  const run = candidate.replace(/[\s=]/g, '')
+  const upper = run.replace(/[^A-Z]/g, '').length
+  const lower = run.replace(/[^a-z]/g, '').length
+  const digit = run.replace(/[^0-9]/g, '').length
+  const letters = upper + lower
+
+  if (letters === 0 || letters === run.length) return false
+  if (/^[0-9a-f]+$/i.test(run)) return false
+  if (run.includes('+')) return true
+
+  return Math.max(upper, lower, digit) < BASE64_DOMINANT_CLASS_RATIO * (letters + digit)
+}
+
+const stripBase64 = (text: string): string =>
+  text.replace(BASE64_CANDIDATE_REGEX, (candidate) =>
+    isBase64Like(candidate) ? OMITTED_CONTENT_MARKER : candidate
+  )
 
 export interface IDataContextInput {
   alerts: Alerts[] | null
@@ -68,6 +94,23 @@ const truncateChars = (text: string, maxChars: number): string => {
     .trimEnd()}…`
 }
 
+// Like truncateChars, but a cut that would land inside an http(s) URL moves to before that URL
+const truncateKeepingUrls = (text: string, maxChars: number): string => {
+  const chars = Array.from(text)
+
+  if (chars.length <= maxChars) return text
+  if (maxChars <= 0) return ''
+
+  let cut = chars.slice(0, maxChars - 1).join('').length
+
+  for (const match of text.matchAll(HTTP_URL_REGEX)) {
+    const start = match.index ?? 0
+    if (start < cut && cut < start + match[0].length) cut = start
+  }
+
+  return `${text.slice(0, cut).trimEnd()}…`
+}
+
 const collapseWhitespace = (text: string): string => text.replace(/\s+/g, ' ').trim()
 
 /**
@@ -78,14 +121,14 @@ export const toContextText = (text: string): string => {
     .split(URL_OR_DATA_URI_REGEX)
     .map((part, index) => {
       // Even indexes are plain text, odd ones the captured URL or data URI
-      if (index % 2 === 0) return part.replace(BASE64_REGEX, OMITTED_CONTENT_MARKER)
+      if (index % 2 === 0) return stripBase64(part)
       // http(s) URLs are kept verbatim: long path-style URLs look like base64 runs
       return /^https?:/i.test(part) ? part : OMITTED_CONTENT_MARKER
     })
     .join('')
     .trim()
 
-  return truncateChars(withoutBinary, ASSISTANT_CONTEXT_MAX_ENTRY_CHARS)
+  return truncateKeepingUrls(withoutBinary, ASSISTANT_CONTEXT_MAX_ENTRY_CHARS)
 }
 
 /**
@@ -138,7 +181,7 @@ const formatDataDate = (value: Date | string | null | undefined): string => {
 }
 
 // `whole` fields (urls) are never cut: a partial url is worse than none, so past the limit they
-// are left out
+// are left out. Other fields are cut, but never in the middle of a url they embed
 const buildRecordLine = (id: number, fields: RecordField[]): IRecordLine => {
   const parts = [`- #${id}`]
   let truncated = false
@@ -150,7 +193,7 @@ const buildRecordLine = (id: number, fields: RecordField[]): IRecordLine => {
     if (tooLong) truncated = true
     if (tooLong && whole) return
 
-    const clean = truncateChars(full, DATA_FIELD_MAX_CHARS)
+    const clean = truncateKeepingUrls(full, DATA_FIELD_MAX_CHARS)
     if (clean) parts.push(`${label}: ${clean}`)
   })
 
@@ -216,7 +259,8 @@ const renderDataContext = (sections: IDataSection[], shown: number[]): string =>
 /**
  * Saved-data block for question answering. `null` means the type could not be fetched.
  * Output never exceeds `maxChars` code points; records are dropped whole, never cut.
- * Field values over 500 chars are cut with "…" (urls are left out instead of cut). Whenever a
+ * Field values over 500 chars are cut with "…" (never inside an embedded url; url fields are
+ * left out instead of cut). Whenever a
  * record is dropped, a field is cut or left out, or a type is unavailable, the block ends with
  * DATA_CONTEXT_OMITTED_NOTICE.
  */

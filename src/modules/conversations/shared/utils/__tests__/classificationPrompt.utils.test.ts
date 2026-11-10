@@ -46,6 +46,14 @@ describe('prompts with a dynamic date', () => {
     expect(prompt.trimEnd().endsWith('HOY_ES: <fecha>')).toBe(true)
   })
 
+  it('the classifier prompt points at the HOY_ES line, not at "the last line"', () => {
+    // The dynamic context block is appended after the date line
+    expect(assistantPromptFlagsLite2).toContain(
+      'given in the `HOY_ES:` line after these instructions'
+    )
+    expect(assistantPromptFlagsLite2).not.toContain('last line')
+  })
+
   it('the question prompt is the lite prompt plus the context rules, then the date', () => {
     const liteStable = assistantPromptLite.split('HOY_ES: <fecha>')[0]
 

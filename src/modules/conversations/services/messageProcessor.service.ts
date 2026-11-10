@@ -374,38 +374,51 @@ export default class MessageProcessor {
   /**
    * Answers a question with the recent turns and the saved data of the request scope.
    * `scopeChannelId` null = personal records only; a string = that channel's records.
+   * A channel request without a usable channel id loads nothing: its null scope would expose the
+   * asker's personal records in the channel, so every type is reported as unavailable.
    * Returns null when the AI gives no answer.
    */
   private answerQuestion = async (
     userId: number,
     question: string,
     scopeChannelId: string | null,
+    isChannelContext: boolean,
     history: IRequestHistory
   ): Promise<IConversation | null> => {
     const scope = { channelId: scopeChannelId }
+    const canFetch = !isChannelContext || scopeChannelId !== null
 
     const [turns, alerts, tasks, notes, links] = await Promise.all([
       history.getTurns().catch((): IAssistantContextEntry[] => []),
-      this.fetchQuestionData(
-        'alerts',
-        userId,
-        async () => await this.alertsServices.getAlertsByUserId(userId, { sent: false, ...scope })
-      ),
-      this.fetchQuestionData(
-        'tasks',
-        userId,
-        async () => await this.tasksServices.getTasksByUserId(userId, scope)
-      ),
-      this.fetchQuestionData(
-        'notes',
-        userId,
-        async () => await this.notesServices.getNotesByUserId(userId, scope)
-      ),
-      this.fetchQuestionData(
-        'links',
-        userId,
-        async () => await this.linksServices.getLinksByUserId(userId, scope)
-      ),
+      canFetch
+        ? this.fetchQuestionData(
+            'alerts',
+            userId,
+            async () =>
+              await this.alertsServices.getAlertsByUserId(userId, { sent: false, ...scope })
+          )
+        : null,
+      canFetch
+        ? this.fetchQuestionData(
+            'tasks',
+            userId,
+            async () => await this.tasksServices.getTasksByUserId(userId, scope)
+          )
+        : null,
+      canFetch
+        ? this.fetchQuestionData(
+            'notes',
+            userId,
+            async () => await this.notesServices.getNotesByUserId(userId, scope)
+          )
+        : null,
+      canFetch
+        ? this.fetchQuestionData(
+            'links',
+            userId,
+            async () => await this.linksServices.getLinksByUserId(userId, scope)
+          )
+        : null,
     ])
 
     // Data and turns travel as user/assistant messages, never inside the system prompt
@@ -1490,6 +1503,7 @@ export default class MessageProcessor {
           userId,
           assistantMessage.cleanMessage,
           scopeChannelId,
+          isChannelContext,
           history
         )
 
@@ -2172,7 +2186,13 @@ export default class MessageProcessor {
           return await this.searchAndSummarize(cleanMessage, parsed.query)
         }
         case 'question': {
-          return await this.answerQuestion(userId, cleanMessage, scopeChannelId, history)
+          return await this.answerQuestion(
+            userId,
+            cleanMessage,
+            scopeChannelId,
+            isChannelContext,
+            history
+          )
         }
         case 'translate': {
           const translateText = parsed.text ?? parsed.parameters?.text

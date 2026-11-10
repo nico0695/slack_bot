@@ -165,6 +165,73 @@ describe('toContextText', () => {
     )
   })
 
+  it('keeps the prose line that follows a wrapped base64 block whole', () => {
+    const line = 'QUJDRA+/'.repeat(10).slice(0, 76)
+
+    expect(toContextText(`${line}\n${line}\nGracias por todo`)).toBe(
+      `${OMITTED_CONTENT_MARKER}\nGracias por todo`
+    )
+    expect(toContextText(`${line}\n${line}\nGracias`)).toBe(`${OMITTED_CONTENT_MARKER}\nGracias`)
+  })
+
+  it('keeps a list of hex checksums, one per line', () => {
+    const sums = [
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      '9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08',
+      '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae',
+    ].join('\n')
+
+    expect(toContextText(`sumas:\n${sums}\nlisto`)).toBe(`sumas:\n${sums}\nlisto`)
+  })
+
+  it('keeps consecutive lines of long extension-less paths', () => {
+    const paths = [
+      '/home/deploy/apps/slack-bot/releases/20261110/node_modules/some-package/dist/internal/helpers',
+      '/home/deploy/apps/slack-bot/releases/20261110/src/modules/conversations/shared/utils/README',
+      '/Users/Shared/Projects/slack_bot/src/modules/conversations/services/messageProcessor',
+    ].join('\n')
+
+    expect(toContextText(paths)).toBe(paths)
+  })
+
+  it.each([
+    ['dashes', '-'.repeat(300)],
+    ['underscores', '_'.repeat(300)],
+    ['equal signs', '='.repeat(300)],
+    ['wrapped dashes', `${'-'.repeat(70)}\n${'-'.repeat(70)}`],
+    ['one letter', 'a'.repeat(300)],
+    ['mixed-case letters', 'jaJAjaJA'.repeat(40)],
+  ])('keeps long separator and letter-only runs (%s)', (_name, run) => {
+    expect(toContextText(`antes ${run} después`)).toBe(`antes ${run} después`)
+  })
+
+  it('removes base64 without "+" or "/" (single run and wrapped)', () => {
+    const blob = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk'.repeat(5)
+    const line = blob.slice(0, 76)
+
+    expect(toContextText(`antes ${blob} después`)).toBe(`antes ${OMITTED_CONTENT_MARKER} después`)
+    expect(toContextText(`${line}\n${line}\nfin`)).toBe(`${OMITTED_CONTENT_MARKER}\nfin`)
+  })
+
+  it('backs off to before a URL instead of cutting it', () => {
+    const url = 'https://example.com/docs/page?id=12345'
+    const prefix = 'palabra '.repeat(300).slice(0, ASSISTANT_CONTEXT_MAX_ENTRY_CHARS - 20)
+    const result = toContextText(`${prefix} ${url} y algo más de texto`)
+
+    expect(result).toBe(`${prefix.trimEnd()}…`)
+    expect(len(result)).toBeLessThanOrEqual(ASSISTANT_CONTEXT_MAX_ENTRY_CHARS)
+    expect(result).not.toContain('http')
+  })
+
+  it('keeps a URL that ends before the cut', () => {
+    const url = 'https://example.com/docs/page?id=12345'
+    const result = toContextText(`${url} ${'x'.repeat(ASSISTANT_CONTEXT_MAX_ENTRY_CHARS)}`)
+
+    expect(len(result)).toBe(ASSISTANT_CONTEXT_MAX_ENTRY_CHARS)
+    expect(result.startsWith(`${url} xxx`)).toBe(true)
+    expect(result.endsWith('x…')).toBe(true)
+  })
+
   it('keeps consecutive lines of normal prose', () => {
     const prose = [
       'Primera línea con bastante texto para superar los sesenta caracteres de largo sin problema.',
@@ -425,6 +492,28 @@ describe('buildDataContext', () => {
     expect(output).toContain(`descripción: ${'x'.repeat(499)}…`)
     expect(output.endsWith(DATA_CONTEXT_OMITTED_NOTICE)).toBe(true)
     expect(DATA_CONTEXT_OMITTED_NOTICE).toContain('campos recortados')
+  })
+
+  it('cuts before an embedded url instead of through it and adds the notice', () => {
+    const text = 'x'.repeat(480)
+    const output = buildDataContext({
+      ...empty,
+      alerts: [alert(1, { message: `${text} https://example.com/docs/page?id=12345 more` })],
+    })
+
+    expect(output).toContain(`mensaje: ${text}… |`)
+    expect(output).not.toContain('https://example.co')
+    expect(output.endsWith(DATA_CONTEXT_OMITTED_NOTICE)).toBe(true)
+  })
+
+  it('keeps an embedded url that ends before the cut', () => {
+    const url = 'https://example.com/docs/page?id=12345'
+    const output = buildDataContext({
+      ...empty,
+      notes: [note(1, { description: `${url} ${'x'.repeat(600)}` })],
+    })
+
+    expect(output).toContain(`descripción: ${url} ${'x'.repeat(499 - url.length - 1)}…`)
   })
 
   it('has no notice for a field of exactly the limit', () => {
